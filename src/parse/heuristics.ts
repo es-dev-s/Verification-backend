@@ -145,6 +145,184 @@ function isLikelyBachelorDegree(s: string): boolean {
 const FIELD_TAIL =
   "(?:\\s*(?:\\([^)]{0,40}\\))?(?:\\s*[–—\\-]\\s*|\\s+(?:in|of)\\s+|\\s+)[A-Za-z][A-Za-z0-9\\s&\\-(),./]{2,70})?";
 
+/** Australian VET national / training package qualification code (not unit codes). */
+const TRAINING_PACKAGE_CODE = /^[A-Z]{2,4}\d{5}\b/i;
+
+function cleanProgramField(raw: string | null | undefined): string | null {
+  let s = clean(raw);
+  if (!s) return null;
+  s = s
+    .replace(/\s+Date\s+Completed[:\s].*$/i, "")
+    .replace(/\s+Award\s+Number[-:\s].*$/i, "")
+    .replace(/\s+CGPA\s*:.*$/i, "")
+    .replace(/\s+GPA\s*:.*$/i, "")
+    .replace(/\s+Register\s+Number.*$/i, "")
+    .replace(/\s+Pr\.?\s*$/i, "")
+    .replace(/\s+Program\s*$/i, "")
+    .replace(/^of\s+/i, "")
+    .trim();
+  if (TRAINING_PACKAGE_CODE.test(s)) {
+    s = s.replace(TRAINING_PACKAGE_CODE, "").trim();
+  }
+  if (!s || s.length < 3) return null;
+  if (/^(program|department|faculty|branch|course|name)$/i.test(s)) return null;
+  return s;
+}
+
+/**
+ * Explicit "Qualification:" / "Award:" / "Course:" / "Program:" lines
+ * (common on VET/RTO/TAFE records of results).
+ */
+function extractLabeledQualification(text: string): string | null {
+  const m = text.match(
+    /(?:^|\n)\s*(?:Qualification|Award|Course|Program)\s*:\s*([^\n\r]+)/i,
+  );
+  if (!m?.[1]) return null;
+  return sanitizeDegreeTitle(cleanProgramField(m[1]));
+}
+
+/**
+ * Program name glued before "COURSE NAME" on some transcripts
+ * (student name often mashed onto the front via OCR).
+ */
+function extractProgramBeforeCourseName(text: string): string | null {
+  const m = text.match(
+    /([A-Za-z][A-Za-z\s&]+?Engineering)\s*COURSE\s+NAME/i,
+  );
+  if (!m?.[1]) return null;
+  let s = m[1].trim();
+  // HAMZAPetroleum → HAMZA Petroleum
+  s = s
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]{2,})([A-Z][a-z])/g, "$1 $2");
+  // Drop leading ALL-CAPS name tokens
+  s = s.replace(/^(?:[A-Z]{2,}(?:\s+[A-Z]{2,})*\s+)+/, "").trim();
+  return cleanProgramField(s);
+}
+
+/** Branch / Department / Programme field values printed on transcripts. */
+function extractBranchOrDepartment(text: string): string | null {
+  const labeled = text.match(
+    /(?:^|\n)\s*(?:Branch|Department|Programme|Faculty)\s*[:\-]\s*([^\n\r]+)/i,
+  );
+  const fromLabel = cleanProgramField(labeled?.[1]);
+  if (fromLabel && fromLabel.length >= 4) return fromLabel;
+
+  // Bilingual TR/EN headers: (Program/Department)\n(Materials Science And Engineering Pr.)
+  const bilingual = text.match(
+    /\(\s*Program\s*\/\s*Department\s*\)\s*[\r\n]+\s*\(\s*([^)]+?)\s*\)/i,
+  );
+  const fromBilingual = cleanProgramField(bilingual?.[1]);
+  if (fromBilingual && fromBilingual.length >= 4) return fromBilingual;
+
+  const fromHeader = extractProgramBeforeCourseName(text);
+  if (fromHeader && fromHeader.length >= 8) return fromHeader;
+
+  return null;
+}
+
+/** Academic degree type from bilingual transcripts, e.g. (Bachelor`s Degree). */
+function extractAcademicDegreeType(text: string): string | null {
+  const m = text.match(
+    /\(\s*Type\s+of\s+Academic\s+Degree\s*\)\s*[\r\n]+\s*\(\s*([^)]+?)\s*\)/i,
+  );
+  let s = clean(m?.[1]);
+  if (!s) return null;
+  s = s.replace(/`/g, "'").trim();
+  if (/bachelor/i.test(s)) return s;
+  if (/master|licence|license|associate|doctoral|phd/i.test(s)) return s;
+  return null;
+}
+
+/** Abbreviation from DEGREES AWARDED block (often OCR-mashed with dates). */
+function extractDegreesAwardedAbbrev(text: string): string | null {
+  // Allow glue like "2015B.S.February" (no word boundary before B).
+  const m = text.match(
+    /DEGREES?\s*AWARDED[\s\S]{0,200}?(?:^|[^A-Za-z])(B\.?\s*S\.?|B\.?\s*Sc\.?|B\.?\s*Tech\.?|B\.?\s*Eng\.?|B\.?\s*A\.?|BSc|BTech|BEng)(?![A-Za-z])/i,
+  );
+  if (!m?.[1]) return null;
+  const raw = m[1].replace(/\s+/g, "");
+  if (/^B\.?S\.?$/i.test(raw)) return "B.S.";
+  if (/^B\.?Sc\.?$/i.test(raw) || /^BSc$/i.test(raw)) return "B.Sc.";
+  if (/^B\.?Tech\.?$/i.test(raw) || /^BTech$/i.test(raw)) return "B.Tech.";
+  if (/^B\.?Eng\.?$/i.test(raw) || /^BEng$/i.test(raw)) return "B.Eng.";
+  if (/^B\.?A\.?$/i.test(raw)) return "B.A.";
+  return clean(m[1]);
+}
+
+function composeDegreeAndField(
+  degreePart: string | null,
+  fieldPart: string | null,
+): string | null {
+  // Require a degree/abbrev part — field-only is handled separately.
+  if (!degreePart) return null;
+  if (!fieldPart) return degreePart;
+  const fieldRe = new RegExp(
+    fieldPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    "i",
+  );
+  if (fieldRe.test(degreePart)) return degreePart;
+  if (/\bin\b/i.test(degreePart)) return degreePart;
+  // Prefer "B.S. Petroleum..." over "B.S. in Petroleum..." for short abbrevs
+  if (/^(?:B\.?\s*(?:S|Sc|Tech|Eng|A)\.?|BSc|BTech|BEng)$/i.test(degreePart.trim())) {
+    return `${degreePart} ${fieldPart}`;
+  }
+  return `${degreePart} in ${fieldPart}`;
+}
+
+/**
+ * Transcript-oriented title: labeled quals, bilingual Program/Department,
+ * Branch + B.Tech/B.S., DEGREES AWARDED + department header.
+ */
+function extractTranscriptDegreeTitle(text: string): string | null {
+  const labeled = extractLabeledQualification(text);
+  if (labeled) return labeled;
+
+  const field = extractBranchOrDepartment(text);
+  const academicType = extractAcademicDegreeType(text);
+  const awardedAbbrev = extractDegreesAwardedAbbrev(text);
+
+  const composed =
+    composeDegreeAndField(academicType, field) ??
+    composeDegreeAndField(awardedAbbrev, field);
+  if (composed) {
+    return sanitizeDegreeTitle(composed);
+  }
+
+  // Field-only when the transcript never prints Bachelor/B.Tech/Diploma wording
+  // (otherwise prefer extractDegreeTitle, then enrich with Branch).
+  const hasExplicitDegreeWording =
+    /\bbachelor|b\.?\s*tech|b\.?\s*sc|b\.?\s*eng|\bbs\b|diploma\s+of|advanced\s+diploma|degree\s+of\b/i.test(
+      text,
+    );
+  if (
+    field &&
+    !hasExplicitDegreeWording &&
+    /engineering|technology|science|arts|business|management/i.test(field)
+  ) {
+    return sanitizeDegreeTitle(field);
+  }
+  return null;
+}
+
+function extractDiplomaTitle(text: string): string | null {
+  const space = educationSearchText(text);
+  const patterns: RegExp[] = [
+    /\b((?:Advanced\s+)?Diploma\s+of\s+[A-Za-z][A-Za-z0-9\s&\-(),./]{2,80})/i,
+    /\b((?:Adv\.?\s*)?Diploma\s+in\s+[A-Za-z][A-Za-z0-9\s&\-(),./]{2,80})/i,
+  ];
+  let best: string | null = null;
+  for (const re of patterns) {
+    const m = space.match(re) ?? text.match(re);
+    if (!m?.[1]) continue;
+    let cand = clean(m[1]);
+    if (!cand || cand.length < 8 || cand.length > 120) continue;
+    cand = sanitizeDegreeTitle(cand) ?? cand;
+    if (!best || cand.length > best.length) best = cand;
+  }
+  return best;
+}
+
 function extractDegreeTitle(text: string): string | null {
   const space = educationSearchText(text);
   const patterns: RegExp[] = [
@@ -392,12 +570,28 @@ export function heuristicsEducationFromText(text: string): EducationExtract {
   const extract = emptyEducation();
   if (!text.trim()) return extract;
 
+  // Prefer transcript labels (Qualification / Branch / Program/Department / DEGREES AWARDED)
+  extract.degreeTitle = extractTranscriptDegreeTitle(text);
+
   const isDiplomaOnly =
-    /\badvanced\s+diploma\b/i.test(text) &&
+    /\badvanced\s+diploma\b|\bdiploma\s+of\b/i.test(text) &&
     !/\bbachelor|b\.?\s*sc|b\.?\s*tech|b\.?\s*eng|\bbs\b/i.test(text);
 
-  if (!isDiplomaOnly) {
-    extract.degreeTitle = extractDegreeTitle(text);
+  if (!extract.degreeTitle) {
+    if (isDiplomaOnly) {
+      extract.degreeTitle = extractDiplomaTitle(text);
+    } else {
+      extract.degreeTitle = extractDegreeTitle(text);
+    }
+  }
+
+  // Enrich bare B.Tech / Bachelor of Technology with Branch: field when present
+  if (extract.degreeTitle) {
+    const field = extractBranchOrDepartment(text);
+    const enriched = composeDegreeAndField(extract.degreeTitle, field);
+    if (enriched) {
+      extract.degreeTitle = sanitizeDegreeTitle(enriched) ?? extract.degreeTitle;
+    }
   }
 
   extract.institution = extractInstitution(text);

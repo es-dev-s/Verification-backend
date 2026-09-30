@@ -42,7 +42,9 @@ Rules:
 - Return one entry per distinct award found under Education / Qualifications / Academic background.
 - If the CV lists several degrees (e.g. Bachelor + Master), return ALL of them — never keep only the bachelor's.
 - If two bachelor's appear, include both; set multipleBachelors true on each bachelor entry (or the first).
-- Copy wording as written. Never invent institution, country, or dates.
+- A line labeled "Qualification:", "Award:", "Course:", or "Program:" followed by a value is an explicitly stated degree title (VET/RTO/TAFE as well as university) — use that value; do not leave degreeTitle null.
+- Australian VET titles often start with a training package code (e.g. "ICT60220", "BSB50420"). Strip that leading code and return only the qualification name. Do not confuse these with per-unit codes in a subject table (e.g. "BSBCRT611").
+- Copy wording as written (after stripping a leading training package code). Never invent institution, country, or dates.
 - Never leave truncated titles or unclosed parentheses; omit curly braces / JSON artifacts.
 - country only if stated near that education line (not from work locations).
 - statedDuration only for explicit duration phrases (e.g. "3 years"); otherwise null.
@@ -59,7 +61,16 @@ Text:
 Expected entries (order flexible):
   { degreeLevel: "master", degreeTitle: "M.Sc. Petroleum Engineering", institution: "Suez University", ... }
   { degreeLevel: "bachelor", degreeTitle: "B.Sc. Petroleum Engineering", institution: "METU", ... }
-  { degreeLevel: "advanced_diploma", degreeTitle: "Advanced Diploma of IT", institution: "Bella College Australia", ... }`;
+  { degreeLevel: "advanced_diploma", degreeTitle: "Advanced Diploma of IT", institution: "Bella College Australia", ... }
+
+Example — Australian VET/RTO labeled qualification:
+Text:
+  Qualification: ICT60220 Advanced Diploma of Information Technology
+  BELLA COLLEGE AUSTRALIA
+  Queensland, Australia
+Expected:
+  { degreeLevel: "advanced_diploma", degreeTitle: "Advanced Diploma of Information Technology", institution: "BELLA COLLEGE AUSTRALIA", country: "Australia", ... }
+  (Strip "ICT60220"; do not leave degreeTitle null.)`;
 }
 
 export function educationMultiSystemPrompt(): string {
@@ -96,7 +107,26 @@ Return JSON only matching this schema exactly:
 Per-source hints:
 - CERTIFICATE: Prefer awarded title and issuing institution as printed for the target level.
 - TRANSCRIPT: Prefer program name, institution, and enrollment/session years near the header.
+  Also covers VET/RTO/TAFE records of results — not only university transcripts.
+  Degree/program titles appear under many label spellings — treat all of these as stated degreeTitle
+  (do not leave null when present): Qualification, Award, Course, Program, Programme, Branch,
+  Department, Department/Program, Program/Department, Degrees Awarded, Type of Academic Degree.
+  Combine a degree type/abbrev with the program/branch field when both appear
+  (e.g. "B.S." + "Petroleum and Natural Gas Engineering" → "B.S. Petroleum and Natural Gas Engineering";
+  "Bachelor's Degree" + "Materials Science And Engineering" → "Bachelor's Degree in Materials Science And Engineering";
+  "BACHELOR OF TECHNOLOGY (B.Tech)" + Branch "CIVIL ENGINEERING" → include the branch).
+  On bilingual transcripts, prefer the English parenthetical after Program/Department or Type of Academic Degree.
 - CV: Prefer the education line that matches the target degree level if present.
+
+Explicit qualification labels (stated, not inferred) — especially for TRANSCRIPT sources:
+- If a line is labeled "Qualification:", "Award:", "Course:", "Program:", "Programme:", "Branch:",
+  or "Department:" followed by a value, that value is stated (not inferred). Never return degreeTitle
+  null when such a labeled line exists for the target level.
+- Australian qualifications often prefix a training package / national code (e.g. "ICT60220", "BSB50420")
+  immediately before the title. Strip that leading code and return only the name:
+  "ICT60220 Advanced Diploma of Information Technology" → degreeTitle "Advanced Diploma of Information Technology".
+- Do NOT confuse qualification codes with per-unit codes in a subject/results table (e.g. "BSBCRT611", "ICTNWK612") — those are unrelated.
+- Do NOT invent a title from course/unit lists alone when no award/program/branch line is printed.
 
 Program duration (critical):
 - Near the degree/program title header, look for SESSION YYYY-YYYY, BATCH YYYY-YYYY, or YYYY-YYYY / YYYY – YYYY.
@@ -158,6 +188,41 @@ Expected:
   start = "2018", end = "2022"
   Do NOT take "UK" from a profile sentence about UK consultancy work.
 
+Example E — Australian VET/RTO transcript (target advanced_diploma):
+Text:
+  Record of Results
+  Qualification: ICT60220 Advanced Diploma of Information Technology
+  ...
+  Unit Code Unit Name
+  BSBCRT611 Apply critical thinking for complex problem solving
+  ...
+  BELLA COLLEGE AUSTRALIA
+  Address: ... Spring Hill, Queensland, Australia, 4000
+Expected for that source:
+  degreeTitle = "Advanced Diploma of Information Technology"  (strip leading ICT60220; do NOT null)
+  institution ≈ "BELLA COLLEGE AUSTRALIA"
+  country = "Australia"
+  Do NOT use unit codes like BSBCRT611 as the degree title.
+
+Example F — bilingual transcript Program/Department (target bachelor):
+Text:
+  (Program/Department)
+  (Materials Science And Engineering Pr.)
+  (Type of Academic Degree)
+  (Bachelor's Degree)
+Expected:
+  degreeTitle ≈ "Bachelor's Degree in Materials Science And Engineering"
+  (strip trailing "Pr."; do NOT leave null)
+
+Example G — DEGREES AWARDED + department header (target bachelor):
+Text:
+  ...HAMZAPetroleum and Natural Gas EngineeringCOURSE NAME...
+  DEGREES AWARDED ... B.S. February 08, 2021
+  DEPARTMENT/ PROGRAM
+Expected:
+  degreeTitle ≈ "B.S. Petroleum and Natural Gas Engineering"
+  (combine awarded abbrev with the program name printed before COURSE NAME)
+
 Rules:
 - Include one entry in "sources" for every documentId provided in the user message (even if all fields are null).
 - Echo documentId and documentType exactly as given.
@@ -179,7 +244,7 @@ export function educationSystemPrompt(docType: DocumentTypeLabel): string {
     CERTIFICATE:
       "This is a degree certificate or diploma. Prefer the awarded title and issuing institution as printed on the certificate.",
     TRANSCRIPT:
-      "This is an academic transcript. Prefer program name, institution, and SESSION/BATCH year ranges near the header. Ignore Result Declaration / Date of Issue stamps.",
+      "This is an academic transcript. Prefer program/qualification/branch/department name (including bilingual Program/Department and DEGREES AWARDED), institution, and SESSION/BATCH year ranges near the header. Ignore Result Declaration / Date of Issue stamps.",
     CV: "This is a CV/resume. Prefer the education line matching the target degree level. Do not invent details.",
   };
 
@@ -208,7 +273,8 @@ Return JSON only matching this schema exactly:
 Rules:
 - Target the requested degree level (default bachelor). Ignore other levels unless they are clearly the intended award.
 - If several matching awards appear, take the first and set multipleBachelors to true when applicable.
-- Every value is nullable. Never guess, invent, or normalize institution/degree wording — copy as written.
+- A "Qualification:", "Award:", "Course:", or "Program:" line is an explicitly stated degree title (including VET/RTO/TAFE). Strip a leading Australian training package code (e.g. ICT60220) before returning degreeTitle.
+- Every value is nullable. Never guess, invent, or normalize institution/degree wording — copy as written (after code strip).
 - country only if the document states a country (address, header, seal text). Otherwise null.
 - statedDuration is an explicit duration phrase if present (e.g. "3 years", "6 semesters"); otherwise null.
 - From SESSION/BATCH YYYY-YYYY near the program title, set start/end to those years. Never use Result Declaration / Date of Issue dates as start/end.

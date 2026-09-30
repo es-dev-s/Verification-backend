@@ -53,6 +53,9 @@ export function sanitizeDegreeTitle(
   let s = stripJunkChars(String(value));
   if (!s) return null;
 
+  // Australian VET national / training package code prefix (e.g. ICT60220, BSB50420)
+  s = s.replace(/^[A-Z]{2,4}\d{5}\s+/i, "").trim();
+
   s = stripUnbalancedParens(s);
   s = stripTrailingCutoffStub(s);
 
