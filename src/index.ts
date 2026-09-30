@@ -41,6 +41,7 @@ async function main() {
 
   await app.register(cors, {
     origin: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "X-Client-Id"],
   });
   await app.register(helmet, { contentSecurityPolicy: false });

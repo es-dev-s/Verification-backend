@@ -4,19 +4,24 @@ import { prisma } from "../lib/prisma.js";
 import { acquireParseSlot } from "../lib/rateLimit.js";
 import { computeDuration } from "../parse/duration.js";
 import {
+  heuristicsCvEducationEntries,
   heuristicsEducationMulti,
   heuristicsExperienceFromText,
   heuristicsPerSource,
 } from "../parse/heuristics.js";
 import { mergeEducation } from "../parse/mergeEducation.js";
 import {
+  cvEducationSystemPrompt,
   educationMultiSystemPrompt,
   experienceSystemPrompt,
 } from "../parse/prompts.js";
 import {
+  cvEducationExtractSchema,
   educationExtractSchema,
   educationMultiExtractSchema,
   experienceExtractSchema,
+  type CvEducationEntry,
+  type DegreeLevelLabel,
   type DocumentTypeLabel,
   type EducationExtract,
   type PerSourceEducation,
@@ -40,33 +45,143 @@ const emptyExtract = (): EducationExtract => ({
   multipleBachelors: false,
 });
 
-export async function parseEducation(caseId: string) {
-  const docs = await prisma.document.findMany({
-    where: {
-      caseId,
-      status: "DONE",
-      type: { in: ["CV", "TRANSCRIPT", "CERTIFICATE"] },
-      text: { not: null },
-    },
-  });
+/**
+ * Parse every education entry on a CV, each tagged with a degreeLevel guess.
+ * Does not filter by case.selectedDegreeLevels — callers do that.
+ */
+export async function parseCvEducationEntries(
+  cvText: string,
+): Promise<{ entries: CvEducationEntry[]; fallback: boolean; geminiRaw: unknown }> {
+  const cleaned = correctOcrEducationText(cvText.slice(0, 20_000), "cv").text;
+  let data: unknown;
+  let fallback = false;
 
-  if (!docs.length) {
+  try {
+    await acquireParseSlot(config.parseRpm);
+    const out = await generateJson(
+      `--- CV text ---\n${cleaned}`,
+      cvEducationSystemPrompt(),
+      {
+        deadlineMs: Date.now() + GEMINI_SOFT_DEADLINE_MS,
+        maxTokens: 3072,
+        responseSchema: cvEducationExtractSchema,
+      },
+    );
+    data = out.data;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[parse/cv-education] Gemini failed (${message}) — heuristics fallback`,
+    );
+    data = heuristicsCvEducationEntries(cleaned);
+    fallback = true;
+  }
+
+  let parsed = cvEducationExtractSchema.safeParse(data);
+  if (!parsed.success || !parsed.data.entries.length) {
+    if (!fallback) {
+      console.warn(
+        "[parse/cv-education] empty/invalid Gemini entries — heuristics fallback",
+      );
+    }
+    data = heuristicsCvEducationEntries(cleaned);
+    parsed = cvEducationExtractSchema.safeParse(data);
+    fallback = true;
+  }
+
+  const entries = (parsed.success ? parsed.data.entries : []).map((e) => ({
+    ...sanitizeEducationExtract(e),
+    degreeLevel: e.degreeLevel,
+  }));
+
+  return { entries, fallback, geminiRaw: data };
+}
+
+/** Filter CV multi-entries down to one degree level (first match). */
+export function pickCvEntryForLevel(
+  entries: CvEducationEntry[],
+  degreeLevel: DegreeLevelLabel,
+): EducationExtract | null {
+  const hit = entries.find((e) => e.degreeLevel === degreeLevel);
+  if (!hit) return null;
+  const { degreeLevel: _level, ...rest } = hit;
+  return rest;
+}
+
+export async function parseEducation(
+  caseId: string,
+  degreeLevel: DegreeLevelLabel = "bachelor",
+) {
+  const caseRow = await prisma.case.findUnique({
+    where: { id: caseId },
+    select: { selectedDegreeLevels: true },
+  });
+  if (
+    caseRow?.selectedDegreeLevels?.length &&
+    !caseRow.selectedDegreeLevels.includes(degreeLevel)
+  ) {
     return {
+      qualification: null,
       bachelors: null,
+      degreeLevel,
       fields: {},
       fromCvOnly: false,
-      flags: ["no_documents"],
-      message: "No extracted documents to read",
+      flags: ["level_not_selected"],
+      message: `Degree level "${degreeLevel}" is not in selectedDegreeLevels`,
       geminiRaw: null,
       fallback: false,
     };
   }
 
-  const labeled = docs
+  const docs = await prisma.document.findMany({
+    where: {
+      caseId,
+      status: "DONE",
+      text: { not: null },
+      OR: [
+        { type: "CV" },
+        {
+          type: { in: ["TRANSCRIPT", "CERTIFICATE"] },
+          degreeLevel,
+        },
+        // Legacy single-degree docs stored without degreeLevel → treat as bachelor
+        ...(degreeLevel === "bachelor"
+          ? [
+              {
+                type: {
+                  in: ["TRANSCRIPT", "CERTIFICATE"] as Array<
+                    "TRANSCRIPT" | "CERTIFICATE"
+                  >,
+                },
+                degreeLevel: null,
+              },
+            ]
+          : []),
+      ],
+    },
+  });
+
+  const cvDoc = docs.find((d) => d.type === "CV");
+  const levelDocs = docs.filter((d) => d.type !== "CV");
+
+  if (!cvDoc && !levelDocs.length) {
+    return {
+      qualification: null,
+      bachelors: null,
+      degreeLevel,
+      fields: {},
+      fromCvOnly: false,
+      flags: ["no_documents"],
+      message: "No extracted documents to read for this degree level",
+      geminiRaw: null,
+      fallback: false,
+    };
+  }
+
+  const labeled = levelDocs
     .map((doc) => {
       const raw = (doc.text ?? "").trim();
       if (!raw) return null;
-      // Re-apply OCR cleanup for docs extracted before the corrector existed
       const { text } = correctOcrEducationText(raw, doc.id);
       return {
         documentId: doc.id,
@@ -76,101 +191,127 @@ export async function parseEducation(caseId: string) {
     })
     .filter((d): d is NonNullable<typeof d> => d != null);
 
-  if (!labeled.length) {
-    return {
-      bachelors: null,
-      fields: {},
-      fromCvOnly: false,
-      flags: ["no_text"],
-      message: "No extracted text to read",
-      geminiRaw: null,
-      fallback: false,
-    };
-  }
-
-  await acquireParseSlot(config.parseRpm);
-
-  const userPrompt = labeled
-    .map(
-      (d) =>
-        `=== SOURCE documentId=${d.documentId} documentType=${d.documentType} ===\n${d.text}`,
-    )
-    .join("\n\n");
-
-  let data: Record<string, unknown>;
+  let sources: PerSourceEducation[] = [];
+  let data: Record<string, unknown> = { sources: [] };
   let fallback = false;
   let geminiMeta: { keyUsed?: string; modelUsed?: string } = {};
+  let cvGeminiRaw: unknown = null;
 
-  try {
-    const out = await generateJson(
-      userPrompt,
-      educationMultiSystemPrompt(),
-      {
-        deadlineMs: Date.now() + GEMINI_SOFT_DEADLINE_MS,
-        maxTokens: 2048,
-        responseSchema: educationMultiExtractSchema,
-      },
+  // Transcript / certificate for this level
+  if (labeled.length) {
+    await acquireParseSlot(config.parseRpm);
+    const userPrompt =
+      `Target degreeLevel=${degreeLevel}. Extract only fields for this level.\n\n` +
+      labeled
+        .map(
+          (d) =>
+            `=== SOURCE documentId=${d.documentId} documentType=${d.documentType} ===\n${d.text}`,
+        )
+        .join("\n\n");
+
+    try {
+      const out = await generateJson(
+        userPrompt,
+        educationMultiSystemPrompt(),
+        {
+          deadlineMs: Date.now() + GEMINI_SOFT_DEADLINE_MS,
+          maxTokens: 2048,
+          responseSchema: educationMultiExtractSchema,
+        },
+      );
+      data = out.data;
+      geminiMeta = { keyUsed: out.keyUsed, modelUsed: out.modelUsed };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[parse/education/${degreeLevel}] Gemini failed (${message}) — heuristics fallback`,
+      );
+      data = heuristicsEducationMulti(labeled) as unknown as Record<
+        string,
+        unknown
+      >;
+      fallback = true;
+    }
+
+    const multi = educationMultiExtractSchema.safeParse(data);
+    const byId = new Map(
+      (multi.success ? multi.data.sources : []).map((s) => [s.documentId, s]),
     );
-    data = out.data;
-    geminiMeta = { keyUsed: out.keyUsed, modelUsed: out.modelUsed };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `[parse/education] Gemini failed (${message}) — using heuristics fallback`,
-    );
-    data = heuristicsEducationMulti(labeled) as unknown as Record<
-      string,
-      unknown
-    >;
-    fallback = true;
-  }
 
-  const multi = educationMultiExtractSchema.safeParse(data);
-  const byId = new Map(
-    (multi.success ? multi.data.sources : []).map((s) => [s.documentId, s]),
-  );
-
-  let sources: PerSourceEducation[] = labeled.map((d) => {
-    const raw = byId.get(d.documentId);
-    if (!raw) {
+    sources = labeled.map((d) => {
+      const raw = byId.get(d.documentId);
+      if (!raw) {
+        return {
+          documentId: d.documentId,
+          documentType: d.documentType,
+          extract: emptyExtract(),
+          degreeLevel,
+        };
+      }
+      const parsed = educationExtractSchema.safeParse(raw);
+      const extract = parsed.success ? parsed.data : emptyExtract();
       return {
         documentId: d.documentId,
         documentType: d.documentType,
-        extract: emptyExtract(),
+        extract: sanitizeEducationExtract(extract),
+        degreeLevel,
       };
-    }
-    const parsed = educationExtractSchema.safeParse(raw);
-    const extract = parsed.success ? parsed.data : emptyExtract();
-    return {
-      documentId: d.documentId,
-      documentType: d.documentType,
-      extract: sanitizeEducationExtract(extract),
-    };
-  });
+    });
 
-  // If Gemini returned empty/unusable sources, fall back to heuristics
-  const anyValue = sources.some((s) =>
-    Boolean(
-      s.extract.degreeTitle ||
-        s.extract.institution ||
-        s.extract.country ||
-        s.extract.start ||
-        s.extract.end,
-    ),
-  );
-  if (!anyValue) {
-    console.warn(
-      "[parse/education] empty Gemini fields — heuristics fallback",
+    const anyValue = sources.some((s) =>
+      Boolean(
+        s.extract.degreeTitle ||
+          s.extract.institution ||
+          s.extract.country ||
+          s.extract.start ||
+          s.extract.end,
+      ),
     );
-    sources = heuristicsPerSource(labeled).map((s) => ({
-      ...s,
-      extract: sanitizeEducationExtract(s.extract),
-    }));
-    data = heuristicsEducationMulti(labeled) as unknown as Record<
-      string,
-      unknown
-    >;
-    fallback = true;
+    if (!anyValue) {
+      console.warn(
+        `[parse/education/${degreeLevel}] empty Gemini fields — heuristics fallback`,
+      );
+      sources = heuristicsPerSource(labeled).map((s) => ({
+        ...s,
+        extract: sanitizeEducationExtract(s.extract),
+        degreeLevel,
+      }));
+      data = heuristicsEducationMulti(labeled) as unknown as Record<
+        string,
+        unknown
+      >;
+      fallback = true;
+    }
+  }
+
+  // CV contribution: multi-entry parse, keep only this degreeLevel
+  if (cvDoc?.text?.trim()) {
+    const cvParsed = await parseCvEducationEntries(cvDoc.text);
+    cvGeminiRaw = cvParsed.geminiRaw;
+    if (cvParsed.fallback) fallback = true;
+    const cvExtract = pickCvEntryForLevel(cvParsed.entries, degreeLevel);
+    if (cvExtract) {
+      sources.push({
+        documentId: cvDoc.id,
+        documentType: "CV",
+        extract: sanitizeEducationExtract(cvExtract),
+        degreeLevel,
+      });
+    }
+  }
+
+  if (!sources.length) {
+    return {
+      qualification: null,
+      bachelors: null,
+      degreeLevel,
+      fields: {},
+      fromCvOnly: false,
+      flags: ["no_text"],
+      message: `No usable education text for ${degreeLevel}`,
+      geminiRaw: { levelDocs: data, cv: cvGeminiRaw },
+      fallback,
+    };
   }
 
   const merged = mergeEducation(sources);
@@ -179,27 +320,24 @@ export async function parseEducation(caseId: string) {
       ? Number(merged.fields.durationYears.value)
       : null;
 
-  await prisma.bachelors.upsert({
-    where: { caseId },
+  const qualificationData = {
+    degreeTitle: merged.fields.degreeTitle.value,
+    institution: merged.fields.institution.value,
+    country: merged.fields.country.value,
+    durationYears: Number.isFinite(durationYears as number)
+      ? (durationYears as number)
+      : null,
+    durationCalculated: merged.durationCalculated,
+  };
+
+  await prisma.qualification.upsert({
+    where: { caseId_degreeLevel: { caseId, degreeLevel } },
     create: {
       caseId,
-      degreeTitle: merged.fields.degreeTitle.value,
-      institution: merged.fields.institution.value,
-      country: merged.fields.country.value,
-      durationYears: Number.isFinite(durationYears as number)
-        ? (durationYears as number)
-        : null,
-      durationCalculated: merged.durationCalculated,
+      degreeLevel,
+      ...qualificationData,
     },
-    update: {
-      degreeTitle: merged.fields.degreeTitle.value,
-      institution: merged.fields.institution.value,
-      country: merged.fields.country.value,
-      durationYears: Number.isFinite(durationYears as number)
-        ? (durationYears as number)
-        : null,
-      durationCalculated: merged.durationCalculated,
-    },
+    update: qualificationData,
   });
 
   const fieldEntries = Object.entries(merged.fields) as Array<
@@ -208,10 +346,17 @@ export async function parseEducation(caseId: string) {
 
   for (const [field, meta] of fieldEntries) {
     await prisma.fieldSource.upsert({
-      where: { caseId_field: { caseId, field } },
+      where: {
+        caseId_field_degreeLevel: {
+          caseId,
+          field,
+          degreeLevel,
+        },
+      },
       create: {
         caseId,
         field,
+        degreeLevel,
         sourceDocumentId: meta.sourceDocumentId,
         extractedValue: meta.value,
         finalValue: meta.value,
@@ -228,25 +373,26 @@ export async function parseEducation(caseId: string) {
     });
   }
 
+  const block = {
+    ...qualificationData,
+    durationYears: qualificationData.durationYears,
+  };
+
   return {
-    bachelors: {
-      degreeTitle: merged.fields.degreeTitle.value,
-      institution: merged.fields.institution.value,
-      country: merged.fields.country.value,
-      durationYears: Number.isFinite(durationYears as number)
-        ? durationYears
-        : null,
-      durationCalculated: merged.durationCalculated,
-    },
+    qualification: { degreeLevel, ...block },
+    /** @deprecated Compat for single-bachelor UI — same as qualification when level is bachelor */
+    bachelors: degreeLevel === "bachelor" ? block : null,
+    degreeLevel,
     fields: merged.fields,
     fromCvOnly: merged.fromCvOnly,
     flags: fallback ? [...merged.flags, "heuristics_fallback"] : merged.flags,
-    geminiRaw: data,
+    geminiRaw: { levelDocs: data, cv: cvGeminiRaw },
     fallback,
     geminiMeta,
     perSource: sources.map((s) => ({
       documentId: s.documentId,
       documentType: s.documentType,
+      degreeLevel: s.degreeLevel ?? degreeLevel,
       extract: s.extract,
       duration: computeDuration({
         statedDuration: s.extract.statedDuration,

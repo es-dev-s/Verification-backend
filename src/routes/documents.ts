@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { DocumentType } from "@prisma/client";
+import { DegreeLevel, DocumentType } from "@prisma/client";
 import { config } from "../config.js";
 import { deleteBlob, sha256, storeBlob } from "../lib/blob.js";
 import { detectFormatFromBytes } from "../lib/formats.js";
@@ -7,6 +7,29 @@ import { prisma } from "../lib/prisma.js";
 import { getExtractQueue } from "../lib/queues.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
 import { markReadsStale } from "../workers/extract.js";
+
+const DEGREE_LEVELS = new Set<string>(Object.values(DegreeLevel));
+
+function fieldValue(
+  fields: Record<string, { value?: string } | Array<{ value?: string }> | undefined>,
+  ...keys: string[]
+): string {
+  for (const key of keys) {
+    const t = fields[key];
+    if (!t) continue;
+    if (Array.isArray(t)) return String(t[0]?.value ?? "");
+    return String(t.value ?? "");
+  }
+  return "";
+}
+
+function parseDegreeLevel(raw: string): DegreeLevel | null {
+  const normalized = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (!normalized) return null;
+  // Accept UI labels: "Advanced Diploma" → advanced_diploma
+  if (DEGREE_LEVELS.has(normalized)) return normalized as DegreeLevel;
+  return null;
+}
 
 export const documentRoutes: FastifyPluginAsync = async (app) => {
   app.post("/cases/:id/documents", async (req, reply) => {
@@ -36,9 +59,9 @@ export const documentRoutes: FastifyPluginAsync = async (app) => {
         .send({ error: "Too many jobs in flight for this case" });
     }
 
-    const queryType = String(
-      (req.query as { type?: string }).type ?? "",
-    ).toUpperCase();
+    const query = req.query as { type?: string; degreeLevel?: string };
+    const queryType = String(query.type ?? "").toUpperCase();
+    const queryDegreeLevel = String(query.degreeLevel ?? "");
 
     const file = await req.file();
     if (!file) {
@@ -49,19 +72,43 @@ export const documentRoutes: FastifyPluginAsync = async (app) => {
       string,
       { value?: string } | Array<{ value?: string }> | undefined
     >;
-    const fieldTypeRaw = (() => {
-      const t = fields.type ?? fields.documentType;
-      if (!t) return "";
-      if (Array.isArray(t)) return String(t[0]?.value ?? "");
-      return String(t.value ?? "");
-    })();
-    const typeRaw = (queryType || fieldTypeRaw).toUpperCase();
+    const typeRaw = (
+      queryType || fieldValue(fields, "type", "documentType", "docType")
+    ).toUpperCase();
     if (!["CV", "TRANSCRIPT", "CERTIFICATE"].includes(typeRaw)) {
       return reply
         .code(400)
         .send({ error: "type must be CV, Transcript, or Certificate" });
     }
     const type = typeRaw as DocumentType;
+
+    const degreeLevelRaw =
+      queryDegreeLevel || fieldValue(fields, "degreeLevel", "degree_level");
+    let degreeLevel: DegreeLevel | null = parseDegreeLevel(degreeLevelRaw);
+
+    if (type === "CV") {
+      if (degreeLevelRaw.trim()) {
+        return reply.code(400).send({
+          error: "degreeLevel must be omitted for CV uploads",
+        });
+      }
+      degreeLevel = null;
+    } else {
+      // TRANSCRIPT / CERTIFICATE require a selected degree level
+      if (!degreeLevel) {
+        return reply.code(400).send({
+          error:
+            "degreeLevel is required for Transcript and Certificate (diploma | advanced_diploma | bachelor | master | phd)",
+        });
+      }
+      const selected = caseRow.selectedDegreeLevels ?? [];
+      if (!selected.includes(degreeLevel)) {
+        return reply.code(400).send({
+          error: `degreeLevel "${degreeLevel}" is not in this case's selectedDegreeLevels`,
+          selectedDegreeLevels: selected,
+        });
+      }
+    }
 
     const chunks: Buffer[] = [];
     let total = 0;
@@ -89,21 +136,25 @@ export const documentRoutes: FastifyPluginAsync = async (app) => {
 
     const hash = sha256(bytes);
 
-    // Keep only the latest file per type on a case — remove prior CV/Transcript/Certificate.
-    const previous = await prisma.document.findMany({
-      where: { caseId, type },
-      select: { id: true },
-    });
-    if (previous.length) {
-      const ids = previous.map((d) => d.id);
-      await prisma.document.deleteMany({ where: { id: { in: ids } } });
-      await Promise.all(ids.map((id) => deleteBlob(id).catch(() => undefined)));
+    // CV stays singular — replace prior CV(s). Transcript/certificate keep
+    // multiple ordered files per degree level (multi-page photos).
+    if (type === "CV") {
+      const previous = await prisma.document.findMany({
+        where: { caseId, type: "CV" },
+        select: { id: true },
+      });
+      if (previous.length) {
+        const ids = previous.map((d) => d.id);
+        await prisma.document.deleteMany({ where: { id: { in: ids } } });
+        await Promise.all(ids.map((id) => deleteBlob(id).catch(() => undefined)));
+      }
     }
 
     const doc = await prisma.document.create({
       data: {
         caseId,
         type,
+        degreeLevel,
         originalName: file.filename || `upload.${format.toLowerCase()}`,
         format,
         sha256: hash,

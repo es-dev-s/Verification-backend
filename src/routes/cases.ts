@@ -1,12 +1,26 @@
 import type { FastifyPluginAsync } from "fastify";
+import { DegreeLevel } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 
-const occupationBody = z.object({
+const degreeLevelSchema = z.nativeEnum(DegreeLevel);
+
+const patchBody = z.object({
   targetOccupation: z.string().min(1).max(200).nullable().optional(),
+  selectedDegreeLevels: z.array(degreeLevelSchema).optional(),
+});
+
+const qualificationDraftSchema = z.object({
+  degreeLevel: degreeLevelSchema,
+  degreeTitle: z.string().nullable().optional(),
+  institution: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  durationYears: z.number().nullable().optional(),
+  durationCalculated: z.boolean().optional(),
 });
 
 const draftBody = z.object({
+  /** Legacy single-block shape — mapped to Qualification bachelor when present. */
   bachelors: z
     .object({
       degreeTitle: z.string().nullable().optional(),
@@ -16,6 +30,7 @@ const draftBody = z.object({
       durationCalculated: z.boolean().optional(),
     })
     .optional(),
+  qualifications: z.array(qualificationDraftSchema).optional(),
   experienceRows: z
     .array(
       z.object({
@@ -30,10 +45,141 @@ const draftBody = z.object({
       }),
     )
     .optional(),
+  /** Legacy flat map — applied at bachelor when no degreeLevel entries are sent. */
   fieldFinals: z
     .record(z.string(), z.string().nullable())
     .optional(),
+  /** Preferred: per-level field finals. */
+  fieldFinalEntries: z
+    .array(
+      z.object({
+        field: z.string(),
+        degreeLevel: degreeLevelSchema,
+        finalValue: z.string().nullable(),
+      }),
+    )
+    .optional(),
 });
+
+async function upsertFieldFinals(
+  caseId: string,
+  body: z.infer<typeof draftBody>,
+) {
+  if (body.fieldFinalEntries?.length) {
+    for (const entry of body.fieldFinalEntries) {
+      await prisma.fieldSource.upsert({
+        where: {
+          caseId_field_degreeLevel: {
+            caseId,
+            field: entry.field,
+            degreeLevel: entry.degreeLevel,
+          },
+        },
+        create: {
+          caseId,
+          field: entry.field,
+          degreeLevel: entry.degreeLevel,
+          finalValue: entry.finalValue,
+          extractedValue: entry.finalValue,
+        },
+        update: { finalValue: entry.finalValue },
+      });
+    }
+    return;
+  }
+  if (!body.fieldFinals) return;
+  for (const [field, finalValue] of Object.entries(body.fieldFinals)) {
+    await prisma.fieldSource.upsert({
+      where: {
+        caseId_field_degreeLevel: {
+          caseId,
+          field,
+          degreeLevel: "bachelor",
+        },
+      },
+      create: {
+        caseId,
+        field,
+        degreeLevel: "bachelor",
+        finalValue,
+        extractedValue: finalValue,
+      },
+      update: { finalValue },
+    });
+  }
+}
+
+async function upsertQualifications(
+  caseId: string,
+  body: z.infer<typeof draftBody>,
+) {
+  const rows: z.infer<typeof qualificationDraftSchema>[] = [
+    ...(body.qualifications ?? []),
+  ];
+  if (body.bachelors && !rows.some((r) => r.degreeLevel === "bachelor")) {
+    rows.push({ degreeLevel: "bachelor", ...body.bachelors });
+  }
+  for (const q of rows) {
+    await prisma.qualification.upsert({
+      where: {
+        caseId_degreeLevel: { caseId, degreeLevel: q.degreeLevel },
+      },
+      create: {
+        caseId,
+        degreeLevel: q.degreeLevel,
+        degreeTitle: q.degreeTitle ?? null,
+        institution: q.institution ?? null,
+        country: q.country ?? null,
+        durationYears: q.durationYears ?? null,
+        durationCalculated: q.durationCalculated ?? false,
+      },
+      update: {
+        degreeTitle: q.degreeTitle ?? null,
+        institution: q.institution ?? null,
+        country: q.country ?? null,
+        durationYears: q.durationYears ?? null,
+        durationCalculated: q.durationCalculated ?? false,
+      },
+    });
+  }
+}
+
+function caseInclude() {
+  return {
+    documents: { orderBy: { createdAt: "asc" as const } },
+    qualifications: { orderBy: { degreeLevel: "asc" as const } },
+    experienceRows: { orderBy: { sortOrder: "asc" as const } },
+    fieldSources: true,
+    readJobs: {
+      orderBy: { updatedAt: "desc" as const },
+      take: 20,
+    },
+  };
+}
+
+/** Temporary compat: expose bachelor Qualification as `bachelors` for existing UI. */
+function withLegacyBachelors<T extends { qualifications: Array<{
+  degreeLevel: DegreeLevel;
+  degreeTitle: string | null;
+  institution: string | null;
+  country: string | null;
+  durationYears: number | null;
+  durationCalculated: boolean;
+}> }>(row: T) {
+  const bachelor = row.qualifications.find((q) => q.degreeLevel === "bachelor");
+  return {
+    ...row,
+    bachelors: bachelor
+      ? {
+          degreeTitle: bachelor.degreeTitle,
+          institution: bachelor.institution,
+          country: bachelor.country,
+          durationYears: bachelor.durationYears,
+          durationCalculated: bachelor.durationCalculated,
+        }
+      : null,
+  };
+}
 
 export const caseRoutes: FastifyPluginAsync = async (app) => {
   app.post("/cases", async (req, reply) => {
@@ -48,24 +194,15 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     const row = await prisma.case.findFirst({
       where: { id, clientId: req.clientId },
-      include: {
-        documents: { orderBy: { createdAt: "asc" } },
-        bachelors: true,
-        experienceRows: { orderBy: { sortOrder: "asc" } },
-        fieldSources: true,
-        readJobs: {
-          orderBy: { updatedAt: "desc" },
-          take: 20,
-        },
-      },
+      include: caseInclude(),
     });
     if (!row) return reply.code(404).send({ error: "Case not found" });
-    return row;
+    return withLegacyBachelors(row);
   });
 
   app.patch("/cases/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const body = occupationBody.parse(req.body);
+    const body = patchBody.parse(req.body);
     const existing = await prisma.case.findFirst({
       where: { id, clientId: req.clientId },
     });
@@ -78,6 +215,10 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
           body.targetOccupation === undefined
             ? existing.targetOccupation
             : body.targetOccupation,
+        selectedDegreeLevels:
+          body.selectedDegreeLevels === undefined
+            ? existing.selectedDegreeLevels
+            : body.selectedDegreeLevels,
       },
     });
     return updated;
@@ -96,26 +237,7 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
       data: { draftJson: body },
     });
 
-    if (body.bachelors) {
-      await prisma.bachelors.upsert({
-        where: { caseId: id },
-        create: {
-          caseId: id,
-          degreeTitle: body.bachelors.degreeTitle ?? null,
-          institution: body.bachelors.institution ?? null,
-          country: body.bachelors.country ?? null,
-          durationYears: body.bachelors.durationYears ?? null,
-          durationCalculated: body.bachelors.durationCalculated ?? false,
-        },
-        update: {
-          degreeTitle: body.bachelors.degreeTitle ?? null,
-          institution: body.bachelors.institution ?? null,
-          country: body.bachelors.country ?? null,
-          durationYears: body.bachelors.durationYears ?? null,
-          durationCalculated: body.bachelors.durationCalculated ?? false,
-        },
-      });
-    }
+    await upsertQualifications(id, body);
 
     if (body.experienceRows) {
       await prisma.experienceRow.deleteMany({ where: { caseId: id } });
@@ -136,20 +258,7 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    if (body.fieldFinals) {
-      for (const [field, finalValue] of Object.entries(body.fieldFinals)) {
-        await prisma.fieldSource.upsert({
-          where: { caseId_field: { caseId: id, field } },
-          create: {
-            caseId: id,
-            field,
-            finalValue,
-            extractedValue: finalValue,
-          },
-          update: { finalValue },
-        });
-      }
-    }
+    await upsertFieldFinals(id, body);
 
     return { ok: true };
   });
@@ -167,26 +276,7 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
       data: { draftJson: body, status: "CONFIRMED" },
     });
 
-    if (body.bachelors) {
-      await prisma.bachelors.upsert({
-        where: { caseId: id },
-        create: {
-          caseId: id,
-          degreeTitle: body.bachelors.degreeTitle ?? null,
-          institution: body.bachelors.institution ?? null,
-          country: body.bachelors.country ?? null,
-          durationYears: body.bachelors.durationYears ?? null,
-          durationCalculated: body.bachelors.durationCalculated ?? false,
-        },
-        update: {
-          degreeTitle: body.bachelors.degreeTitle ?? null,
-          institution: body.bachelors.institution ?? null,
-          country: body.bachelors.country ?? null,
-          durationYears: body.bachelors.durationYears ?? null,
-          durationCalculated: body.bachelors.durationCalculated ?? false,
-        },
-      });
-    }
+    await upsertQualifications(id, body);
 
     if (body.experienceRows) {
       await prisma.experienceRow.deleteMany({ where: { caseId: id } });
@@ -207,30 +297,18 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    if (body.fieldFinals) {
-      for (const [field, finalValue] of Object.entries(body.fieldFinals)) {
-        await prisma.fieldSource.upsert({
-          where: { caseId_field: { caseId: id, field } },
-          create: {
-            caseId: id,
-            field,
-            finalValue,
-            extractedValue: finalValue,
-          },
-          update: { finalValue },
-        });
-      }
-    }
+    await upsertFieldFinals(id, body);
+
+    // Clear extracted text after confirm (retention) — all docs on the case
+    await prisma.document.updateMany({
+      where: { caseId: id },
+      data: { text: null },
+    });
 
     const updated = await prisma.case.findUnique({
       where: { id },
-      include: {
-        documents: true,
-        bachelors: true,
-        experienceRows: { orderBy: { sortOrder: "asc" } },
-        fieldSources: true,
-      },
+      include: caseInclude(),
     });
-    return updated;
+    return updated ? withLegacyBachelors(updated) : updated;
   });
 };

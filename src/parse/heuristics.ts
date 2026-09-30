@@ -3,6 +3,9 @@
  * Best-effort only — never invent values beyond pattern matches.
  */
 import type {
+  CvEducationEntry,
+  CvEducationExtract,
+  DegreeLevelLabel,
   DocumentTypeLabel,
   EducationExtract,
   EducationMultiExtract,
@@ -406,6 +409,77 @@ export function heuristicsEducationFromText(text: string): EducationExtract {
   extract.statedDuration = years.statedDuration;
 
   return extract;
+}
+
+function guessDegreeLevel(line: string): DegreeLevelLabel | null {
+  if (/\b(ph\.?\s*d|doctorate|doctor\s+of\s+philosophy|dphil|edd)\b/i.test(line)) {
+    return "phd";
+  }
+  if (
+    /\b(master|m\.?\s*sc|msc|m\.?\s*eng|mba|mphil|postgraduate)\b/i.test(line)
+  ) {
+    return "master";
+  }
+  if (/\badvanced\s+diploma|adv\.?\s*diploma|graduate\s+diploma\b/i.test(line)) {
+    return "advanced_diploma";
+  }
+  if (
+    /\b(bachelor|b\.?\s*sc|bsc|b\.?\s*tech|b\.?\s*eng|beng|undergraduate|\bbs\b|\bba\b)\b/i.test(
+      line,
+    )
+  ) {
+    return "bachelor";
+  }
+  if (/\bdiploma\b/i.test(line)) return "diploma";
+  return null;
+}
+
+/**
+ * Best-effort multi-entry CV education parse (heuristics fallback).
+ * Returns every detectable award line tagged with a degreeLevel guess.
+ */
+export function heuristicsCvEducationEntries(text: string): CvEducationExtract {
+  const entries: CvEducationEntry[] = [];
+  if (!text.trim()) return { entries };
+
+  const eduBlock =
+    text.match(
+      /(?:^|\n)\s*(?:education|qualifications|academic\s+background|academic\s+information)\b[:\s]*([\s\S]{20,5000}?)(?=\n\s*(?:experience|work\s+history|employment|skills|technical|projects|certifications|languages|references)\b|$)/i,
+    )?.[1] ?? text;
+
+  const lines = eduBlock
+    .split(/\n+/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter((l) => l.length > 4);
+
+  for (const line of lines) {
+    const level = guessDegreeLevel(line);
+    if (!level) continue;
+    const base = heuristicsEducationFromText(line);
+    // Prefer title from the line itself when extractDegreeTitle works on the snippet
+    if (!base.degreeTitle) {
+      base.degreeTitle = sanitizeDegreeTitle(line.slice(0, 120));
+    }
+    if (!base.degreeTitle && !base.institution) continue;
+    entries.push({
+      ...base,
+      degreeLevel: level,
+      multipleBachelors: false,
+    });
+  }
+
+  // Fallback: single bachelor extract from full text if nothing line-matched
+  if (!entries.length) {
+    const one = heuristicsEducationFromText(text);
+    if (one.degreeTitle || one.institution) {
+      entries.push({
+        ...one,
+        degreeLevel: guessDegreeLevel(text) ?? "bachelor",
+      });
+    }
+  }
+
+  return { entries };
 }
 
 export function heuristicsEducationMulti(

@@ -44,97 +44,122 @@ enum ReadJobStatus {
   FAILED
 }
 
-model Case {
-  id                String   @id @default(cuid())
-  clientId          String
-  targetOccupation  String?
-  status            CaseStatus @default(DRAFT)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+/// Selected / document-scoped education level. Null on CV documents and experience read jobs.
+enum DegreeLevel {
+  diploma
+  advanced_diploma
+  bachelor
+  master
+  phd
+}
 
-  documents     Document[]
-  readJobs      ReadJob[]
+model Case {
+  id                   String     @id @default(cuid())
+  clientId             String
+  targetOccupation     String?
+  status               CaseStatus @default(DRAFT)
+  /// User-selected degree levels for this case (ordered preference left to UI).
+  selectedDegreeLevels DegreeLevel[] @default([])
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  documents      Document[]
+  readJobs       ReadJob[]
   experienceRows ExperienceRow[]
-  bachelors     Bachelors?
-  fieldSources  FieldSource[]
-  draftJson     Json?
+  qualifications Qualification[]
+  fieldSources   FieldSource[]
+  draftJson      Json?
 
   @@index([clientId])
 }
 
 model Document {
-  id                String         @id @default(cuid())
-  caseId            String
-  type              DocumentType
-  originalName      String
-  format            DocumentFormat
-  sha256            String
-  status            DocumentStatus @default(QUEUED)
-  error             String?
-  text              String?
-  extractionMethod  String?
-  ocrConfidence     Float?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id               String         @id @default(cuid())
+  caseId           String
+  /// Document kind (CV | TRANSCRIPT | CERTIFICATE). Existing column name `type` — same role as "docType" in the multi-degree plan.
+  type             DocumentType
+  /// Null for CV. Required for TRANSCRIPT / CERTIFICATE once multi-degree uploads are wired.
+  degreeLevel      DegreeLevel?
+  originalName     String
+  format           DocumentFormat
+  sha256           String
+  status           DocumentStatus @default(QUEUED)
+  error            String?
+  text             String?
+  extractionMethod String?
+  ocrConfidence    Float?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  case          Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  fieldSources  FieldSource[]
+  case         Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  fieldSources FieldSource[]
 
   @@unique([caseId, sha256])
   @@index([caseId])
+  @@index([caseId, type, degreeLevel])
   @@index([status])
 }
 
 model ReadJob {
-  id         String        @id
-  caseId     String
-  section    ReadSection
-  inputHash  String
-  status     ReadJobStatus @default(QUEUED)
-  resultJson Json?
-  error      String?
-  stale      Boolean       @default(false)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id          String        @id
+  caseId      String
+  section     ReadSection
+  /// Set for EDUCATION jobs (one job per degree level). Null for EXPERIENCE.
+  degreeLevel DegreeLevel?
+  inputHash   String
+  status      ReadJobStatus @default(QUEUED)
+  resultJson  Json?
+  error       String?
+  stale       Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
-  @@index([caseId, section])
+  @@index([caseId, section, degreeLevel])
   @@index([status])
 }
 
 model ExperienceRow {
-  id                   String  @id @default(cuid())
-  caseId               String
-  employer             String?
-  title                String?
-  start                String?
-  end                  String?
-  statedDurationYears  Float?
-  domainSuggested      Boolean?
-  domainFinal          Boolean?
-  sortOrder            Int     @default(0)
+  id                  String   @id @default(cuid())
+  caseId              String
+  employer            String?
+  title               String?
+  start               String?
+  end                 String?
+  statedDurationYears Float?
+  domainSuggested     Boolean?
+  domainFinal         Boolean?
+  sortOrder           Int      @default(0)
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@index([caseId])
 }
 
-model Bachelors {
-  caseId             String  @id
+/// One education qualification block per selected degree level on a case.
+model Qualification {
+  id                 String      @id @default(cuid())
+  caseId             String
+  degreeLevel        DegreeLevel
   degreeTitle        String?
   institution        String?
   country            String?
   durationYears      Float?
-  durationCalculated Boolean @default(false)
+  durationCalculated Boolean     @default(false)
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, degreeLevel])
+  @@index([caseId])
 }
 
 model FieldSource {
-  id               String  @id @default(cuid())
+  id               String       @id @default(cuid())
   caseId           String
   field            String
+  /// Education field sources are scoped per degree level. Null reserved for non-level fields if added later.
+  degreeLevel      DegreeLevel?
   sourceDocumentId String?
   extractedValue   String?
   finalValue       String?
@@ -144,6 +169,7 @@ model FieldSource {
   case           Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
   sourceDocument Document? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
 
-  @@unique([caseId, field])
+  @@unique([caseId, field, degreeLevel])
   @@index([caseId])
+  @@index([caseId, degreeLevel])
 }

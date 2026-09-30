@@ -1,10 +1,72 @@
 import type { DocumentTypeLabel } from "./schemas.js";
 
+/**
+ * CV-only: extract every degree/diploma entry found, each tagged with a degreeLevel guess.
+ * Server filters to the case's selected levels later — do not drop entries here.
+ */
+export function cvEducationSystemPrompt(): string {
+  return `You extract ALL education / qualification entries from a CV/resume plain text.
+
+Return JSON only matching this schema exactly:
+{
+  "entries": [
+    {
+      "degreeLevel": "diploma" | "advanced_diploma" | "bachelor" | "master" | "phd",
+      "degreeTitle": string|null,
+      "institution": string|null,
+      "country": string|null,
+      "start": string|null,
+      "end": string|null,
+      "statedDuration": string|null,
+      "multipleBachelors": boolean,
+      "confidence": {
+        "degreeTitle": number|null,
+        "institution": number|null,
+        "country": number|null,
+        "start": number|null,
+        "end": number|null,
+        "statedDuration": number|null
+      }
+    }
+  ]
+}
+
+degreeLevel mapping (use the best match for each entry):
+- "PhD", "Doctor of Philosophy", "DPhil", "EdD" → phd
+- "Master", "M.Sc", "MSc", "M.Eng", "MBA", "MPhil" → master
+- "Bachelor", "B.Sc", "BSc", "B.Eng", "B.Tech", "BA", "BS", "undergraduate degree" → bachelor
+- "Advanced Diploma", "Adv. Diploma", "Graduate Diploma" (when clearly advanced diploma) → advanced_diploma
+- "Diploma", "Dip.", "Ordinary Diploma" (not advanced) → diploma
+
+Rules:
+- Return one entry per distinct award found under Education / Qualifications / Academic background.
+- If the CV lists several degrees (e.g. Bachelor + Master), return ALL of them — never keep only the bachelor's.
+- If two bachelor's appear, include both; set multipleBachelors true on each bachelor entry (or the first).
+- Copy wording as written. Never invent institution, country, or dates.
+- Never leave truncated titles or unclosed parentheses; omit curly braces / JSON artifacts.
+- country only if stated near that education line (not from work locations).
+- statedDuration only for explicit duration phrases (e.g. "3 years"); otherwise null.
+- start/end from enrollment/graduation years when present; use "Present" for ongoing study.
+- If no education entries found, return {"entries": []}.
+- confidence 0.0–1.0 when a value is set; null when value is null.
+
+Example:
+Text:
+  EDUCATION
+  M.Sc. Petroleum Engineering | Suez University | 2025
+  B.Sc. Petroleum Engineering | METU | 2021
+  Advanced Diploma of IT | Bella College Australia | 2020
+Expected entries (order flexible):
+  { degreeLevel: "master", degreeTitle: "M.Sc. Petroleum Engineering", institution: "Suez University", ... }
+  { degreeLevel: "bachelor", degreeTitle: "B.Sc. Petroleum Engineering", institution: "METU", ... }
+  { degreeLevel: "advanced_diploma", degreeTitle: "Advanced Diploma of IT", institution: "Bella College Australia", ... }`;
+}
+
 export function educationMultiSystemPrompt(): string {
-  return `You extract bachelor's-degree education fields from one or more labeled documents' plain text.
+  return `You extract education fields for a single target degree level from one or more labeled documents' plain text.
 
 You will receive several sources, each tagged with documentId and documentType (CV, TRANSCRIPT, or CERTIFICATE).
-Extract fields SEPARATELY for each source. Do not merge across sources — the server merges by priority.
+A target degree level may be stated in the user message. Extract fields SEPARATELY for each source for that level only. Do not merge across sources — the server merges by priority.
 
 Return JSON only matching this schema exactly:
 {
@@ -32,9 +94,9 @@ Return JSON only matching this schema exactly:
 }
 
 Per-source hints:
-- CERTIFICATE: Prefer awarded bachelor's title and issuing institution as printed.
+- CERTIFICATE: Prefer awarded title and issuing institution as printed for the target level.
 - TRANSCRIPT: Prefer program name, institution, and enrollment/session years near the header.
-- CV: Education may be brief; prefer the bachelor's line if present.
+- CV: Prefer the education line that matches the target degree level if present.
 
 Program duration (critical):
 - Near the degree/program title header, look for SESSION YYYY-YYYY, BATCH YYYY-YYYY, or YYYY-YYYY / YYYY – YYYY.
@@ -77,13 +139,13 @@ Text:
   Government College University
   Faisalabad, Pakistan
   ...
-  B. Sc Civil Engineering Technology   (may appear on a verification/CV form, not always on the transcript body)
+  B. Sc Civil Engineering Technology
 Expected when present:
   institution ≈ "Government College University Faisalabad" (or as printed)
   country = "Pakistan"
-  degreeTitle from the bachelor line when printed; null if the transcript never names the award.
+  degreeTitle from the award line when printed; null if the transcript never names the award.
 
-Example D — CV education block:
+Example D — CV education block (target bachelor):
 Text:
   EDUCATION
   Bachelor of Engineering (Hons.), Civil Engineering
@@ -96,17 +158,11 @@ Expected:
   start = "2018", end = "2022"
   Do NOT take "UK" from a profile sentence about UK consultancy work.
 
-Example E — ignore non-bachelor awards:
-Text:
-  Qualification: ICT60220 Advanced Diploma of Information Technology
-Expected:
-  degreeTitle = null (Advanced Diploma is not a bachelor's). Still extract institution/country if printed.
-
 Rules:
 - Include one entry in "sources" for every documentId provided in the user message (even if all fields are null).
 - Echo documentId and documentType exactly as given.
-- Target the Bachelor's degree only. Ignore Diploma, Advanced Diploma, Master's, PhD, short courses unless clearly the bachelor award.
-- If several bachelor's degrees appear in one source, take the first and set multipleBachelors to true.
+- Target only the degree level requested in the user message (default bachelor if unspecified). Ignore other levels on the same document.
+- If several awards of the same target level appear in one source, take the first and set multipleBachelors to true when the target is bachelor.
 - Every value is nullable. Never guess, invent, or normalize institution/degree wording — copy as written (after OCR cleanup already applied).
 - Never leave truncated titles (e.g. cut off mid-word or with an unclosed parenthesis like "(Pow"). Prefer the longest complete phrase that appears in the text; if the source is cut off, stop at the last complete word and omit dangling "(".
 - Do not include curly braces {}, JSON artifacts, or markdown in any field.
@@ -121,13 +177,13 @@ Rules:
 export function educationSystemPrompt(docType: DocumentTypeLabel): string {
   const typeHints: Record<DocumentTypeLabel, string> = {
     CERTIFICATE:
-      "This is a degree certificate or diploma. Prefer the awarded bachelor's title and issuing institution as printed on the certificate.",
+      "This is a degree certificate or diploma. Prefer the awarded title and issuing institution as printed on the certificate.",
     TRANSCRIPT:
       "This is an academic transcript. Prefer program name, institution, and SESSION/BATCH year ranges near the header. Ignore Result Declaration / Date of Issue stamps.",
-    CV: "This is a CV/resume. Education entries may be brief. Prefer the bachelor's degree line if present. Do not invent details.",
+    CV: "This is a CV/resume. Prefer the education line matching the target degree level. Do not invent details.",
   };
 
-  return `You extract bachelor's-degree education fields from one document's plain text.
+  return `You extract education fields from one document's plain text.
 ${typeHints[docType]}
 
 Return JSON only matching this schema exactly:
@@ -150,8 +206,8 @@ Return JSON only matching this schema exactly:
 }
 
 Rules:
-- Target the Bachelor's degree only. Ignore Diploma, Master's, PhD, certificates of short courses unless they are clearly the bachelor award.
-- If several bachelor's degrees appear, take the first and set multipleBachelors to true.
+- Target the requested degree level (default bachelor). Ignore other levels unless they are clearly the intended award.
+- If several matching awards appear, take the first and set multipleBachelors to true when applicable.
 - Every value is nullable. Never guess, invent, or normalize institution/degree wording — copy as written.
 - country only if the document states a country (address, header, seal text). Otherwise null.
 - statedDuration is an explicit duration phrase if present (e.g. "3 years", "6 semesters"); otherwise null.
