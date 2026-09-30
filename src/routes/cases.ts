@@ -8,6 +8,7 @@ const degreeLevelSchema = z.nativeEnum(DegreeLevel);
 const patchBody = z.object({
   targetOccupation: z.string().min(1).max(200).nullable().optional(),
   selectedDegreeLevels: z.array(degreeLevelSchema).optional(),
+  engineeringTitledDegree: z.boolean().nullable().optional(),
 });
 
 const qualificationDraftSchema = z.object({
@@ -45,6 +46,7 @@ const draftBody = z.object({
       }),
     )
     .optional(),
+  engineeringTitledDegree: z.boolean().nullable().optional(),
   /** Legacy flat map — applied at bachelor when no degreeLevel entries are sent. */
   fieldFinals: z
     .record(z.string(), z.string().nullable())
@@ -219,6 +221,10 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
           body.selectedDegreeLevels === undefined
             ? existing.selectedDegreeLevels
             : body.selectedDegreeLevels,
+        engineeringTitledDegree:
+          body.engineeringTitledDegree === undefined
+            ? existing.engineeringTitledDegree
+            : body.engineeringTitledDegree,
       },
     });
     return updated;
@@ -234,7 +240,12 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
 
     await prisma.case.update({
       where: { id },
-      data: { draftJson: body },
+      data: {
+        draftJson: body,
+        ...(body.engineeringTitledDegree !== undefined
+          ? { engineeringTitledDegree: body.engineeringTitledDegree }
+          : {}),
+      },
     });
 
     await upsertQualifications(id, body);
@@ -273,7 +284,13 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
 
     await prisma.case.update({
       where: { id },
-      data: { draftJson: body, status: "CONFIRMED" },
+      data: {
+        draftJson: body,
+        status: "CONFIRMED",
+        ...(body.engineeringTitledDegree !== undefined
+          ? { engineeringTitledDegree: body.engineeringTitledDegree }
+          : {}),
+      },
     });
 
     await upsertQualifications(id, body);

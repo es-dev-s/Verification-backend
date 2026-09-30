@@ -54,14 +54,16 @@ enum DegreeLevel {
 }
 
 model Case {
-  id                   String     @id @default(cuid())
-  clientId             String
-  targetOccupation     String?
-  status               CaseStatus @default(DRAFT)
+  id                       String     @id @default(cuid())
+  clientId                 String
+  targetOccupation         String?
+  status                   CaseStatus @default(DRAFT)
   /// User-selected degree levels for this case (ordered preference left to UI).
-  selectedDegreeLevels DegreeLevel[] @default([])
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
+  selectedDegreeLevels     DegreeLevel[] @default([])
+  /// Manual-only: is any verified qualification an engineering-titled degree? Never set by AI.
+  engineeringTitledDegree  Boolean?
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
 
   documents      Document[]
   readJobs       ReadJob[]

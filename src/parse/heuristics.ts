@@ -540,6 +540,34 @@ function looksLikeJunkJobLine(s: string): boolean {
   );
 }
 
+/**
+ * Best-effort engineering-related flag from title/employer only.
+ * Returns null when the text is too thin to decide (matches prompt: don't guess).
+ */
+export function guessEngineeringRelated(
+  title: string | null | undefined,
+  employer?: string | null,
+): boolean | null {
+  const blob = `${title ?? ""} ${employer ?? ""}`.trim();
+  if (!blob) return null;
+  if (
+    /\b(engineer|engineering|draughtsman|draftsman|site\s+supervisor|site\s+engineer|civil|mechanical|electrical|structural|construction|maintenance\s+engineer|field\s+engineer|geotech|petroleum\s+engineer|software\s+engineer|hardware\s+engineer)\b/i.test(
+      blob,
+    )
+  ) {
+    return true;
+  }
+  // Clear non-engineering titles we can reject without duties text
+  if (
+    /\b(accountant|teacher|nurse|chef|marketer|sales\s+executive|receptionist|cashier|waiter|barista)\b/i.test(
+      blob,
+    )
+  ) {
+    return false;
+  }
+  return null;
+}
+
 export function heuristicsExperienceFromText(text: string): ExperienceExtract {
   const rows: ExperienceExtract["rows"] = [];
   if (!text.trim()) return { rows };
@@ -610,7 +638,7 @@ export function heuristicsExperienceFromText(text: string): ExperienceExtract {
       start: clean(start),
       end: parseDateEnd(end),
       statedDurationYears: statedDurationYears ?? null,
-      domainMatch: null,
+      domainMatch: guessEngineeringRelated(t, e),
     });
   };
 

@@ -217,10 +217,17 @@ describe("cross-level education isolation", () => {
       masterAfterFirstRead,
       "master Qualification must be unaffected by subsequent bachelor read",
     );
-    assert.ok(store.bachelor);
-    assert.match(store.bachelor!.institution ?? "", /macquarie/i);
+    const bachelorAfter = store["bachelor"] as
+      | {
+          degreeTitle: string | null;
+          institution: string | null;
+          country: string | null;
+        }
+      | undefined;
+    assert.ok(bachelorAfter);
+    assert.match(bachelorAfter.institution ?? "", /macquarie/i);
     assert.notEqual(
-      (store.bachelor!.institution ?? "").toLowerCase(),
+      (bachelorAfter.institution ?? "").toLowerCase(),
       (store.master!.institution ?? "").toLowerCase(),
     );
   });

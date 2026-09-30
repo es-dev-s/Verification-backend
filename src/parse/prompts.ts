@@ -228,7 +228,7 @@ Return JSON only matching this schema exactly:
       "start": string|null,
       "end": string|null,
       "statedDurationYears": number|null,
-      "domainMatch": null,
+      "domainMatch": true|false|null,
       "confidence": {
         "employer": number|null,
         "title": number|null,
@@ -255,7 +255,8 @@ Rules:
   Still extract employer and title in this case, set start/end to null, and put the number in statedDurationYears.
   Never omit an entry just because dates are missing — return it with nulls instead.
 - Fill every field that is visible in the text. Partial rows are valid (employer-only, title-only, duration-only, etc.).
-- Always set domainMatch to null (occupation matching is disabled for now).
+- For each work experience entry, determine if the role and its duties are engineering-related (e.g. design, construction, technical or site supervision, maintenance, or engineering analysis work). Return domainMatch: true or false based only on the role/duties text. Do not guess if duties aren't described — use null when unclear.
+- Do not compare roles against any target occupation. domainMatch is engineering-related only.
 - statedDurationYears is a number of years when an explicit duration is stated without calendar dates; otherwise null.
 - Sort is not required; the server will sort. Prefer most recent roles first if you can.
 - Skip Education / Skills / Projects / Certifications sections — only paid or professional roles under Experience / Work History / Employment (or a short Experience: line on a CV/profile).
