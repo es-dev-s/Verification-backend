@@ -40,7 +40,6 @@ const draftBody = z.object({
         title: z.string().nullable().optional(),
         start: z.string().nullable().optional(),
         end: z.string().nullable().optional(),
-        statedDurationYears: z.number().nullable().optional(),
         domainSuggested: z.boolean().nullable().optional(),
         domainFinal: z.boolean().nullable().optional(),
       }),
@@ -152,6 +151,7 @@ function caseInclude() {
     qualifications: { orderBy: { degreeLevel: "asc" as const } },
     experienceRows: { orderBy: { sortOrder: "asc" as const } },
     fieldSources: true,
+    assessment: true,
     readJobs: {
       orderBy: { updatedAt: "desc" as const },
       take: 20,
@@ -160,14 +160,19 @@ function caseInclude() {
 }
 
 /** Temporary compat: expose bachelor Qualification as `bachelors` for existing UI. */
-function withLegacyBachelors<T extends { qualifications: Array<{
-  degreeLevel: DegreeLevel;
-  degreeTitle: string | null;
-  institution: string | null;
-  country: string | null;
-  durationYears: number | null;
-  durationCalculated: boolean;
-}> }>(row: T) {
+function withLegacyBachelors<T extends {
+  qualifications: Array<{
+    degreeLevel: DegreeLevel;
+    degreeTitle: string | null;
+    institution: string | null;
+    country: string | null;
+    durationYears: number | null;
+    durationCalculated: boolean;
+  }>;
+  assessment?: {
+    resultJson: unknown;
+  } | null;
+}>(row: T) {
   const bachelor = row.qualifications.find((q) => q.degreeLevel === "bachelor");
   return {
     ...row,
@@ -180,6 +185,7 @@ function withLegacyBachelors<T extends { qualifications: Array<{
           durationCalculated: bachelor.durationCalculated,
         }
       : null,
+    assessment: (row.assessment?.resultJson as object | null) ?? null,
   };
 }
 
@@ -260,7 +266,6 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
             title: row.title ?? null,
             start: row.start ?? null,
             end: row.end ?? null,
-            statedDurationYears: row.statedDurationYears ?? null,
             domainSuggested: row.domainSuggested ?? null,
             domainFinal: row.domainFinal ?? null,
             sortOrder: index,
@@ -305,7 +310,6 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
             title: row.title ?? null,
             start: row.start ?? null,
             end: row.end ?? null,
-            statedDurationYears: row.statedDurationYears ?? null,
             domainSuggested: row.domainSuggested ?? null,
             domainFinal: row.domainFinal ?? null,
             sortOrder: index,

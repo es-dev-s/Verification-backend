@@ -474,8 +474,8 @@ export async function parseExperience(caseId: string) {
 
   const sorted = [...rows].sort(
     (a, b) =>
-      compareExperienceDates(b.start, b.end, b.statedDurationYears) -
-      compareExperienceDates(a.start, a.end, a.statedDurationYears),
+      compareExperienceDates(b.start, b.end) -
+      compareExperienceDates(a.start, a.end),
   );
 
   await prisma.experienceRow.deleteMany({ where: { caseId } });
@@ -488,7 +488,6 @@ export async function parseExperience(caseId: string) {
         title: null,
         start: null,
         end: null,
-        statedDurationYears: null,
         domainSuggested: null,
         domainFinal: null,
         sortOrder: 0,
@@ -502,11 +501,6 @@ export async function parseExperience(caseId: string) {
         title: row.title,
         start: row.start,
         end: row.end,
-        statedDurationYears:
-          row.statedDurationYears != null &&
-          Number.isFinite(row.statedDurationYears)
-            ? row.statedDurationYears
-            : null,
         domainSuggested: row.domainMatch,
         domainFinal: row.domainMatch,
         sortOrder: index,
@@ -531,14 +525,11 @@ export async function parseExperience(caseId: string) {
 function compareExperienceDates(
   start: string | null | undefined,
   end: string | null | undefined,
-  statedDurationYears?: number | null,
 ): number {
   const raw = end && !/present|current|ongoing/i.test(end) ? end : start;
   if (raw) {
     const m = raw.match(/(19|20)\d{2}/);
     if (m) return Number(m[0]);
   }
-  // Duration-only rows sort below dated roles but above blank
-  if (statedDurationYears != null && statedDurationYears > 0) return 1;
   return 0;
 }

@@ -101,11 +101,22 @@ function isAbortError(message: string): boolean {
   );
 }
 
-function thinkingConfigFor(modelName: string) {
-  const isV3 = /gemini-3/.test(modelName);
-  return isV3
-    ? { thinkingLevel: ThinkingLevel.LOW }
-    : { thinkingBudget: 0 };
+function isUnavailableError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("unavailable") ||
+    lower.includes('"code":503') ||
+    lower.includes("high demand") ||
+    lower.includes("temporarily")
+  );
+}
+
+function thinkingConfigFor(modelName: string, _disableThinking = false) {
+  // gemini-3.x rejects MINIMAL; LOW is the lightest supported level.
+  if (/gemini-3/.test(modelName)) {
+    return { thinkingLevel: ThinkingLevel.LOW };
+  }
+  return { thinkingBudget: 0 };
 }
 
 function zodToResponseJsonSchema(schema: z.ZodType): unknown {
@@ -117,7 +128,27 @@ function zodToResponseJsonSchema(schema: z.ZodType): unknown {
 
 export type GenerateJsonOpts = {
   maxTokens?: number;
+  /** Absolute epoch ms when this call must stop. */
   deadlineMs?: number;
+  /** Per-attempt abort timeout (ms). Defaults to 9s — raise for large extract jobs. */
+  requestTimeoutMs?: number;
+  /**
+   * Max live attempts across keys/models for this call.
+   * Default: try all keys × models (parse soft-fail path).
+   */
+  maxAttempts?: number;
+  /**
+   * On client abort/timeout, stop immediately instead of rotating keys.
+   * Default true when requestTimeoutMs is explicitly set; false for short parse calls.
+   */
+  failFastOnAbort?: boolean;
+  /** Skip / minimize model thinking (faster large JSON extracts). */
+  disableThinking?: boolean;
+  /**
+   * Override model list for this call. Default: config.geminiModels.
+   * Parse/form autofill should omit this. Assess may pass the primary model only.
+   */
+  models?: string[];
   /** Zod schema → responseJsonSchema for constrained JSON output. */
   responseSchema?: z.ZodType;
 };
@@ -132,24 +163,45 @@ export async function generateJson(
     throw new GeminiQuotaExhaustedError();
   }
 
-  const deadline = opts?.deadlineMs ?? Date.now() + config.parseTimeoutMs;
+  const perRequestTimeoutMs = opts?.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
+  const failFastOnAbort =
+    opts?.failFastOnAbort ?? opts?.requestTimeoutMs != null;
+  const modelNames =
+    opts?.models?.filter(Boolean) ?? config.geminiModels;
+  if (!modelNames.length) {
+    throw new GeminiUnavailableError("No Gemini models configured");
+  }
+  const maxAttempts =
+    opts?.maxAttempts ??
+    Math.max(keys.length * Math.max(modelNames.length, 1), 1);
+  const disableThinking = opts?.disableThinking ?? false;
+
+  // Prefer an explicit request window over a short shared parse deadline.
+  const deadline =
+    opts?.deadlineMs ??
+    Date.now() + Math.max(config.parseTimeoutMs, perRequestTimeoutMs + 2_000);
+
   const maxTokens = opts?.maxTokens ?? 2048;
   const responseJsonSchema = opts?.responseSchema
     ? zodToResponseJsonSchema(opts.responseSchema)
     : undefined;
   let lastError: Error | null = null;
+  let attempts = 0;
 
   console.log(
-    `[gemini] start models=${config.geminiModels.join(",")} keys=${keys.length} ` +
+    `[gemini] start models=${modelNames.join(",")} keys=${keys.length} ` +
       `promptChars=${prompt.length} systemChars=${systemPrompt.length} maxTokens=${maxTokens} ` +
-      `schema=${Boolean(responseJsonSchema)}`,
+      `schema=${Boolean(responseJsonSchema)} requestTimeoutMs=${perRequestTimeoutMs} ` +
+      `maxAttempts=${maxAttempts} failFastOnAbort=${failFastOnAbort}`,
   );
 
-  for (const modelName of config.geminiModels) {
+  for (const modelName of modelNames) {
     if (Date.now() >= deadline) break;
+    if (attempts >= maxAttempts) break;
 
     for (let offset = 0; offset < keys.length; offset++) {
       if (Date.now() >= deadline) break;
+      if (attempts >= maxAttempts) break;
 
       const key = keys[(rrIndex + offset) % keys.length]!;
       if (exhausted.has(key.name)) continue;
@@ -159,9 +211,15 @@ export async function generateJson(
 
       const remaining = deadline - Date.now();
       if (remaining < 1500) {
-        throw new GeminiUnavailableError("Gemini deadline exceeded");
+        throw new GeminiUnavailableError(
+          lastError?.message
+            ? `Gemini deadline exceeded (${lastError.message})`
+            : "Gemini deadline exceeded",
+        );
       }
-      const attemptTimeout = Math.min(REQUEST_TIMEOUT_MS, remaining - 200);
+      // Do not starve a long extract: honour requestTimeoutMs when remaining allows.
+      const attemptTimeout = Math.min(perRequestTimeoutMs, remaining - 200);
+      attempts += 1;
 
       const controller = new AbortController();
       const timer = setTimeout(() => {
@@ -174,7 +232,7 @@ export async function generateJson(
       try {
         lastCallAt = Date.now();
         console.log(
-          `[gemini] → request model=${modelName} key=${key.name} timeoutMs=${attemptTimeout}`,
+          `[gemini] → request model=${modelName} key=${key.name} timeoutMs=${attemptTimeout} attempt=${attempts}/${maxAttempts}`,
         );
 
         const ai = new GoogleGenAI({ apiKey: key.value });
@@ -188,7 +246,7 @@ export async function generateJson(
             maxOutputTokens: maxTokens,
             responseMimeType: "application/json",
             ...(responseJsonSchema ? { responseJsonSchema } : {}),
-            thinkingConfig: thinkingConfigFor(modelName),
+            thinkingConfig: thinkingConfigFor(modelName, disableThinking),
           },
         });
 
@@ -232,11 +290,20 @@ export async function generateJson(
           exhausted.add(key.name);
           continue;
         }
+        if (isUnavailableError(message)) {
+          // Overloaded model — try next key/model, but respect maxAttempts.
+          continue;
+        }
         if (isMissingModelError(message)) {
           break;
         }
         if (aborted || isAbortError(message)) {
-          // Move on quickly after a real abort
+          // Do NOT rotate through every key on abort — that invents "deadline exceeded".
+          if (failFastOnAbort || attempts >= maxAttempts) {
+            throw new GeminiUnavailableError(
+              `Gemini request timed out after ${attemptTimeout}ms (${message})`,
+            );
+          }
           continue;
         }
       }

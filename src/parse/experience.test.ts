@@ -20,7 +20,7 @@ Urdu
 `;
 
 describe("experience duration-only extraction", () => {
-  it("extracts UCC Site Supervisor with statedDurationYears and null dates", () => {
+  it("extracts UCC Site Supervisor with null dates", () => {
     const result = heuristicsExperienceFromText(UCC_DURATION_ONLY_CV);
     const parsed = experienceExtractSchema.parse(result);
     assert.ok(parsed.rows.length >= 1, "expected at least one experience row");
@@ -34,7 +34,6 @@ describe("experience duration-only extraction", () => {
     assert.equal(row!.title, "Site Supervisor");
     assert.equal(row!.start, null);
     assert.equal(row!.end, null);
-    assert.equal(row!.statedDurationYears, 3);
   });
 
   it("schema accepts rows with null start/end", () => {
@@ -45,12 +44,11 @@ describe("experience duration-only extraction", () => {
           title: "Site Supervisor",
           start: null,
           end: null,
-          statedDurationYears: 3,
           domainMatch: null,
         },
       ],
     });
-    assert.equal(parsed.rows[0]!.statedDurationYears, 3);
+    assert.equal(parsed.rows[0]!.employer, "UCC Pvt. Ltd");
     assert.equal(parsed.rows[0]!.start, null);
   });
 });

@@ -65,14 +65,70 @@ model Case {
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
 
-  documents      Document[]
-  readJobs       ReadJob[]
-  experienceRows ExperienceRow[]
-  qualifications Qualification[]
-  fieldSources   FieldSource[]
-  draftJson      Json?
+  documents         Document[]
+  readJobs          ReadJob[]
+  experienceRows    ExperienceRow[]
+  qualifications    Qualification[]
+  fieldSources      FieldSource[]
+  draftJson         Json?
+  assessment        Assessment?
+  extractedSubjects ExtractedSubject[]
 
   @@index([clientId])
+}
+
+/// Persisted ANZSCO assessment result for a case (currently Chemical Engineer 233111).
+model Assessment {
+  id                    String   @id @default(cuid())
+  caseId                String   @unique
+  /// Hash of transcript (+ CV) text used as input — skip re-LLM when unchanged.
+  inputHash             String
+  anzscoCode            String?
+  /// high | medium | low | null when no_match
+  confidence            String?
+  /// verified_no_risk | conditional | not_verified | no_match
+  determination         String
+  recommended           Boolean  @default(false)
+  foundationalMatched   Int      @default(0)
+  foundationalExpected  Int      @default(5)
+  coreMatched           Int      @default(0)
+  coreExpected          Int      @default(9)
+  foundationalPct       Float    @default(0)
+  corePct               Float    @default(0)
+  tier1Outcome          String?
+  tier2Outcome          String?
+  tier3GateMet          Boolean  @default(false)
+  workExperienceBoost   Boolean  @default(false)
+  qualificationsUsed    String[] @default([])
+  explanation           String?
+  resultJson            Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+/// Subject rows extracted from transcript text (persisted so assessment can rerun without LLM).
+model ExtractedSubject {
+  id             String  @id @default(cuid())
+  caseId         String
+  documentId     String?
+  name           String
+  code           String?
+  credits        String?
+  grade          String?
+  yearOrSemester String?
+  /// bachelor | master | unknown
+  qualification  String  @default("unknown")
+  sourceSnippet  String?
+  isRepeat       Boolean @default(false)
+  sortOrder      Int     @default(0)
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
 }
 
 model Document {
@@ -129,7 +185,6 @@ model ExperienceRow {
   title               String?
   start               String?
   end                 String?
-  statedDurationYears Float?
   domainSuggested     Boolean?
   domainFinal         Boolean?
   sortOrder           Int      @default(0)

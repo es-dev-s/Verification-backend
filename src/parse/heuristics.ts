@@ -780,7 +780,6 @@ export function heuristicsExperienceFromText(text: string): ExperienceExtract {
     title: string | null,
     start: string | null,
     end: string | null,
-    statedDurationYears: number | null = null,
   ) => {
     let e = clean(employer);
     let t = clean(title);
@@ -807,8 +806,7 @@ export function heuristicsExperienceFromText(text: string): ExperienceExtract {
           r.employer === e &&
           r.title === t &&
           r.start === clean(start) &&
-          r.end === parseDateEnd(end) &&
-          (r.statedDurationYears ?? null) === (statedDurationYears ?? null),
+          r.end === parseDateEnd(end),
       )
     ) {
       return;
@@ -831,7 +829,6 @@ export function heuristicsExperienceFromText(text: string): ExperienceExtract {
       title: t,
       start: clean(start),
       end: parseDateEnd(end),
-      statedDurationYears: statedDurationYears ?? null,
       domainMatch: guessEngineeringRelated(t, e),
     });
   };
@@ -964,7 +961,7 @@ export function heuristicsExperienceFromText(text: string): ExperienceExtract {
     const title = clean(dm[2]);
     const employer = clean(dm[3]?.replace(/[.,;]+$/g, "") ?? null);
     if (!Number.isFinite(years) || years <= 0) continue;
-    pushRow(employer, title, null, null, years);
+    pushRow(employer, title, null, null);
   }
 
   return { rows: rows.slice(0, 12) };

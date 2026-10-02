@@ -63,8 +63,6 @@ export const experienceRowSchema = z.object({
   title: z.string().nullable(),
   start: z.string().nullable(),
   end: z.string().nullable(),
-  /** Years when the CV states a duration instead of calendar dates. */
-  statedDurationYears: z.number().nullable(),
   domainMatch: z.boolean().nullable(),
   confidence: z
     .object({
@@ -72,7 +70,6 @@ export const experienceRowSchema = z.object({
       title: z.number().nullable().optional(),
       start: z.number().nullable().optional(),
       end: z.number().nullable().optional(),
-      statedDurationYears: z.number().nullable().optional(),
     })
     .optional(),
 });
