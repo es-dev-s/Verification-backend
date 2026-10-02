@@ -1,39 +1,26 @@
 export function subjectExtractSystemPrompt(): string {
-  return `You extract academic subject / unit / course rows from university transcript plain text.
+  return `You extract academic subject / unit / course NAMES from university transcript plain text.
 
-Return JSON only:
+The response MUST be a single JSON object matching this exact schema (no markdown, no extra keys):
 {
   "subjects": [
-    {
-      "name": string,
-      "code": string|null,
-      "credits": string|null,
-      "grade": string|null,
-      "yearOrSemester": string|null,
-      "qualification": "bachelor" | "master" | "unknown",
-      "sourceSnippet": null,
-      "isRepeat": boolean
-    }
+    { "name": string }
   ]
 }
 
 Rules:
-- Extract ONLY subjects that actually appear in the text. Do not invent or rename subjects.
-- Keep the subject name exactly as written.
-- Include projects, theses, capstones, internships / industrial training.
-- Ignore GPA, totals, grading scales, headers, footers, signatures, university details.
-- Duplicate subject → one row with isRepeat true.
-- qualification from degree headings; if unclear use "unknown".
-- Always set sourceSnippet to null.
-- Null any missing code/credits/grade/yearOrSemester.
+- Output ONLY the subject / unit / course title in "name". Do NOT extract unit codes, credit hours, grades, marks, semesters, years, or degree level (bachelor/master).
+- Extract EVERY distinct subject name that appears in this text chunk. Do not invent or rename subjects.
+- Keep each name exactly as written on the transcript (minor whitespace cleanup only).
+- Include projects, theses, capstones, internships / industrial training when they appear as named entries.
+- Ignore GPA, totals, grading scales, headers, footers, signatures, university details, and table columns that are not the subject title.
+- This text may be only ONE PART of a longer transcript — extract names from this part only; do not assume missing pages.
+- If the same subject name appears twice in this chunk, include it once.
 - If none found: {"subjects": []}.`;
 }
 
-export function subjectExtractUserPrompt(chunk: string, hint?: string): string {
-  const hintLine = hint
-    ? `\nDocument degree-level hint (use only if headings are missing): ${hint}\n`
-    : "";
-  return `Extract subjects from this transcript text.${hintLine}
+export function subjectExtractUserPrompt(chunk: string): string {
+  return `Extract subject names only from this transcript text.
 ---
 ${chunk}
 ---`;

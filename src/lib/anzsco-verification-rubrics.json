@@ -1,0 +1,4776 @@
+{
+  "meta": {
+    "schemaVersion": "1.2.0",
+    "description": "Academic / vocational verification decision config per ANZSCO occupation. Decision logic and canonical subject lists only; naming variants live in the per-ANZSCO Consolidated Rubric.",
+    "generatedFrom": "26 verification_steps .docx files",
+    "howToResolve": "occupation = occupations[id]; flow = flows[occupation.flow]; any field absent on an occupation falls back to defaults. labels.* on an occupation override defaults.",
+    "knownIssues": [
+      "Tier 2 bands in these occupations are written 7–8 / 5–5 / 3–3 / 0–1 (of 8), leaving scores 6, 4 and 2 undefined: materials-engineer, geotechnical-engineer, structural-engineer, transport-engineer, industrial-engineer, production-plant-engineer, petroleum-engineer, environmental-engineer, naval-architect. Encoded as minimum thresholds (7/5/3).",
+      "Determination matrices omit one combination in each flow (Flag + Medium; Medium + Not Met). Added as inferred rules, marked inferred=true.",
+      "Tier 3 appears in the docs as a gate but not in the determination matrix. Modelled as a post-step that downgrades auto-approve to manual review.",
+      "ANZSCO 233999 is used by two occupations (Automation & Control, Mechatronics). `id` is the unique key.",
+      "A single transcript subject may fill both a Tier 1 and a Tier 2 row in some occupations (e.g. Fluid Mechanics, Surveying). The docs do not say whether dual counting across tiers is allowed."
+    ]
+  },
+  "defaults": {
+    "scoring": {
+      "method": "count_of_core_rows_matched",
+      "forbidRatioScoring": true,
+      "bandRule": "Compare score to thresholds from highest to lowest; first threshold met wins. Below the last threshold: tier1 = flag, tier2/coreUnits = high."
+    },
+    "optionalNeverPenalises": true,
+    "matchingRules": {
+      "equivalentNamesAccepted": true,
+      "combinedSubjectMaySatisfyMultipleRows": true,
+      "integratedCurriculumMissingStandaloneIsNotDeficiency": true,
+      "namingVariantSource": "Per-ANZSCO Consolidated Rubric (separate file). This config holds decision logic only."
+    },
+    "outcomes": {
+      "tier1": {
+        "noRisk": {
+          "label": "Adequate Foundation – No Risk",
+          "action": "Proceed to Tier 2 automatically."
+        },
+        "lowRisk": {
+          "label": "Adequate Foundation – Low Risk",
+          "action": "Proceed to Tier 2; log the gap as an assessor note."
+        },
+        "flag": {
+          "label": "Foundation Gap – Flag",
+          "action": "Route to manual reviewer alongside the Tier 2 outcome; never auto-reject on Tier 1 alone."
+        }
+      },
+      "tier2": {
+        "noRisk": {
+          "label": "Verified – No Risk",
+          "action": "Full coverage; proceed to positive determination automatically."
+        },
+        "lowRisk": {
+          "label": "Verified – Low Risk",
+          "action": "Proceed to positive determination; log missing subjects as an assessor note, no manual hold."
+        },
+        "medium": {
+          "label": "Conditional – Medium Risk",
+          "action": "Route to manual reviewer with matched/unmatched core subjects highlighted."
+        },
+        "high": {
+          "label": "Not Verified – High Risk",
+          "action": "Do not auto-approve; refer for full manual academic assessment."
+        }
+      },
+      "coreUnits": {
+        "noRisk": {
+          "label": "Verified – No Risk",
+          "action": "Full core-unit coverage; proceed automatically."
+        },
+        "lowRisk": {
+          "label": "Verified – Low Risk",
+          "action": "Proceed; log missing units as an assessor note."
+        },
+        "medium": {
+          "label": "Conditional – Medium Risk",
+          "action": "Route to manual reviewer with matched/unmatched core units highlighted."
+        },
+        "high": {
+          "label": "Not Verified – High Risk",
+          "action": "Do not auto-approve; refer for full manual assessment."
+        }
+      },
+      "electives": {
+        "met": {
+          "label": "Met",
+          "action": "No manual hold for this component."
+        },
+        "notMet": {
+          "label": "Not Met",
+          "action": "Route to manual reviewer to confirm packaging rule."
+        }
+      }
+    },
+    "determinationLabels": {
+      "verified": "Verified – No Risk (auto-approve)",
+      "conditional": "Conditional – refer to manual reviewer",
+      "notVerified": "Not Verified – refer for full manual assessment"
+    },
+    "tier3": {
+      "gateRule": "Presence of the capstone/major project alone gives Tier 3 No Risk. Absence routes the file to manual review even if Tier 1 and Tier 2 are strong. Tier 3 is a gate, never a third score.",
+      "supportingRowsNeverDriveOutcome": true
+    }
+  },
+  "flows": {
+    "academic_3_tier": {
+      "evaluationOrder": [
+        "qualification",
+        "tier1",
+        "tier2",
+        "determination",
+        "tier3Gate"
+      ],
+      "determinationRules": [
+        {
+          "when": {
+            "tier2": [
+              "high"
+            ]
+          },
+          "result": "notVerified"
+        },
+        {
+          "when": {
+            "tier1": [
+              "noRisk",
+              "lowRisk"
+            ],
+            "tier2": [
+              "noRisk",
+              "lowRisk"
+            ]
+          },
+          "result": "verified"
+        },
+        {
+          "when": {
+            "tier1": [
+              "noRisk",
+              "lowRisk"
+            ],
+            "tier2": [
+              "medium"
+            ]
+          },
+          "result": "conditional"
+        },
+        {
+          "when": {
+            "tier1": [
+              "flag"
+            ],
+            "tier2": [
+              "noRisk",
+              "lowRisk"
+            ]
+          },
+          "result": "conditional"
+        },
+        {
+          "when": {
+            "tier1": [
+              "flag"
+            ],
+            "tier2": [
+              "medium"
+            ]
+          },
+          "result": "conditional",
+          "inferred": true,
+          "note": "Not in source docs (matrix has no Flag + Medium row). Inferred: both tiers call for manual review."
+        }
+      ],
+      "matchMode": "first_match_wins",
+      "postStep": {
+        "name": "tier3Gate",
+        "ifGateMissingAndResultIs": "verified",
+        "thenResult": "conditional"
+      }
+    },
+    "vocational_units": {
+      "evaluationOrder": [
+        "qualification",
+        "coreUnits",
+        "electives",
+        "determination"
+      ],
+      "determinationRules": [
+        {
+          "when": {
+            "coreUnits": [
+              "high"
+            ]
+          },
+          "result": "notVerified"
+        },
+        {
+          "when": {
+            "coreUnits": [
+              "noRisk",
+              "lowRisk"
+            ],
+            "electives": [
+              "met"
+            ]
+          },
+          "result": "verified"
+        },
+        {
+          "when": {
+            "coreUnits": [
+              "noRisk",
+              "lowRisk"
+            ],
+            "electives": [
+              "notMet"
+            ]
+          },
+          "result": "conditional"
+        },
+        {
+          "when": {
+            "coreUnits": [
+              "medium"
+            ],
+            "electives": [
+              "met"
+            ]
+          },
+          "result": "conditional"
+        },
+        {
+          "when": {
+            "coreUnits": [
+              "medium"
+            ],
+            "electives": [
+              "notMet"
+            ]
+          },
+          "result": "conditional",
+          "inferred": true,
+          "note": "Not in source docs (matrix has no Medium + Not Met row). Inferred: manual review."
+        }
+      ],
+      "matchMode": "first_match_wins",
+      "rules": {
+        "unitCodeEquivalence": {
+          "source": "training.gov.au",
+          "supersededCodesCountAsMatch": true
+        },
+        "partialCoreCoverageMayStayInBand": true,
+        "electiveCheck": "count_only",
+        "rtoNamingVariationIgnoredWhenCodeMatches": true,
+        "practicalEvidence": "supporting_only_never_replaces_core_units"
+      }
+    }
+  },
+  "occupations": [
+    {
+      "id": "civil-engineer",
+      "anzsco": "233211",
+      "title": "Civil Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "01_Civil_verification_steps_v2.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [],
+      "qualification": {
+        "statement": "Confirm the qualification is primarily in Civil Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233211), e.g. Bachelor of Civil Engineering, Bachelor of Engineering (Civil), Bachelor of Science in Civil Engineering, Bachelor of Technology in Civil Engineering."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected",
+            "matchingNote": "Includes Mathematics I/II/III, Numerical Methods, Probability & Statistics, Differential Equations, Linear Algebra, etc."
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected",
+            "matchingNote": "Includes Physics / Physics Laboratory / Physics for Engineers variants."
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected",
+            "matchingNote": "Includes Chemistry / Chemistry Laboratory / Chemistry for Engineers variants."
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics / Mechanics of Solids",
+            "status": "expected",
+            "matchingNote": "Includes Statics, Dynamics, Strength of Materials, Mechanics of Materials, Structural Mechanics variants."
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / CAD / Graphics",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Graphics, CAD, Architectural/Descriptive Drawing variants."
+          },
+          {
+            "id": "T1.6",
+            "name": "Computer Programming / Computing",
+            "status": "optional"
+          },
+          {
+            "id": "T1.7",
+            "name": "Communication, Ethics & Professional Practice",
+            "status": "optional"
+          },
+          {
+            "id": "T1.8",
+            "name": "Others (general science/humanities electives)",
+            "status": "contextual",
+            "matchingNote": "Not used to determine suitability (e.g. Basic Electrical Engineering, Environmental Studies, general electives)."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Structural Analysis / Structural Design (Concrete, Steel, Timber, Prestressed)"
+          },
+          {
+            "id": "T2.2",
+            "name": "Concrete Technology & Construction Materials"
+          },
+          {
+            "id": "T2.3",
+            "name": "Geotechnical Engineering / Soil Mechanics / Foundations / Engineering Geology"
+          },
+          {
+            "id": "T2.4",
+            "name": "Surveying / Geomatics / GIS"
+          },
+          {
+            "id": "T2.5",
+            "name": "Fluid Mechanics & Hydraulics"
+          },
+          {
+            "id": "T2.6",
+            "name": "Water Resources Engineering / Hydrology / Irrigation"
+          },
+          {
+            "id": "T2.7",
+            "name": "Transportation / Highway / Traffic Engineering"
+          },
+          {
+            "id": "T2.8",
+            "name": "Construction Management / Estimation & Contracts"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Environmental / Water & Wastewater Engineering",
+            "note": "Reclassified from “core” to “elective” in this update — see callout below."
+          },
+          {
+            "name": "Building Planning, Architecture & Town Planning",
+            "note": "Supplementary / specialised."
+          },
+          {
+            "name": "Earthquake Engineering",
+            "note": "Supplementary / specialised."
+          },
+          {
+            "name": "Marine / Airport / Specialised Infrastructure",
+            "note": "Not observed on any of the 10 transcripts; treat as elective only."
+          },
+          {
+            "name": "Computational Methods for Civil Engineering",
+            "note": "Not observed on any of the 10 transcripts; treat as elective only."
+          },
+          {
+            "name": "Risk, Hazard & Disaster Management",
+            "note": "Supplementary / specialised."
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Engineering Shop",
+            "aliases": [
+              "Workshop Practice",
+              "Engineering Shop"
+            ]
+          },
+          {
+            "label": "Entrepreneurship / Engineering Management",
+            "aliases": [
+              "Entrepreneurship",
+              "Engineering Management"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "mining-engineer",
+      "anzsco": "233611",
+      "title": "Mining Engineer (excluding Petroleum)",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "02_Mining_Engineer_233611_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Mining Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233611). e.g. Bachelor of Mining Engineering, Bachelor of Engineering (Mining), Bachelor of Science in Mining Engineering, Bachelor of Technology in Mining Engineering, Bachelor of Engineering (Mining and Minerals)."
+      },
+      "tier1": {
+        "total": 6,
+        "thresholds": {
+          "noRisk": 5,
+          "lowRisk": 4
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics / Mechanics of Solids / Strength of Materials",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Mechanics, Mechanics of Solids, Strength of Materials variants."
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          },
+          {
+            "id": "T1.6",
+            "name": "Computer Programming / Computing",
+            "status": "expected",
+            "matchingNote": "Includes Computer Programming, Computing variants."
+          },
+          {
+            "id": "T1.7",
+            "name": "Communication, Ethics & Professional Practice",
+            "status": "optional"
+          },
+          {
+            "id": "T1.8",
+            "name": "Others (General Engineering / Electrical / Environmental / Workshop)",
+            "status": "contextual",
+            "matchingNote": "Not used to determine suitability (context only)."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 12,
+        "thresholds": {
+          "noRisk": 11,
+          "lowRisk": 8,
+          "medium": 5
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Mining Geology / Engineering Geology"
+          },
+          {
+            "id": "T2.2",
+            "name": "Mine Surveying / Surveying / Geomatics"
+          },
+          {
+            "id": "T2.3",
+            "name": "Underground Mining Methods / Technology"
+          },
+          {
+            "id": "T2.4",
+            "name": "Surface Mining Technology"
+          },
+          {
+            "id": "T2.5",
+            "name": "Mining Machinery / Mine Equipment & Mechanization"
+          },
+          {
+            "id": "T2.6",
+            "name": "Drilling & Blasting Engineering"
+          },
+          {
+            "id": "T2.7",
+            "name": "Rock Mechanics / Ground Control / Strata Control"
+          },
+          {
+            "id": "T2.8",
+            "name": "Mineral Processing"
+          },
+          {
+            "id": "T2.9",
+            "name": "Mine Ventilation / Mine Environmental & Climate Engineering"
+          },
+          {
+            "id": "T2.10",
+            "name": "Mine Economics / Mineral Economics / Mine Management"
+          },
+          {
+            "id": "T2.11",
+            "name": "Mine Legislation & Safety / Mine Health and Safety"
+          },
+          {
+            "id": "T2.12",
+            "name": "Mine Electrical / Mechanical & Fluid Systems in Mining"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Coal Preparation / Clean Coal Technology"
+          },
+          {
+            "name": "Petroleum & Reservoir Engineering (dual Mining/Petroleum programs)"
+          },
+          {
+            "name": "Materials & Metallurgy Electives"
+          },
+          {
+            "name": "Sustainability, Rehabilitation & Site Remediation"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Economics Electives"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Thesis / Graduation Project",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Thesis",
+            "Graduation Project"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor / Mini Project",
+            "aliases": [
+              "Minor",
+              "Mini Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / Internship / Vocational Training",
+            "aliases": [
+              "Industrial Training",
+              "Internship",
+              "Vocational Training"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Survey Camp / Field Camp",
+            "aliases": [
+              "Survey Camp",
+              "Field Camp"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "automation-control-engineer",
+      "anzsco": "233999",
+      "title": "Automation & Control Engineer (Mechatronics/Industrial specialisation)",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "03_Automation_Control_Engineer_233999_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "info",
+          "field": "anzsco",
+          "message": "ANZSCO 233999 is shared by Automation & Control and Mechatronics. Key lookups by `id`, not by `anzsco`."
+        },
+        {
+          "severity": "medium",
+          "field": "tier2.core",
+          "message": "Row 12 \"Others / Special Topics\" is a catch-all counted in the 12-subject denominator; row 7 is tagged \"(supporting)\" but also counted. Decide how a catch-all row is matched."
+        }
+      ],
+      "anzscoMapping": {
+        "note": "Note on ANZSCO mapping: ANZSCO 233999 (Engineering Professionals nec) --- this occupation has no single dedicated ANZSCO code. Cross-check against Electrical Engineer (233311) or Industrial Engineer (233511) where the transcript's majority content sits in those streams instead. This should be confirmed against the applicant's actual qualification title, majority subject content and nominated occupation before the assessment below is applied.",
+        "crossCheck": [
+          {
+            "anzsco": "233311",
+            "title": "Electrical Engineer"
+          },
+          {
+            "anzsco": "233511",
+            "title": "Industrial Engineer"
+          }
+        ],
+        "requiresConfirmationBeforeScoring": true
+      },
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Automation & Control Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233999). e.g. Bachelor of Engineering (Automation and Control), Bachelor of Engineering (Instrumentation and Control), Bachelor of Technology in Electronics & Instrumentation Engineering, Bachelor of Engineering (Electrical and Automation), Bachelor of Engineering (Industrial Automation)."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          },
+          {
+            "id": "T1.6",
+            "name": "Computer Programming / Computing",
+            "status": "optional"
+          },
+          {
+            "id": "T1.7",
+            "name": "Basic Electrical & Electronics",
+            "status": "optional"
+          },
+          {
+            "id": "T1.8",
+            "name": "Communication, Ethics & Professional Practice",
+            "status": "optional"
+          }
+        ]
+      },
+      "tier2": {
+        "total": 12,
+        "thresholds": {
+          "noRisk": 11,
+          "lowRisk": 8,
+          "medium": 5
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Control Systems / Control Engineering"
+          },
+          {
+            "id": "T2.2",
+            "name": "Process Dynamics, Control & Instrumentation"
+          },
+          {
+            "id": "T2.3",
+            "name": "Instrumentation & Measurement"
+          },
+          {
+            "id": "T2.4",
+            "name": "Industrial Automation / PLC / SCADA"
+          },
+          {
+            "id": "T2.5",
+            "name": "Mechatronics / Robotics"
+          },
+          {
+            "id": "T2.6",
+            "name": "Sensors, Actuators & Transducers"
+          },
+          {
+            "id": "T2.7",
+            "name": "Digital Electronics / Logic Design (supporting)",
+            "labelledSupporting": true
+          },
+          {
+            "id": "T2.8",
+            "name": "Microprocessors, Microcontrollers & Embedded Systems"
+          },
+          {
+            "id": "T2.9",
+            "name": "Power Electronics / Drives for Automation"
+          },
+          {
+            "id": "T2.10",
+            "name": "Industrial Communication Networks / Fieldbus"
+          },
+          {
+            "id": "T2.11",
+            "name": "Process Control Systems Design"
+          },
+          {
+            "id": "T2.12",
+            "name": "Others / Special Topics",
+            "catchAll": true
+          }
+        ],
+        "optional": []
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor / Mini Project",
+            "aliases": [
+              "Minor",
+              "Mini Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Engineering Shop",
+            "aliases": [
+              "Workshop Practice",
+              "Engineering Shop"
+            ]
+          },
+          {
+            "label": "Entrepreneurship / Engineering Management",
+            "aliases": [
+              "Entrepreneurship",
+              "Engineering Management"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "mechatronics-engineer",
+      "anzsco": "233999",
+      "title": "Mechatronics Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "04_Mechatronics_Engineer_233999_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "info",
+          "field": "anzsco",
+          "message": "ANZSCO 233999 is shared by Automation & Control and Mechatronics. Key lookups by `id`, not by `anzsco`."
+        },
+        {
+          "severity": "low",
+          "field": "tier1.subjects",
+          "message": "5 of the 10 Tier 1 rows are slices of mathematics (Engineering Maths, Linear Algebra, Differential Equations, Probability & Statistics, Applied Geometry). A single \"Mathematics I–IV\" course can only fill several rows via the combined-subjects rule."
+        }
+      ],
+      "anzscoMapping": {
+        "note": "Note on ANZSCO mapping: ANZSCO 233999 (Engineering Professionals nec) --- no dedicated ANZSCO code exists; Mechatronics Engineer is explicitly listed as an example occupation within this unit group. Depending on the transcript's majority content, cross-check against Mechanical Engineer (233512) or Electronics Engineer (233411). This should be confirmed against the applicant's actual qualification title, majority subject content and nominated occupation before the assessment below is applied.",
+        "crossCheck": [
+          {
+            "anzsco": "233512",
+            "title": "Mechanical Engineer"
+          },
+          {
+            "anzsco": "233411",
+            "title": "Electronics Engineer"
+          }
+        ],
+        "requiresConfirmationBeforeScoring": true
+      },
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Mechatronics Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233999). e.g. Bachelor of Mechatronics Engineering, Bachelor of Engineering (Mechatronics), Bachelor of Technology in Mechatronics Engineering, Bachelor of Engineering (Robotics and Mechatronics)."
+      },
+      "tier1": {
+        "total": 10,
+        "thresholds": {
+          "noRisk": 8,
+          "lowRisk": 6
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Linear Algebra & Vector Calculus",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Differential Equations & Transforms",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Probability & Statistics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Applied Geometry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.6",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.7",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.8",
+            "name": "Computer Programming (Foundational)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.9",
+            "name": "Engineering Drawing / CAD / Graphics",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, CAD, Graphics variants."
+          },
+          {
+            "id": "T1.10",
+            "name": "Engineering Mechanics / Mechanics of Solids",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Mechanics, Mechanics of Solids variants."
+          },
+          {
+            "id": "T1.11",
+            "name": "Others (General/Support Subjects)",
+            "status": "contextual",
+            "matchingNote": "Not used to determine suitability (context only)."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 15,
+        "thresholds": {
+          "noRisk": 14,
+          "lowRisk": 10,
+          "medium": 6
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Electric Circuits & Circuit Analysis"
+          },
+          {
+            "id": "T2.2",
+            "name": "Electronics (Analog & Digital)"
+          },
+          {
+            "id": "T2.3",
+            "name": "Electrical Machines & Power Systems"
+          },
+          {
+            "id": "T2.4",
+            "name": "Power Electronics & Drives"
+          },
+          {
+            "id": "T2.5",
+            "name": "Microprocessors, Microcontrollers & Embedded Systems"
+          },
+          {
+            "id": "T2.6",
+            "name": "Sensors, Actuators & Instrumentation"
+          },
+          {
+            "id": "T2.7",
+            "name": "Control Systems"
+          },
+          {
+            "id": "T2.8",
+            "name": "Robotics & Machine Vision"
+          },
+          {
+            "id": "T2.9",
+            "name": "Mechatronics System Design & Fundamentals"
+          },
+          {
+            "id": "T2.10",
+            "name": "Signal Processing & Communication Systems"
+          },
+          {
+            "id": "T2.11",
+            "name": "Machine Theory, Kinematics & Vibration"
+          },
+          {
+            "id": "T2.12",
+            "name": "Thermodynamics, Fluid Mechanics & Heat Transfer"
+          },
+          {
+            "id": "T2.13",
+            "name": "Materials Science & Manufacturing Processes"
+          },
+          {
+            "id": "T2.14",
+            "name": "Industrial Automation & PLC"
+          },
+          {
+            "id": "T2.15",
+            "name": "Electro-Mechanical & Mechanical Systems"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Artificial Intelligence & Simulation Tools (Elective)"
+          },
+          {
+            "name": "Specialized / Applied Engineering Electives"
+          },
+          {
+            "name": "Engineering Management, Economics & Quality (Elective)"
+          },
+          {
+            "name": "Rapid Prototyping & Additive Manufacturing"
+          },
+          {
+            "name": "Renewable Energy & Sustainability"
+          },
+          {
+            "name": "Innovative Engineering Design"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Final Design Project",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Final Design Project"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Engineering Shop",
+            "aliases": [
+              "Workshop Practice",
+              "Engineering Shop"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "chemical-engineer",
+      "anzsco": "233111",
+      "title": "Chemical Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "05_Chemical_Engineer_233111_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Chemical Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233111). e.g. Bachelor of Chemical Engineering, Bachelor of Engineering (Chemical), Bachelor of Science in Chemical Engineering, Bachelor of Technology in Chemical Engineering."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / CAD / Graphics",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, CAD, Graphics variants."
+          },
+          {
+            "id": "T1.6",
+            "name": "Basic Electrical & Electronics Engineering",
+            "status": "optional"
+          },
+          {
+            "id": "T1.7",
+            "name": "Computer Programming / Computing",
+            "status": "optional"
+          },
+          {
+            "id": "T1.8",
+            "name": "Communication, Ethics & Professional Practice",
+            "status": "optional"
+          }
+        ]
+      },
+      "tier2": {
+        "total": 9,
+        "thresholds": {
+          "noRisk": 8,
+          "lowRisk": 6,
+          "medium": 4
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Material & Energy Balances / Process Calculations"
+          },
+          {
+            "id": "T2.2",
+            "name": "Chemical Engineering Thermodynamics"
+          },
+          {
+            "id": "T2.3",
+            "name": "Fluid Mechanics / Fluid Flow Operations"
+          },
+          {
+            "id": "T2.4",
+            "name": "Heat Transfer"
+          },
+          {
+            "id": "T2.5",
+            "name": "Mass Transfer / Separation Processes"
+          },
+          {
+            "id": "T2.6",
+            "name": "Chemical Reaction Engineering"
+          },
+          {
+            "id": "T2.7",
+            "name": "Process/Plant Design, Simulation, Optimization & Safety"
+          },
+          {
+            "id": "T2.8",
+            "name": "Process Dynamics, Control & Instrumentation"
+          },
+          {
+            "id": "T2.9",
+            "name": "Chemical Engineering Economics / Project Economics"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Chemical Process Industries / Chemical Technology"
+          },
+          {
+            "name": "Materials Science / Engineering Materials"
+          },
+          {
+            "name": "Environmental Engineering / Pollution Control"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Major Project / Thesis / Final-Year Project/ Capstone Project",
+          "aliases": [
+            "Major Project",
+            "Thesis",
+            "Final-Year Project",
+            "Capstone Project"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Engineering Shop",
+            "aliases": [
+              "Workshop Practice",
+              "Engineering Shop"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "electronics-engineer",
+      "anzsco": "233411",
+      "title": "Electronics Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "06_Electronics_verification_steps_v2.docx",
+        "version": "v3",
+        "note": "Only doc on v3; it also has extra principles. Doc references a \"Section 0 reclassification note\" that is not in the file."
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.softCore",
+          "message": "Doc says Power Electronics and Instrumentation are \"Recommended\" yet both count in the 11-subject denominator. Engine must decide whether they score normally or are exempt."
+        }
+      ],
+      "qualification": {
+        "statement": "Determine whether the qualification is primarily an Electronics Engineering qualification or an equivalent engineering qualification with substantial Electronics Engineering content (e.g. Bachelor of Electronics Engineering, Bachelor of Electronics and Communication Engineering, Bachelor of Electronics & Telecommunication Engineering, Bachelor of Technology in Electronics Engineering). Where the qualification has a combined discipline title — Electronics and Communication, Electronics and Telecommunication, Electronics and Computer Engineering — assess the actual transcript rather than rejecting the qualification on title alone.",
+        "combinedTitlesAssessedOnTranscript": true
+      },
+      "tier1": {
+        "total": 4,
+        "thresholds": {
+          "noRisk": 3,
+          "lowRisk": 2
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Mathematics I–IV, Applied Mathematics, Mathematical Methods variants."
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Physics, Applied Physics, General Physics I/II variants."
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected",
+            "matchingNote": "Includes Engineering/Applied/General Chemistry variants."
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Graphics, Computer Aided Engineering Drawing variants."
+          },
+          {
+            "id": "T1.5",
+            "name": "Computer Programming Fundamentals",
+            "status": "optional"
+          },
+          {
+            "id": "T1.6",
+            "name": "Basic Electrical Engineering",
+            "status": "optional",
+            "matchingNote": "Strengthens the assessment; its absence alone is not a deficiency — often absorbed into Electronic Devices & Circuits coverage instead."
+          },
+          {
+            "id": "T1.7",
+            "name": "Others (assessor notes / uncaptured subjects)",
+            "status": "contextual",
+            "matchingNote": "Not used to determine suitability."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 11,
+        "thresholds": {
+          "noRisk": 9,
+          "lowRisk": 7,
+          "medium": 4
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Electronic Devices & Circuits",
+            "matchingNote": "Basic Electronics, Analog Electronic Circuits, Electronic Devices, Solid State Devices variants."
+          },
+          {
+            "id": "T2.2",
+            "name": "Circuit / Network Theory & Analysis",
+            "matchingNote": "Network Analysis, Network Theory, Electric Circuit Theory, Network Analysis & Synthesis variants."
+          },
+          {
+            "id": "T2.3",
+            "name": "Digital Electronics & Logic Design / Digital Signal Processing",
+            "matchingNote": "Digital Circuits, Digital System Design, Logic Design, paired with Digital Signal Processing on most transcripts — see reclassification note below."
+          },
+          {
+            "id": "T2.4",
+            "name": "Electromagnetic Theory / Fields & Waves",
+            "matchingNote": "Field Theory, Electromagnetic Fields & Waves, Applied Electromagnetic Theory variants."
+          },
+          {
+            "id": "T2.5",
+            "name": "Signals & Systems",
+            "matchingNote": "Signals and Systems (consistently named across nearly all transcripts)."
+          },
+          {
+            "id": "T2.6",
+            "name": "Control Systems",
+            "matchingNote": "Control Systems Engineering, Modern/Linear Control Theory, Principles of Control Systems variants."
+          },
+          {
+            "id": "T2.7",
+            "name": "Microprocessors, Microcontrollers & Embedded Systems",
+            "matchingNote": "Microprocessors, Micro-Controller Based System Design, Embedded Systems variants."
+          },
+          {
+            "id": "T2.8",
+            "name": "Communication Systems (Analog & Digital)",
+            "matchingNote": "Analog/Digital Communication, Communication Principles, Advanced Communication Systems variants."
+          },
+          {
+            "id": "T2.9",
+            "name": "Computer Architecture & Networks",
+            "matchingNote": "Computer Organization and Architecture, Computer Communication and Networks variants."
+          },
+          {
+            "id": "T2.10",
+            "name": "Power Electronics",
+            "matchingNote": "Power Electronics, Industrial and Power Electronics — the least consistently present core subject across the sample.",
+            "importance": "recommended"
+          },
+          {
+            "id": "T2.11",
+            "name": "Instrumentation & Measurement",
+            "matchingNote": "Electronic Instrumentation, E&E Measurements & Instrumentation variants.",
+            "importance": "recommended"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Analog & Linear Integrated Circuits",
+            "note": "Specialisation-track dependent; strengthens confidence, absence is not a deficiency."
+          },
+          {
+            "name": "Semiconductor Devices & Materials",
+            "note": "Rarely present as a standalone subject on the sample transcripts; treat as elective only."
+          },
+          {
+            "name": "VLSI Design",
+            "note": "Specialisation-track dependent."
+          },
+          {
+            "name": "Wireless / Optical / Satellite Communication",
+            "note": "Specialisation-track dependent."
+          },
+          {
+            "name": "Microwave, Antenna, Radar & Transmission Lines",
+            "note": "Specialisation-track dependent."
+          }
+        ],
+        "softCore": {
+          "ids": [
+            "T2.10",
+            "T2.11"
+          ],
+          "note": "Power Electronics and Instrumentation & Measurement are \"Recommended\" rather than \"Essential\" and are the most often missing; their absence alone should not push a transcript out of No Risk / Low Risk."
+        }
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Major Project / Thesis / Degree Project",
+          "aliases": [
+            "Final-Year",
+            "Major Project",
+            "Thesis",
+            "Degree Project"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / Internship / OJT / Technical Seminar / Independent Study",
+            "aliases": [
+              "Industrial Training",
+              "Internship",
+              "OJT",
+              "Technical Seminar",
+              "Independent Study"
+            ]
+          }
+        ],
+        "optional": [],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review",
+        "evidenceFramework": "Part B (PE2 engineering application, PE3 professional attributes). Final-Year/Major Project is the gate."
+      },
+      "matching": {
+        "multiPartCoursesCountOnce": true,
+        "note": "Electronics I–IV or Communication Systems I–II are one knowledge domain; do not double-count in Tier 2."
+      },
+      "crossOccupationAlignment": {
+        "with": [
+          {
+            "anzsco": "233311",
+            "title": "Electrical Engineer"
+          }
+        ],
+        "trigger": "Transcript mixes Electrical and Electronics subjects",
+        "action": "Run the Tier 2 score against both rubrics and compare, rather than relying on the degree title.",
+        "electronicsLeaning": "electronic circuits, digital electronics, signals & systems, microprocessors, embedded, communication, control, instrumentation",
+        "electricalLeaning": "electrical machines, power systems, transmission/distribution, protection, high voltage, generation"
+      },
+      "labels": {
+        "tier2": {
+          "noRisk": "Verified – No Risk (Strong Match)",
+          "lowRisk": "Verified – Low Risk (Strong Match)",
+          "medium": "Conditional – Medium Risk (Moderate Match)",
+          "high": "Not Verified – High Risk (Weak Match)"
+        },
+        "determination": {
+          "verified": "Strong Academic Match – No Risk (auto-approve)",
+          "conditional": "Moderate Academic Match – refer to manual reviewer",
+          "notVerified": "Weak Academic Match – refer for full manual assessment"
+        }
+      }
+    },
+    {
+      "id": "electrical-engineer",
+      "anzsco": "233311",
+      "title": "Electrical Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "07_Electrical_Engineer_233311_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Electrical Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233311). e.g. Bachelor of Electrical Engineering, Bachelor of Engineering (Electrical), Bachelor of Science in Electrical Engineering, Bachelor of Technology in Electrical Engineering, Bachelor of Engineering (Electrical and Electronics)."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          },
+          {
+            "id": "T1.6",
+            "name": "Computer Programming Fundamentals",
+            "status": "optional"
+          },
+          {
+            "id": "T1.7",
+            "name": "Engineering Materials",
+            "status": "optional"
+          }
+        ]
+      },
+      "tier2": {
+        "total": 10,
+        "thresholds": {
+          "noRisk": 9,
+          "lowRisk": 7,
+          "medium": 4
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Electrical Machines / Electrical Installation & Design"
+          },
+          {
+            "id": "T2.2",
+            "name": "Power Systems Analysis & Design"
+          },
+          {
+            "id": "T2.3",
+            "name": "Power System Protection / Switchgear"
+          },
+          {
+            "id": "T2.4",
+            "name": "Power Transmission & Distribution"
+          },
+          {
+            "id": "T2.5",
+            "name": "Power Electronics / Power Generation / Power Plant Engineering"
+          },
+          {
+            "id": "T2.6",
+            "name": "High Voltage Engineering"
+          },
+          {
+            "id": "T2.7",
+            "name": "Control Systems"
+          },
+          {
+            "id": "T2.8",
+            "name": "Instrumentation & Measurement"
+          },
+          {
+            "id": "T2.9",
+            "name": "Renewable / Sustainable Energy Systems"
+          },
+          {
+            "id": "T2.10",
+            "name": "Illumination / Electrical Safety & Utilisation"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Engineering Shop",
+            "aliases": [
+              "Workshop Practice",
+              "Engineering Shop"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "mechanical-engineer",
+      "anzsco": "233512",
+      "title": "Mechanical Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "08_Mechanical_verification_steps_v2.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "low",
+          "field": "tier2",
+          "message": "Only 5 core rows, each a broad composite (e.g. \"Fluid Mechanics / Solid Mechanics / Strength of Materials\"); one miss = Low Risk, two = Medium. Row 2 overlaps the Tier 1 Mechanics row."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm the qualification is primarily in Mechanical Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233512), e.g. Bachelor of Mechanical Engineering, Bachelor of Engineering (Mechanical), Bachelor of Science in Mechanical Engineering, Bachelor of Technology in Mechanical Engineering. A Bachelor of Engineering (Mechatronics) should be assessed case-by-case against Tier 2 coverage.",
+        "note": "A Bachelor of Engineering (Mechatronics) should be assessed case-by-case against Tier 2 coverage."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected",
+            "matchingNote": "Includes Mathematics I/II/III, Calculus, Differential Equations, Numerical Methods, Probability & Statistics variants."
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected",
+            "matchingNote": "Includes General/College Physics, Physics I/II, Physics Lab variants."
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected",
+            "matchingNote": "Includes General/Engineering Chemistry, Chemistry Lab, Chemistry I/II variants."
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "status": "expected",
+            "matchingNote": "Includes Statics, Dynamics, Mechanics of Solids, Strength of Materials, Basic Mechanical Engineering variants."
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Machine Drawing, Engineering Graphics, Computer Aided Design/Drafting variants."
+          },
+          {
+            "id": "T1.6",
+            "name": "Others (general science/humanities/computing electives)",
+            "status": "contextual",
+            "matchingNote": "Includes Computer Programming, Communication/English, Environmental Studies, Basic Electrical/Electronics, Economics, Engineering Management and similar general electives. Not used to determine suitability."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 5,
+          "lowRisk": 4,
+          "medium": 2
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Thermodynamics / Heat Transfer"
+          },
+          {
+            "id": "T2.2",
+            "name": "Fluid Mechanics / Solid Mechanics / Strength of Materials"
+          },
+          {
+            "id": "T2.3",
+            "name": "Materials Science / Metallurgy / Manufacturing Processes"
+          },
+          {
+            "id": "T2.4",
+            "name": "Mechanics / Theory / Dynamics of Machines / Machine Design"
+          },
+          {
+            "id": "T2.5",
+            "name": "Control Engineering / Instrumentation"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Refrigeration & Air Conditioning"
+          },
+          {
+            "name": "Internal Combustion Engines / Automobile Engineering"
+          },
+          {
+            "name": "Power Plant Engineering / Energy Engineering"
+          },
+          {
+            "name": "Renewable Energy / Non-conventional Energy Resources"
+          },
+          {
+            "name": "CAD/CAM/CIM, Industrial Automation & Robotics"
+          },
+          {
+            "name": "Operations Research, Quality & Maintenance Engineering"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          },
+          {
+            "label": "Technical Seminar / Paper Presentation / Workshop Practice / Engineering Shop",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation",
+              "Workshop Practice",
+              "Engineering Shop"
+            ]
+          }
+        ],
+        "optional": [],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "telecommunications-engineer",
+      "anzsco": "263311",
+      "title": "Telecommunications Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "09_Telecommunications_Engineer_263311_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "low",
+          "field": "tier2.core",
+          "message": "Rows 7 and 8 are tagged \"(supporting)\" but count in the 8-subject denominator."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Telecommunications Engineering (or an equivalent engineering qualification acceptable for ANZSCO 263311). e.g. Bachelor of Telecommunications Engineering, Bachelor of Engineering (Telecommunications), Bachelor of Technology in Electronics & Telecommunication Engineering, Bachelor of Engineering (Electronics and Communication) with Telecommunications major."
+      },
+      "tier1": {
+        "total": 6,
+        "thresholds": {
+          "noRisk": 5,
+          "lowRisk": 4
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics / Elements of Mechanical Engineering",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Mechanics, Elements of Mechanical Engineering variants."
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          },
+          {
+            "id": "T1.6",
+            "name": "Computer Programming Fundamentals",
+            "status": "expected"
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Communication Systems (Analog & Digital) / Data & Computer Communications / Networks"
+          },
+          {
+            "id": "T2.2",
+            "name": "Telecommunication Networks, Switching & Traffic Engineering/ Transmission Lines & Media"
+          },
+          {
+            "id": "T2.3",
+            "name": "Electromagnetic Theory / Fields & Waves"
+          },
+          {
+            "id": "T2.4",
+            "name": "Microwave & RF Engineering, Antenna & Wave Propagation"
+          },
+          {
+            "id": "T2.5",
+            "name": "Radar Systems, Satellite & Space Communication, Optical / Fibre-Optic Communication / Wireless & Mobile Communication"
+          },
+          {
+            "id": "T2.6",
+            "name": "Digital Signal Processing / Information Theory, Coding & Network Security / Signals & Systems / Network Analysis & Internetwork Design"
+          },
+          {
+            "id": "T2.7",
+            "name": "Electronic Devices & Circuits (supporting) / Digital Electronics & Logic Design (supporting)",
+            "labelledSupporting": true
+          },
+          {
+            "id": "T2.8",
+            "name": "Microprocessors, Microcontrollers & Embedded Systems (supporting) / VLSI / Digital System Design (supporting) / Instrumentation & Measurement (supporting)",
+            "labelledSupporting": true
+          }
+        ],
+        "optional": []
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Major Project / Thesis / Degree Project",
+          "aliases": [
+            "Final-Year",
+            "Major Project",
+            "Thesis",
+            "Degree Project"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / Internship / OJT / Technical Seminar / Independent Study",
+            "aliases": [
+              "Industrial Training",
+              "Internship",
+              "OJT",
+              "Technical Seminar",
+              "Independent Study"
+            ]
+          }
+        ],
+        "optional": [],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "engineering-technologist",
+      "anzsco": "233914",
+      "title": "Engineering Technologist",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "10_Engineering_Technologist_233914_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "high",
+          "field": "tier2.core",
+          "message": "Core rows 1–6 are six separate engineering streams (civil, mechanical, electrical, electronics, process, telecom) and row 7 is a catch-all sentence, not a subject. No Risk needs 7/7, but a typical technologist degree covers one stream, so most real transcripts would score Medium/High. Confirm whether this should be \"one stream matched\" or \"any N of 6\"."
+        },
+        {
+          "severity": "low",
+          "field": "tier3.optional",
+          "message": "Optional Tier 3 rows are stream names (Civil, Mechanical, ...), which looks copy-pasted from Tier 2."
+        },
+        {
+          "severity": "low",
+          "field": "qualification.statement",
+          "message": "Step 1 text ends with a double full stop and says any equivalent bachelor-level degree is eligible; treat as a broad accept rule."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is a recognised Engineering Technology qualification, or a Bachelor-level engineering degree in a specific stream (Civil, Mechanical, Electrical, Electronics/Instrumentation, Industrial/Process, or Telecommunications) that is assessed as Engineering Technologist rather than Professional Engineer --- typically because the program length, accreditation status, or depth of design content sits below the Washington Accord threshold used for Professional Engineer (Stage 1 Competency). e.g. Bachelor of Engineering Technology, Bachelor of Technology (stream-specific), Bachelor of Engineering (Technology stream / 3-year professional-track degree), Advanced Diploma of Engineering articulated into a Bachelor of Technology, All type of degree equivalent to bachelor of above it will be eligible for Engineering Technology.."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics / Elements of Mechanical Engineering",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Mechanics, Elements of Mechanical Engineering variants."
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / CAD / Graphics",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, CAD, Graphics variants."
+          },
+          {
+            "id": "T1.6",
+            "name": "Basic Electrical & Electronics Engineering",
+            "status": "optional"
+          },
+          {
+            "id": "T1.7",
+            "name": "Computer Programming / Computing",
+            "status": "optional"
+          },
+          {
+            "id": "T1.8",
+            "name": "Communication, Ethics & Professional Practice",
+            "status": "optional"
+          }
+        ]
+      },
+      "tier2": {
+        "total": 7,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Civil / Construction Technology"
+          },
+          {
+            "id": "T2.2",
+            "name": "Mechanical / Manufacturing Technology"
+          },
+          {
+            "id": "T2.3",
+            "name": "Electrical Technology"
+          },
+          {
+            "id": "T2.4",
+            "name": "Electronics / Instrumentation Technology"
+          },
+          {
+            "id": "T2.5",
+            "name": "Industrial / Process / Chemical Technology"
+          },
+          {
+            "id": "T2.6",
+            "name": "Telecommunications Technology"
+          },
+          {
+            "id": "T2.7",
+            "name": "All type of degree equivalent to bachelor with technological will be eligible for Engineering Technology.",
+            "catchAll": true
+          }
+        ],
+        "optional": []
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor / Mini Project",
+            "aliases": [
+              "Minor",
+              "Mini Project"
+            ]
+          },
+          {
+            "label": "Industrial Training Project / Practicum Report / Technical Report / Seminar",
+            "aliases": [
+              "Industrial Training Project",
+              "Practicum Report",
+              "Technical Report",
+              "Seminar"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Design Project (course-embedded)",
+            "aliases": [
+              "Design Project (course-embedded)"
+            ]
+          },
+          {
+            "label": "Civil / Construction",
+            "aliases": [
+              "Civil",
+              "Construction"
+            ]
+          },
+          {
+            "label": "Mechanical / Manufacturing",
+            "aliases": [
+              "Mechanical",
+              "Manufacturing"
+            ]
+          },
+          {
+            "label": "Electrical",
+            "aliases": [
+              "Electrical"
+            ]
+          },
+          {
+            "label": "Electronics / Instrumentation",
+            "aliases": [
+              "Electronics",
+              "Instrumentation"
+            ]
+          },
+          {
+            "label": "Industrial / Process",
+            "aliases": [
+              "Industrial",
+              "Process"
+            ]
+          },
+          {
+            "label": "Telecommunications",
+            "aliases": [
+              "Telecommunications"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "civil-engineering-draftsperson",
+      "anzsco": "312211",
+      "title": "Civil Engineering Draftsperson",
+      "flow": "vocational_units",
+      "source": {
+        "file": "11_Civil_Engineering_Draftsperson_312211_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "high",
+          "field": "coreUnits.units",
+          "message": "Core unit codes are placeholders (\"Core Unit 1–8\") pending validation against training.gov.au. Do not use for production scoring until populated."
+        },
+        {
+          "severity": "medium",
+          "field": "electives.minimumUnits",
+          "message": "Minimum elective count is not stated in the doc (packaging rule). Set before use."
+        }
+      ],
+      "dataNote": "Data note: the core unit codes for this qualification are recorded as placeholders in the source rubric and are pending validation against training.gov.au. The counts, risk bands and structure below are ready for production use; the specific unit codes/titles in Step 2 should be populated as soon as they are confirmed.",
+      "qualification": {
+        "statement": "Confirm that the qualification is, or is equivalent to, RII60520 -- Advanced Diploma of Civil Construction Design. Accepted qualification titles include: RII60520 Advanced Diploma of Civil Construction Design, Overseas equivalent Advanced Diploma / Associate Degree in Civil Engineering Drafting/Design.",
+        "codes": [
+          "RII60520"
+        ]
+      },
+      "coreUnits": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "units": [
+          {
+            "id": "U1",
+            "code": null,
+            "title": "Core Unit 1",
+            "placeholder": true
+          },
+          {
+            "id": "U2",
+            "code": null,
+            "title": "Core Unit 2",
+            "placeholder": true
+          },
+          {
+            "id": "U3",
+            "code": null,
+            "title": "Core Unit 3",
+            "placeholder": true
+          },
+          {
+            "id": "U4",
+            "code": null,
+            "title": "Core Unit 4",
+            "placeholder": true
+          },
+          {
+            "id": "U5",
+            "code": null,
+            "title": "Core Unit 5",
+            "placeholder": true
+          },
+          {
+            "id": "U6",
+            "code": null,
+            "title": "Core Unit 6",
+            "placeholder": true
+          },
+          {
+            "id": "U7",
+            "code": null,
+            "title": "Core Unit 7",
+            "placeholder": true
+          },
+          {
+            "id": "U8",
+            "code": null,
+            "title": "Core Unit 8",
+            "placeholder": true
+          }
+        ]
+      },
+      "electives": {
+        "clusters": [
+          "Project Management (varies)",
+          "Leadership / Innovation",
+          "Structural Design Specialization",
+          "Road & Infrastructure Design",
+          "Business / Feasibility (isolated)",
+          "Engineering Fundamentals (isolated, single RTO observed)",
+          "Others"
+        ],
+        "minimumUnits": null,
+        "rule": "Count-only check: applicant must meet the qualification packaging-rule minimum; no specific elective is mandatory."
+      },
+      "practicalEvidence": {
+        "role": "supporting_only"
+      }
+    },
+    {
+      "id": "telecommunications-network-planner",
+      "anzsco": "313213",
+      "title": "Telecommunications Network Planner",
+      "flow": "vocational_units",
+      "source": {
+        "file": "12_Telecommunications_Network_Planner_313213_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "electives.minimumUnits",
+          "message": "Minimum elective count is not stated in the doc (packaging rule). Set before use."
+        },
+        {
+          "severity": "low",
+          "field": "electives.clusters",
+          "message": "Source lists \"Others\" twice in the elective cluster; deduplicated."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is, or is equivalent to, ICT60220 -- Advanced Diploma of Information Technology (Telecommunications Network Engineering). Accepted qualification titles include: ICT60220 Advanced Diploma of Information Technology (Telecommunications Network Engineering), Overseas equivalent Advanced Diploma / Associate Degree in Telecommunications Network Engineering/Planning.",
+        "codes": [
+          "ICT60220"
+        ]
+      },
+      "coreUnits": {
+        "total": 11,
+        "thresholds": {
+          "noRisk": 10,
+          "lowRisk": 7,
+          "medium": 5
+        },
+        "units": [
+          {
+            "id": "U1",
+            "code": "BSBCRT611",
+            "title": "Apply critical thinking for complex problem solving"
+          },
+          {
+            "id": "U2",
+            "code": "BSBTWK502",
+            "title": "Manage team effectiveness"
+          },
+          {
+            "id": "U3",
+            "code": "BSBXCS402",
+            "title": "Promote workplace cyber security awareness and best practices"
+          },
+          {
+            "id": "U4",
+            "code": "ICTICT608",
+            "title": "Interact with clients on a business level"
+          },
+          {
+            "id": "U5",
+            "code": "ICTICT618",
+            "title": "Manage IP, ethics and privacy in ICT environments"
+          },
+          {
+            "id": "U6",
+            "code": "ICTNPL413",
+            "title": "Evaluate networking regulations and legislation for the telecommunications industry"
+          },
+          {
+            "id": "U7",
+            "code": "ICTNWK612",
+            "title": "Plan and manage troubleshooting advanced integrated IP networks"
+          },
+          {
+            "id": "U8",
+            "code": "ICTPMG613",
+            "title": "Manage ICT project planning"
+          },
+          {
+            "id": "U9",
+            "code": "ICTSAD609",
+            "title": "Plan and monitor business analysis activities in an ICT environment"
+          },
+          {
+            "id": "U10",
+            "code": "ICTTEN615",
+            "title": "Manage network traffic"
+          },
+          {
+            "id": "U11",
+            "code": "ICTTEN622",
+            "title": "Produce ICT network architecture designs"
+          }
+        ]
+      },
+      "electives": {
+        "clusters": [
+          "WAN / Wireless Network Design",
+          "Cyber Security",
+          "Project Management (extended)",
+          "Leadership / Change Management",
+          "Enterprise Analysis / Sustainability (isolated)",
+          "Others"
+        ],
+        "minimumUnits": null,
+        "rule": "Count-only check: applicant must meet the qualification packaging-rule minimum; no specific elective is mandatory."
+      },
+      "practicalEvidence": {
+        "role": "supporting_only"
+      }
+    },
+    {
+      "id": "mechanical-engineering-draftsperson",
+      "anzsco": "312511",
+      "title": "Mechanical Engineering Draftsperson",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "13_Mechanical_Engineering_Draftsperson_312511_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "low",
+          "field": "tier2.core",
+          "message": "Row 9 \"Tool, Die & Jig/Fixture Design (Optional)\" is labelled optional but counted in the 9-subject denominator."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Mechanical Engineering Drafting/Design (or an equivalent engineering qualification acceptable for ANZSCO 312511). e.g. Diploma of Engineering -- Mechanical Drafting/Design, Advanced Diploma of Engineering -- Mechanical Drafting/Design, Associate Degree in Mechanical Engineering Drafting, Bachelor of Engineering Technology (Mechanical Drafting/Design)."
+      },
+      "tier1": {
+        "total": 4,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Applied Mathematics / Trade Mathematics",
+            "status": "expected",
+            "matchingNote": "Includes Applied Mathematics, Trade Mathematics variants."
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics / Applied Science",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Physics, Applied Science variants."
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry / Materials Fundamentals",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Chemistry, Materials Fundamentals variants."
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Graphics / Technical Drawing",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Graphics, Technical Drawing variants."
+          },
+          {
+            "id": "T1.5",
+            "name": "Basic Electrical & Electronics",
+            "status": "optional"
+          },
+          {
+            "id": "T1.6",
+            "name": "Computer Fundamentals / IT",
+            "status": "optional"
+          },
+          {
+            "id": "T1.7",
+            "name": "Communication & Professional Ethics",
+            "status": "optional"
+          }
+        ]
+      },
+      "tier2": {
+        "total": 9,
+        "thresholds": {
+          "noRisk": 8,
+          "lowRisk": 6,
+          "medium": 4
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Computer-Aided Design (2D CAD)"
+          },
+          {
+            "id": "T2.2",
+            "name": "3D Parametric Modeling / Solid Modeling"
+          },
+          {
+            "id": "T2.3",
+            "name": "Geometric Dimensioning & Tolerancing (GD&T)"
+          },
+          {
+            "id": "T2.4",
+            "name": "Machine Design & Component Drafting"
+          },
+          {
+            "id": "T2.5",
+            "name": "Manufacturing Processes & Production Technology"
+          },
+          {
+            "id": "T2.6",
+            "name": "Engineering Materials & Metallurgy"
+          },
+          {
+            "id": "T2.7",
+            "name": "Engineering Mechanics & Strength of Materials"
+          },
+          {
+            "id": "T2.8",
+            "name": "Fluid Power / Hydraulics & Pneumatics"
+          },
+          {
+            "id": "T2.9",
+            "name": "Tool, Die & Jig/Fixture Design (Optional)",
+            "labelledOptional": true
+          }
+        ],
+        "optional": [
+          {
+            "name": "Piping & Plant Layout Drafting"
+          },
+          {
+            "name": "HVAC & Ducting Design"
+          },
+          {
+            "name": "CNC Programming & CAM"
+          },
+          {
+            "name": "Finite Element Analysis (FEA) Basics"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Major Drafting Project / Capstone Design",
+          "aliases": [
+            "Major Drafting Project",
+            "Capstone Design"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project / Mini Project",
+            "aliases": [
+              "Minor Project",
+              "Mini Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / Internship / Apprenticeship",
+            "aliases": [
+              "Industrial Training",
+              "Internship",
+              "Apprenticeship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Workshop Practice / Basic Fabrication",
+            "aliases": [
+              "Workshop Practice",
+              "Basic Fabrication"
+            ]
+          },
+          {
+            "label": "Technical Seminar / Drafting Portfolio",
+            "aliases": [
+              "Technical Seminar",
+              "Drafting Portfolio"
+            ]
+          },
+          {
+            "label": "Industrial Management & Cost Estimation",
+            "aliases": [
+              "Industrial Management & Cost Estimation"
+            ]
+          },
+          {
+            "label": "Safety & Standard Codes Practice",
+            "aliases": [
+              "Safety & Standard Codes Practice"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "electrical-engineering-draftsperson",
+      "anzsco": "312311",
+      "title": "Electrical Engineering Draftsperson",
+      "flow": "vocational_units",
+      "source": {
+        "file": "14_Electrical_Engineering_Draftsperson_312311_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "electives.minimumUnits",
+          "message": "Minimum elective count is not stated in the doc (packaging rule). Set before use."
+        },
+        {
+          "severity": "low",
+          "field": "coreUnits.units",
+          "message": "Unit BSBMSB402 looks like a typo for BSBSMB402 (Plan small business finances). Left as written; verify on training.gov.au."
+        },
+        {
+          "severity": "low",
+          "field": "electives.clusters",
+          "message": "Source lists \"Others / Additional electives\" twice; deduplicated."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is, or is equivalent to, UEE62122 -- Advanced Diploma of Engineering Technology -- Electrical. Accepted qualification titles include: UEE62122 Advanced Diploma of Engineering Technology -- Electrical, Overseas equivalent Advanced Diploma / Associate Degree in Electrical Engineering Drafting/Design.",
+        "codes": [
+          "UEE62122"
+        ]
+      },
+      "coreUnits": {
+        "total": 24,
+        "thresholds": {
+          "noRisk": 21,
+          "lowRisk": 15,
+          "medium": 9
+        },
+        "units": [
+          {
+            "id": "U1",
+            "code": "UEECD0007",
+            "title": "Apply Work Health and Safety regulations, codes and practices in the workplace"
+          },
+          {
+            "id": "U2",
+            "code": "UEECD0030",
+            "title": "Prepare electrotechnology/utilities drawings using manual drafting and CAD equipment and software"
+          },
+          {
+            "id": "U3",
+            "code": "UEECD0031",
+            "title": "Prepare engineering drawings using manual drafting and CAD for electrotechnology applications"
+          },
+          {
+            "id": "U4",
+            "code": "UEECD0032",
+            "title": "Produce detailed electrotechnology/utilities drawings using CAD equipment and software"
+          },
+          {
+            "id": "U5",
+            "code": "UEECD0038",
+            "title": "Provide engineering solutions for problems in complex multiple path circuits"
+          },
+          {
+            "id": "U6",
+            "code": "UEECD0044",
+            "title": "Solve problems in single and three phase low voltage electrical apparatus and circuits"
+          },
+          {
+            "id": "U7",
+            "code": "UEECD0046",
+            "title": "Solve problems in single and three phase low voltage circuits"
+          },
+          {
+            "id": "U8",
+            "code": "UEECD0051",
+            "title": "Use drawings, diagrams, schedules, standards, codes and specifications"
+          },
+          {
+            "id": "U9",
+            "code": "UEECD0059",
+            "title": "Write specifications for electrical engineering projects"
+          },
+          {
+            "id": "U10",
+            "code": "UEECD0064",
+            "title": "Interpret, produce and modify electrotechnology drawings"
+          },
+          {
+            "id": "U11",
+            "code": "UEEEL0006",
+            "title": "Develop detailed and complex drawings for electrical systems using CAD systems"
+          },
+          {
+            "id": "U12",
+            "code": "UEEEL0007",
+            "title": "Develop detailed electrical drawings"
+          },
+          {
+            "id": "U13",
+            "code": "UEEEL0013",
+            "title": "Design explosion-protected electrical systems and installations - mining"
+          },
+          {
+            "id": "U14",
+            "code": "UEEEL0014",
+            "title": "Design explosion-protected electrical systems and installations - gas atmospheres"
+          },
+          {
+            "id": "U15",
+            "code": "UEEEL0015",
+            "title": "Design explosion-protected electrical systems and installations - dust atmospheres"
+          },
+          {
+            "id": "U16",
+            "code": "UEEEL0058",
+            "title": "Plan large electrical projects"
+          },
+          {
+            "id": "U17",
+            "code": "UEEEL0079",
+            "title": "Plan and analyse LV electrical apparatus"
+          },
+          {
+            "id": "U18",
+            "code": "UEEEL0080",
+            "title": "Plan and analyse wiring systems, circuits, control and protection for electrical installations"
+          },
+          {
+            "id": "U19",
+            "code": "UEEIC0047",
+            "title": "Use instrumentation drawings, specifications, standards and equipment manuals"
+          },
+          {
+            "id": "U20",
+            "code": "UEEIC0048",
+            "title": "Use system CAD software to produce control systems specifications and diagrams"
+          },
+          {
+            "id": "U21",
+            "code": "UEERE0001",
+            "title": "Apply sustainable energy and environmental procedures"
+          },
+          {
+            "id": "U22",
+            "code": "UEERE0011",
+            "title": "Design grid connected power supply systems"
+          },
+          {
+            "id": "U23",
+            "code": "BSBSMB401",
+            "title": "Establish legal and risk management requirements of small business"
+          },
+          {
+            "id": "U24",
+            "code": "BSBMSB402",
+            "title": "Plan small business finances"
+          }
+        ]
+      },
+      "electives": {
+        "clusters": [
+          "UEEEL0002 / Design electrical installations (hazardous areas etc)",
+          "UEEEL0039 / UEEEL0040 Design LV power distribution / installations",
+          "UEEEL0042 / UEEEL0045 Design power factor / switchboards",
+          "UEEEL0068 Plan and design renewable energy systems",
+          "UEEIC0013 / UEEIC0025 PLC SCADA / Process control",
+          "BSBPMG522 Undertake project work",
+          "Others / Additional electives"
+        ],
+        "minimumUnits": null,
+        "rule": "Count-only check: applicant must meet the qualification packaging-rule minimum; no specific elective is mandatory."
+      },
+      "practicalEvidence": {
+        "role": "supporting_only"
+      }
+    },
+    {
+      "id": "aeronautical-engineer",
+      "anzsco": "233911",
+      "title": "Aeronautical Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "15_Aeronautical_Engineer_233911_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "info",
+          "field": "tier3",
+          "message": "Tier 3 has no Minor Project row and only Technical Seminar as optional."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Aeronautical Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233911). e.g. Bachelor of Aeronautical Engineering, Bachelor of Engineering (Aeronautical), Bachelor of Science in Aerospace Engineering, Bachelor of Technology in Aeronautical Engineering."
+      },
+      "tier1": {
+        "total": 9,
+        "thresholds": {
+          "noRisk": 8,
+          "lowRisk": 6
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Linear Algebra & Vector Calculus",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Probability & Statistics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Chemistry & Materials",
+            "status": "expected"
+          },
+          {
+            "id": "T1.6",
+            "name": "Computer Programming (Foundational)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.7",
+            "name": "Engineering Drawing / CAD / Graphics",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, CAD, Graphics variants."
+          },
+          {
+            "id": "T1.8",
+            "name": "Engineering Mechanics / Mechanics of Solids",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Mechanics, Mechanics of Solids variants."
+          },
+          {
+            "id": "T1.9",
+            "name": "Basic Electrical & Electronics Engineering",
+            "status": "expected"
+          },
+          {
+            "id": "T1.10",
+            "name": "Others (General / Support Subjects)",
+            "status": "contextual",
+            "matchingNote": "Not used to determine suitability (context only)."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 11,
+        "thresholds": {
+          "noRisk": 10,
+          "lowRisk": 7,
+          "medium": 5
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Aerodynamics"
+          },
+          {
+            "id": "T2.2",
+            "name": "Flight Mechanics, Performance & Control"
+          },
+          {
+            "id": "T2.3",
+            "name": "Aircraft & Aerospace Structures"
+          },
+          {
+            "id": "T2.4",
+            "name": "Aircraft Propulsion & Powerplants"
+          },
+          {
+            "id": "T2.5",
+            "name": "Avionics & Instrumentation"
+          },
+          {
+            "id": "T2.6",
+            "name": "Aircraft Design"
+          },
+          {
+            "id": "T2.7",
+            "name": "Aircraft Systems, Manufacturing & Maintenance"
+          },
+          {
+            "id": "T2.8",
+            "name": "Fluid Mechanics, Thermodynamics & Heat Transfer"
+          },
+          {
+            "id": "T2.9",
+            "name": "Finite Element & Computational Methods"
+          },
+          {
+            "id": "T2.10",
+            "name": "Space Technology & Rotary-Wing Aircraft"
+          },
+          {
+            "id": "T2.11",
+            "name": "Air Transportation, Airport & Airways Operations"
+          }
+        ],
+        "optional": []
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Industrial Training / Internship / Practical Flight-Line Training",
+            "aliases": [
+              "Industrial Training",
+              "Internship",
+              "Practical Flight-Line Training"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "agricultural-engineer",
+      "anzsco": "233912",
+      "title": "Agricultural Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "16_Agricultural_Engineer_233912_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "info",
+          "field": "tier3",
+          "message": "Tier 3 has no Minor Project row; gate plus industrial training only."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Agricultural Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233912). e.g. Bachelor of Agricultural Engineering, Bachelor of Engineering (Agricultural), Bachelor of Technology in Agricultural Engineering, Bachelor of Science in Agricultural Engineering."
+      },
+      "tier1": {
+        "total": 9,
+        "thresholds": {
+          "noRisk": 8,
+          "lowRisk": 6
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Probability & Statistics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Natural & Biological Sciences",
+            "status": "expected"
+          },
+          {
+            "id": "T1.6",
+            "name": "Computer Programming (Foundational)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.7",
+            "name": "Engineering Drawing / CAD / Graphics",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, CAD, Graphics variants."
+          },
+          {
+            "id": "T1.8",
+            "name": "Engineering Mechanics / Mechanics of Solids",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Mechanics, Mechanics of Solids variants."
+          },
+          {
+            "id": "T1.9",
+            "name": "Basic Electrical & Electronics Engineering",
+            "status": "expected"
+          },
+          {
+            "id": "T1.10",
+            "name": "Others (General / Support Subjects)",
+            "status": "contextual",
+            "matchingNote": "Not used to determine suitability (context only)."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 9,
+        "thresholds": {
+          "noRisk": 8,
+          "lowRisk": 6,
+          "medium": 4
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Farm Power, Machinery & Tractors"
+          },
+          {
+            "id": "T2.2",
+            "name": "Soil & Water Engineering (Irrigation, Drainage & Conservation)"
+          },
+          {
+            "id": "T2.3",
+            "name": "Hydrology, Hydraulics & Fluid Mechanics"
+          },
+          {
+            "id": "T2.4",
+            "name": "Agricultural / Farm Structures & Materials"
+          },
+          {
+            "id": "T2.5",
+            "name": "Surveying, Geomatics & GIS"
+          },
+          {
+            "id": "T2.6",
+            "name": "Farm Processing, Food & Post-Harvest Engineering"
+          },
+          {
+            "id": "T2.7",
+            "name": "Thermodynamics, Heat Transfer & Farm Energy"
+          },
+          {
+            "id": "T2.8",
+            "name": "Instrumentation, Automation & Computational Engineering"
+          },
+          {
+            "id": "T2.9",
+            "name": "Environmental & Industrial Engineering (Agricultural Context)"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Educational / Field Exposure Tour"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Industrial Training / Internship / On-the-Job Training",
+            "aliases": [
+              "Industrial Training",
+              "Internship",
+              "On-the-Job Training"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Workshop Practice & Manufacturing Processes",
+            "aliases": [
+              "Workshop Practice & Manufacturing Processes"
+            ]
+          },
+          {
+            "label": "Practical / Hands-on Laboratory Training",
+            "aliases": [
+              "Practical",
+              "Hands-on Laboratory Training"
+            ]
+          },
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "biomedical-engineer",
+      "anzsco": "233913",
+      "title": "Biomedical Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "17_Biomedical_Engineer_233913_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "low",
+          "field": "tier1/tier2",
+          "message": "Life Science sits in the contextual-only Tier 1 row, while Anatomy & Physiology / Biochemistry is Tier 2 core row 1, so a life-science course is only credited at Tier 2. Tier 1 has 7 expected rows of 9 listed."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Biomedical Engineering (or an equivalent engineering qualification acceptable for ANZSCO 233913). e.g. Bachelor of Biomedical Engineering, Bachelor of Engineering (Biomedical), Bachelor of Technology in Biomedical Engineering, Bachelor of Science in Biomedical Engineering."
+      },
+      "tier1": {
+        "total": 7,
+        "thresholds": {
+          "noRisk": 6,
+          "lowRisk": 5
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics / Basic Civil & Mechanical Engineering",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Mechanics, Basic Civil & Mechanical Engineering variants."
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          },
+          {
+            "id": "T1.6",
+            "name": "Computer Programming / Computing",
+            "status": "expected",
+            "matchingNote": "Includes Computer Programming, Computing variants."
+          },
+          {
+            "id": "T1.7",
+            "name": "Basic Electrical & Electronics Engineering",
+            "status": "expected"
+          },
+          {
+            "id": "T1.8",
+            "name": "Communication, Ethics & Professional Practice",
+            "status": "optional"
+          },
+          {
+            "id": "T1.9",
+            "name": "Others (Workshop, Environmental Studies, Life Science, Management, Personality Development)",
+            "status": "contextual",
+            "matchingNote": "Not used to determine suitability (context only)."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 14,
+        "thresholds": {
+          "noRisk": 13,
+          "lowRisk": 9,
+          "medium": 6
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Human Anatomy & Physiology / Biochemistry"
+          },
+          {
+            "id": "T2.2",
+            "name": "Biomaterials / Artificial Organs & Implants"
+          },
+          {
+            "id": "T2.3",
+            "name": "Medical Physics"
+          },
+          {
+            "id": "T2.4",
+            "name": "Biomechanics"
+          },
+          {
+            "id": "T2.5",
+            "name": "Signals & Systems / Biosignal Processing"
+          },
+          {
+            "id": "T2.6",
+            "name": "Biomedical / Medical Instrumentation"
+          },
+          {
+            "id": "T2.7",
+            "name": "Biosensors, Transducers & Measurement"
+          },
+          {
+            "id": "T2.8",
+            "name": "Electronic Devices & Circuits / Integrated Circuits"
+          },
+          {
+            "id": "T2.9",
+            "name": "Microprocessors & Microcontrollers (Biomedical)"
+          },
+          {
+            "id": "T2.10",
+            "name": "Control Systems / Bio-Control Systems"
+          },
+          {
+            "id": "T2.11",
+            "name": "Pathology & Microbiology"
+          },
+          {
+            "id": "T2.12",
+            "name": "Medical / Diagnostic Imaging & Image Processing"
+          },
+          {
+            "id": "T2.13",
+            "name": "Hospital Management / Clinical & Healthcare Systems Engineering"
+          },
+          {
+            "id": "T2.14",
+            "name": "Rehabilitation Engineering / Assistive & Diagnostic-Therapeutic Equipment"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Medical Informatics / AI & Bioinformatics in Healthcare"
+          },
+          {
+            "name": "Telemedicine / Tele-health"
+          },
+          {
+            "name": "Biomedical Optics, Photonics & Laser Instrumentation"
+          },
+          {
+            "name": "BioMEMS / Nanotechnology in Medicine"
+          },
+          {
+            "name": "Radiology, Nuclear Medicine & Radiological Equipment"
+          },
+          {
+            "name": "Virtual Instrumentation"
+          },
+          {
+            "name": "Molecular Biology, Genetics, Immunology & Biotechnology"
+          },
+          {
+            "name": "Ultrasound / Specialised Medical Equipment Applications"
+          },
+          {
+            "name": "Bio-fluidics, Modelling & Simulation"
+          },
+          {
+            "name": "Neuroengineering / Brain-Computer Interfaces"
+          },
+          {
+            "name": "Entrepreneurship & Emerging Design Practices"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Thesis / Major Project",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Thesis",
+            "Major Project"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Industrial Training / Internship / Hospital Training",
+            "aliases": [
+              "Industrial Training",
+              "Internship",
+              "Hospital Training"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Comprehensive Viva",
+            "aliases": [
+              "Technical Seminar",
+              "Comprehensive Viva"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "materials-engineer",
+      "anzsco": "233112",
+      "title": "Materials Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "18_Materials_Engineer_233112_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.thresholds",
+          "message": "Source bands read 7–8 / 5 / 3 / 0–1 (of 8); scores [2, 4, 6] fall in no band. Encoded as minimum-score thresholds (>= 7 No Risk, >= 5 Low, >= 3 Medium, else High) so every score resolves. Confirm this reading."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Materials Engineer (or an equivalent engineering qualification acceptable for ANZSCO 233112). e.g. Bachelor of Materials Engineering, Bachelor of Engineering (Materials), Bachelor of Science in Materials Science & Engineering, Bachelor of Technology in Metallurgical & Materials Engineering."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Materials Science / Structure of Materials / Crystallography"
+          },
+          {
+            "id": "T2.2",
+            "name": "Physical Metallurgy / Phase Transformations"
+          },
+          {
+            "id": "T2.3",
+            "name": "Mechanical Behaviour of Materials / Strength of Materials"
+          },
+          {
+            "id": "T2.4",
+            "name": "Materials Characterisation / Microscopy & Testing"
+          },
+          {
+            "id": "T2.5",
+            "name": "Thermodynamics of Materials / Kinetics"
+          },
+          {
+            "id": "T2.6",
+            "name": "Manufacturing Processes / Materials Processing"
+          },
+          {
+            "id": "T2.7",
+            "name": "Corrosion / Degradation / Surface Engineering"
+          },
+          {
+            "id": "T2.8",
+            "name": "Polymer / Ceramic / Composite Materials"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Nanomaterials / Advanced Materials"
+          },
+          {
+            "name": "Electronic / Magnetic / Functional Materials"
+          },
+          {
+            "name": "Biomaterials"
+          },
+          {
+            "name": "Extractive Metallurgy / Mineral Processing"
+          },
+          {
+            "name": "Welding / Joining Technology"
+          },
+          {
+            "name": "Computational Materials Science / Modelling"
+          },
+          {
+            "name": "Quality Control / Non-Destructive Testing"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Engineering Shop / Lab Work",
+            "aliases": [
+              "Workshop Practice",
+              "Engineering Shop",
+              "Lab Work"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "geotechnical-engineer",
+      "anzsco": "233212",
+      "title": "Geotechnical Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "19_Geotechnical_Engineer_233212_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.thresholds",
+          "message": "Source bands read 7–8 / 5 / 3 / 0–1 (of 8); scores [2, 4, 6] fall in no band. Encoded as minimum-score thresholds (>= 7 No Risk, >= 5 Low, >= 3 Medium, else High) so every score resolves. Confirm this reading."
+        },
+        {
+          "severity": "low",
+          "field": "tier1/tier2",
+          "message": "Tier 1 row 5 includes Surveying; Tier 2 rows 7 and 8 (Strength of Materials, Fluid Mechanics) overlap Tier 1 Mechanics. One subject could fill rows in both tiers."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Geotechnical Engineer (or an equivalent engineering qualification acceptable for ANZSCO 233212). e.g. Bachelor of Civil Engineering (Geotechnical), Bachelor of Engineering (Geotechnical), Bachelor of Science in Geotechnical Engineering, Bachelor of Technology in Civil Engineering with Geotechnical specialisation."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD / Surveying",
+            "status": "expected",
+            "matchingNote": "Includes Drawing, Graphics, CAD and basic Surveying variants."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Soil Mechanics / Geotechnical Engineering Fundamentals"
+          },
+          {
+            "id": "T2.2",
+            "name": "Foundation Engineering / Shallow & Deep Foundations"
+          },
+          {
+            "id": "T2.3",
+            "name": "Rock Mechanics / Engineering Geology"
+          },
+          {
+            "id": "T2.4",
+            "name": "Slope Stability / Earth Retaining Structures"
+          },
+          {
+            "id": "T2.5",
+            "name": "Ground Improvement / Soil Stabilisation"
+          },
+          {
+            "id": "T2.6",
+            "name": "Site Investigation / Geotechnical Exploration"
+          },
+          {
+            "id": "T2.7",
+            "name": "Strength of Materials / Structural Mechanics"
+          },
+          {
+            "id": "T2.8",
+            "name": "Fluid Mechanics / Groundwater Hydrology"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Earthquake Geotechnical Engineering / Seismic Design"
+          },
+          {
+            "name": "Tunnel Engineering / Underground Structures"
+          },
+          {
+            "name": "Pavement Engineering / Transportation Geotechnics"
+          },
+          {
+            "name": "Environmental Geotechnics / Contaminated Land"
+          },
+          {
+            "name": "Numerical Methods / Finite Element Analysis for Geotechnics"
+          },
+          {
+            "name": "Geosynthetics / Reinforced Soil Structures"
+          },
+          {
+            "name": "Risk, Hazard & Disaster Management"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Field Investigation / Lab Work",
+            "aliases": [
+              "Workshop Practice",
+              "Field Investigation",
+              "Lab Work"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "structural-engineer",
+      "anzsco": "233214",
+      "title": "Structural Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "20_Structural_Engineer_233214_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.thresholds",
+          "message": "Source bands read 7–8 / 5 / 3 / 0–1 (of 8); scores [2, 4, 6] fall in no band. Encoded as minimum-score thresholds (>= 7 No Risk, >= 5 Low, >= 3 Medium, else High) so every score resolves. Confirm this reading."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Structural Engineer (or an equivalent engineering qualification acceptable for ANZSCO 233214). e.g. Bachelor of Civil Engineering (Structural), Bachelor of Engineering (Structural), Bachelor of Science in Structural Engineering, Bachelor of Technology in Civil Engineering with Structural specialisation."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Structural Analysis / Theory of Structures"
+          },
+          {
+            "id": "T2.2",
+            "name": "Reinforced Concrete Design / Concrete Structures"
+          },
+          {
+            "id": "T2.3",
+            "name": "Steel Design / Steel Structures"
+          },
+          {
+            "id": "T2.4",
+            "name": "Strength of Materials / Solid Mechanics"
+          },
+          {
+            "id": "T2.5",
+            "name": "Structural Dynamics / Earthquake Engineering"
+          },
+          {
+            "id": "T2.6",
+            "name": "Foundation Engineering / Soil Mechanics"
+          },
+          {
+            "id": "T2.7",
+            "name": "Building Codes / Design Standards & Loading"
+          },
+          {
+            "id": "T2.8",
+            "name": "Construction Materials / Construction Technology"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Prestressed Concrete / Advanced Concrete Design"
+          },
+          {
+            "name": "Bridge Engineering / Bridge Design"
+          },
+          {
+            "name": "Timber / Masonry Structures"
+          },
+          {
+            "name": "Finite Element Analysis / Computational Structural Mechanics"
+          },
+          {
+            "name": "Tall Buildings / High-Rise Design"
+          },
+          {
+            "name": "Structural Health Monitoring / Rehabilitation"
+          },
+          {
+            "name": "Wind Engineering / Aerodynamics of Structures"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Engineering Shop / Lab Work",
+            "aliases": [
+              "Workshop Practice",
+              "Engineering Shop",
+              "Lab Work"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "transport-engineer",
+      "anzsco": "233215",
+      "title": "Transport Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "21_Transport_Engineer_233215_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.thresholds",
+          "message": "Source bands read 7–8 / 5 / 3 / 0–1 (of 8); scores [2, 4, 6] fall in no band. Encoded as minimum-score thresholds (>= 7 No Risk, >= 5 Low, >= 3 Medium, else High) so every score resolves. Confirm this reading."
+        },
+        {
+          "severity": "low",
+          "field": "tier1/tier2",
+          "message": "Tier 1 row 5 includes Surveying and Tier 2 row 7 is Surveying / Geospatial: one transcript subject could fill both."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Transport Engineer (or an equivalent engineering qualification acceptable for ANZSCO 233215). e.g. Bachelor of Civil Engineering (Transport), Bachelor of Engineering (Transport / Traffic), Bachelor of Science in Transportation Engineering, Bachelor of Technology in Civil Engineering with Transport specialisation."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD / Surveying",
+            "status": "expected",
+            "matchingNote": "Includes Drawing, Graphics, CAD and Surveying variants."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Transportation / Highway / Traffic Engineering"
+          },
+          {
+            "id": "T2.2",
+            "name": "Traffic Flow Theory / Traffic Operations & Control"
+          },
+          {
+            "id": "T2.3",
+            "name": "Pavement Design / Highway Materials"
+          },
+          {
+            "id": "T2.4",
+            "name": "Transport Planning / Urban Transport Systems"
+          },
+          {
+            "id": "T2.5",
+            "name": "Highway Geometric Design / Alignment Design"
+          },
+          {
+            "id": "T2.6",
+            "name": "Public Transport Systems / Transit Planning"
+          },
+          {
+            "id": "T2.7",
+            "name": "Surveying / Geospatial Methods for Transport"
+          },
+          {
+            "id": "T2.8",
+            "name": "Construction Management / Estimation for Transport Projects"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Airport Engineering / Air Transport"
+          },
+          {
+            "name": "Railway Engineering / Rail Systems"
+          },
+          {
+            "name": "Intelligent Transport Systems / Smart Mobility"
+          },
+          {
+            "name": "Transport Economics / Project Appraisal"
+          },
+          {
+            "name": "Freight / Logistics / Supply Chain Transport"
+          },
+          {
+            "name": "Road Safety / Accident Analysis"
+          },
+          {
+            "name": "Environmental Impact of Transport"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Field Survey / Lab Work",
+            "aliases": [
+              "Workshop Practice",
+              "Field Survey",
+              "Lab Work"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "industrial-engineer",
+      "anzsco": "233511",
+      "title": "Industrial Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "22_Industrial_Engineer_233511_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.thresholds",
+          "message": "Source bands read 7–8 / 5 / 3 / 0–1 (of 8); scores [2, 4, 6] fall in no band. Encoded as minimum-score thresholds (>= 7 No Risk, >= 5 Low, >= 3 Medium, else High) so every score resolves. Confirm this reading."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Industrial Engineer (or an equivalent engineering qualification acceptable for ANZSCO 233511). e.g. Bachelor of Industrial Engineering, Bachelor of Engineering (Industrial), Bachelor of Science in Industrial Engineering, Bachelor of Technology in Industrial / Production Engineering."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Operations Research / Optimisation / Linear Programming"
+          },
+          {
+            "id": "T2.2",
+            "name": "Work Study / Methods Engineering / Time & Motion Study"
+          },
+          {
+            "id": "T2.3",
+            "name": "Production Planning & Control / Scheduling"
+          },
+          {
+            "id": "T2.4",
+            "name": "Quality Control / Statistical Quality Control / Six Sigma"
+          },
+          {
+            "id": "T2.5",
+            "name": "Facility Layout / Plant Design / Material Handling"
+          },
+          {
+            "id": "T2.6",
+            "name": "Supply Chain / Inventory / Logistics Management"
+          },
+          {
+            "id": "T2.7",
+            "name": "Manufacturing Processes / Production Technology"
+          },
+          {
+            "id": "T2.8",
+            "name": "Engineering Economy / Cost Analysis / Industrial Costing"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Human Factors / Ergonomics"
+          },
+          {
+            "name": "Simulation / Discrete Event Modelling"
+          },
+          {
+            "name": "Lean Manufacturing / Just-in-Time Systems"
+          },
+          {
+            "name": "Reliability / Maintenance Engineering"
+          },
+          {
+            "name": "Project Management / Industrial Project Control"
+          },
+          {
+            "name": "Information Systems / ERP for Manufacturing"
+          },
+          {
+            "name": "Occupational Health & Safety"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Engineering Shop / Lab Work",
+            "aliases": [
+              "Workshop Practice",
+              "Engineering Shop",
+              "Lab Work"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "production-plant-engineer",
+      "anzsco": "233513",
+      "title": "Production or Plant Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "23_Production_or_Plant_Engineer_233513_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.thresholds",
+          "message": "Source bands read 7–8 / 5 / 3 / 0–1 (of 8); scores [2, 4, 6] fall in no band. Encoded as minimum-score thresholds (>= 7 No Risk, >= 5 Low, >= 3 Medium, else High) so every score resolves. Confirm this reading."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Production or Plant Engineer (or an equivalent engineering qualification acceptable for ANZSCO 233513). e.g. Bachelor of Production Engineering, Bachelor of Engineering (Production / Plant / Manufacturing), Bachelor of Science in Production Engineering, Bachelor of Technology in Production / Manufacturing Engineering."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Manufacturing Processes / Production Technology"
+          },
+          {
+            "id": "T2.2",
+            "name": "Machine Tools / Metal Cutting / Machining"
+          },
+          {
+            "id": "T2.3",
+            "name": "Tool Design / Jigs & Fixtures / Die Design"
+          },
+          {
+            "id": "T2.4",
+            "name": "Production Planning & Control / Operations Management"
+          },
+          {
+            "id": "T2.5",
+            "name": "Quality Control / Metrology / Inspection"
+          },
+          {
+            "id": "T2.6",
+            "name": "Materials Science / Metallurgy for Manufacturing"
+          },
+          {
+            "id": "T2.7",
+            "name": "Industrial Automation / CNC / CAM"
+          },
+          {
+            "id": "T2.8",
+            "name": "Plant Layout / Facility Design / Material Handling"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Casting / Welding / Forming Technology"
+          },
+          {
+            "name": "Additive Manufacturing / 3D Printing"
+          },
+          {
+            "name": "Lean / Agile Manufacturing Systems"
+          },
+          {
+            "name": "Maintenance Engineering / Reliability"
+          },
+          {
+            "name": "Industrial Robotics / Mechatronics for Production"
+          },
+          {
+            "name": "Cost Estimation / Engineering Economy"
+          },
+          {
+            "name": "Occupational Health & Safety"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Engineering Shop / Lab Work",
+            "aliases": [
+              "Workshop Practice",
+              "Engineering Shop",
+              "Lab Work"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "petroleum-engineer",
+      "anzsco": "233612",
+      "title": "Petroleum Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "24_Petroleum_Engineer_233612_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.thresholds",
+          "message": "Source bands read 7–8 / 5 / 3 / 0–1 (of 8); scores [2, 4, 6] fall in no band. Encoded as minimum-score thresholds (>= 7 No Risk, >= 5 Low, >= 3 Medium, else High) so every score resolves. Confirm this reading."
+        },
+        {
+          "severity": "low",
+          "field": "tier1/tier2",
+          "message": "Tier 1 row 4 includes Fluid Mechanics and Tier 2 row 5 is Fluid Mechanics / Multiphase Flow: one subject could fill both."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Petroleum Engineer (or an equivalent engineering qualification acceptable for ANZSCO 233612). e.g. Bachelor of Petroleum Engineering, Bachelor of Engineering (Petroleum), Bachelor of Science in Petroleum Engineering, Bachelor of Technology in Petroleum Engineering."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics) / Fluid Mechanics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD variants."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Reservoir Engineering / Reservoir Characterisation"
+          },
+          {
+            "id": "T2.2",
+            "name": "Drilling Engineering / Well Design & Operations"
+          },
+          {
+            "id": "T2.3",
+            "name": "Production Engineering / Well Completions & Stimulation"
+          },
+          {
+            "id": "T2.4",
+            "name": "Petroleum Geology / Formation Evaluation / Petrophysics"
+          },
+          {
+            "id": "T2.5",
+            "name": "Fluid Mechanics / Multiphase Flow in Porous Media"
+          },
+          {
+            "id": "T2.6",
+            "name": "Thermodynamics / Phase Behaviour of Reservoir Fluids"
+          },
+          {
+            "id": "T2.7",
+            "name": "Well Logging / Formation Evaluation Tools"
+          },
+          {
+            "id": "T2.8",
+            "name": "Petroleum Economics / Project Evaluation"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Enhanced Oil Recovery / IOR / EOR Methods"
+          },
+          {
+            "name": "Natural Gas Engineering / Gas Reservoirs"
+          },
+          {
+            "name": "Offshore / Subsea Petroleum Engineering"
+          },
+          {
+            "name": "Well Testing / Pressure Transient Analysis"
+          },
+          {
+            "name": "Health, Safety & Environment in Petroleum Operations"
+          },
+          {
+            "name": "Unconventional Resources / Shale / Tight Oil & Gas"
+          },
+          {
+            "name": "Reservoir Simulation / Numerical Modelling"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Field / Lab Work",
+            "aliases": [
+              "Workshop Practice",
+              "Field",
+              "Lab Work"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "environmental-engineer",
+      "anzsco": "233915",
+      "title": "Environmental Engineer",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "25_Environmental_Engineer_233915_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.thresholds",
+          "message": "Source bands read 7–8 / 5 / 3 / 0–1 (of 8); scores [2, 4, 6] fall in no band. Encoded as minimum-score thresholds (>= 7 No Risk, >= 5 Low, >= 3 Medium, else High) so every score resolves. Confirm this reading."
+        },
+        {
+          "severity": "low",
+          "field": "tier1/tier2",
+          "message": "Tier 1 rows 3–4 include Environmental Chemistry and Fluid Mechanics, which overlap Tier 2 rows 6 and 5."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Environmental Engineer (or an equivalent engineering qualification acceptable for ANZSCO 233915). e.g. Bachelor of Environmental Engineering, Bachelor of Engineering (Environmental), Bachelor of Science in Environmental Engineering, Bachelor of Technology in Environmental Engineering."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry / Environmental Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics / Fluid Mechanics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD / GIS",
+            "status": "expected",
+            "matchingNote": "Includes Drawing, Graphics, CAD and basic GIS variants."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Water & Wastewater Treatment / Sanitary Engineering"
+          },
+          {
+            "id": "T2.2",
+            "name": "Air Pollution Control / Atmospheric Engineering"
+          },
+          {
+            "id": "T2.3",
+            "name": "Solid & Hazardous Waste Management"
+          },
+          {
+            "id": "T2.4",
+            "name": "Environmental Impact Assessment / EIA"
+          },
+          {
+            "id": "T2.5",
+            "name": "Hydrology / Water Resources / Surface & Groundwater"
+          },
+          {
+            "id": "T2.6",
+            "name": "Environmental Chemistry / Contaminant Transport"
+          },
+          {
+            "id": "T2.7",
+            "name": "Ecology / Environmental Biology / Ecosystem Engineering"
+          },
+          {
+            "id": "T2.8",
+            "name": "Environmental Legislation / Standards & Compliance"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Climate Change / Carbon Management"
+          },
+          {
+            "name": "Soil & Groundwater Remediation"
+          },
+          {
+            "name": "Noise Pollution / Acoustic Engineering"
+          },
+          {
+            "name": "Sustainable Design / Green Engineering / LCA"
+          },
+          {
+            "name": "Industrial Ecology / Circular Economy"
+          },
+          {
+            "name": "Remote Sensing / GIS for Environmental Applications"
+          },
+          {
+            "name": "Risk Assessment / Environmental Risk Management"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Field / Lab Work",
+            "aliases": [
+              "Workshop Practice",
+              "Field",
+              "Lab Work"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "naval-architect",
+      "anzsco": "233916",
+      "title": "Naval Architect",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "26_Naval_Architect_233916_verification_steps.docx",
+        "version": "v2"
+      },
+      "reviewFlags": [
+        {
+          "severity": "medium",
+          "field": "tier2.thresholds",
+          "message": "Source bands read 7–8 / 5 / 3 / 0–1 (of 8); scores [2, 4, 6] fall in no band. Encoded as minimum-score thresholds (>= 7 No Risk, >= 5 Low, >= 3 Medium, else High) so every score resolves. Confirm this reading."
+        }
+      ],
+      "qualification": {
+        "statement": "Confirm that the qualification is primarily in Naval Architect (or an equivalent engineering qualification acceptable for ANZSCO 233916). e.g. Bachelor of Naval Architecture, Bachelor of Engineering (Naval Architecture / Marine), Bachelor of Science in Naval Architecture & Ocean Engineering, Bachelor of Technology in Naval Architecture."
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics) / Fluid Mechanics",
+            "status": "expected"
+          },
+          {
+            "id": "T1.5",
+            "name": "Engineering Drawing / Graphics / CAD / Ship Drawing",
+            "status": "expected",
+            "matchingNote": "Includes Engineering Drawing, Graphics, CAD and ship-specific drawing variants."
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "T2.1",
+            "name": "Ship Hydrostatics / Stability of Ships"
+          },
+          {
+            "id": "T2.2",
+            "name": "Ship Resistance & Propulsion / Hydrodynamics"
+          },
+          {
+            "id": "T2.3",
+            "name": "Ship Structures / Strength of Ship Structures"
+          },
+          {
+            "id": "T2.4",
+            "name": "Ship Design / Preliminary Design & Lines Plan"
+          },
+          {
+            "id": "T2.5",
+            "name": "Marine Engineering Systems / Ship Machinery"
+          },
+          {
+            "id": "T2.6",
+            "name": "Seakeeping / Manoeuvring of Ships"
+          },
+          {
+            "id": "T2.7",
+            "name": "Materials for Marine Construction / Welding & Fabrication"
+          },
+          {
+            "id": "T2.8",
+            "name": "Naval Architecture Calculations / Rules & Regulations"
+          }
+        ],
+        "optional": [
+          {
+            "name": "Offshore Structures / Ocean Engineering"
+          },
+          {
+            "name": "Yacht / Small Craft Design"
+          },
+          {
+            "name": "Computational Fluid Dynamics for Ships"
+          },
+          {
+            "name": "Ship Production / Shipyard Technology"
+          },
+          {
+            "name": "Marine Safety / Damage Stability / Subdivision"
+          },
+          {
+            "name": "Underwater Vehicles / Submersibles"
+          },
+          {
+            "name": "Maritime Economics / Ship Costing"
+          },
+          {
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "label": "Final-Year / Capstone Project / Major Project / Thesis",
+          "aliases": [
+            "Final-Year",
+            "Capstone Project",
+            "Major Project",
+            "Thesis"
+          ]
+        },
+        "supporting": [
+          {
+            "label": "Minor Project",
+            "aliases": [
+              "Minor Project"
+            ]
+          },
+          {
+            "label": "Industrial Training / OJT / Internship / Shipyard Training",
+            "aliases": [
+              "Industrial Training",
+              "OJT",
+              "Internship",
+              "Shipyard Training"
+            ]
+          }
+        ],
+        "optional": [
+          {
+            "label": "Technical Seminar / Paper Presentation",
+            "aliases": [
+              "Technical Seminar",
+              "Paper Presentation"
+            ]
+          },
+          {
+            "label": "Workshop Practice / Model Testing / Lab Work",
+            "aliases": [
+              "Workshop Practice",
+              "Model Testing",
+              "Lab Work"
+            ]
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    }
+  ]
+}

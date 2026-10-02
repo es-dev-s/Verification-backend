@@ -27,14 +27,14 @@ function boolEnv(name: string, fallback: boolean): boolean {
 export const assessConfig = {
   /** Soft deadline for a full case assessment (extract + match + score). */
   timeoutMs: intEnv("ASSESS_TIMEOUT_MS", 180_000),
-  /** Target max chars packed into each Gemini extract call. */
+  /** Soft hint for pack size (Groq path splits by key count instead). */
   chunkChars: intEnv("ASSESS_CHUNK_CHARS", 20_000),
-  /** Hard cap on extract LLM calls per transcript (pages are packed). */
-  maxChunks: intEnv("ASSESS_MAX_CHUNKS", 1),
-  /** Parallel extract chunk calls (1 = sequential; safer for large outputs). */
-  extractConcurrency: intEnv("ASSESS_EXTRACT_CONCURRENCY", 1),
-  /** Per-attempt Gemini timeout for subject extraction. */
-  extractRequestTimeoutMs: intEnv("ASSESS_EXTRACT_REQUEST_MS", 25_000),
+  /** Legacy cap; subject extract now fans out 1 part per Groq key. */
+  maxChunks: intEnv("ASSESS_MAX_CHUNKS", 3),
+  /** Legacy; subject extract always runs all Groq key parts in parallel. */
+  extractConcurrency: intEnv("ASSESS_EXTRACT_CONCURRENCY", 3),
+  /** Per-attempt Groq timeout for subject extraction. */
+  extractRequestTimeoutMs: intEnv("ASSESS_EXTRACT_REQUEST_MS", 60_000),
   /** Fuzzy match similarity threshold (0–1). */
   fuzzyThreshold: floatEnv("ASSESS_FUZZY_THRESHOLD", 0.82),
   /** Use LLM for leftover unclear subject matches (slow). Default off. */

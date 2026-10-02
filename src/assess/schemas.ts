@@ -21,11 +21,36 @@ export const extractedSubjectSchema = z.object({
 
 export type ExtractedSubjectRow = z.infer<typeof extractedSubjectSchema>;
 
+/** LLM response for subject extraction — names only. */
+export const subjectExtractLlmItemSchema = z.object({
+  name: z.string().min(1),
+});
+
+export const subjectExtractLlmSchema = z.object({
+  subjects: z.array(subjectExtractLlmItemSchema),
+});
+
+export type SubjectExtractLlm = z.infer<typeof subjectExtractLlmSchema>;
+
 export const subjectExtractSchema = z.object({
   subjects: z.array(extractedSubjectSchema),
 });
 
 export type SubjectExtract = z.infer<typeof subjectExtractSchema>;
+
+/** Normalize LLM name-only rows into full extracted subject rows. */
+export function subjectNameToExtractedRow(name: string): ExtractedSubjectRow {
+  return extractedSubjectSchema.parse({
+    name: name.trim(),
+    code: null,
+    credits: null,
+    grade: null,
+    yearOrSemester: null,
+    qualification: "unknown",
+    sourceSnippet: null,
+    isRepeat: false,
+  });
+}
 
 export const llmMatchDecisionSchema = z.object({
   decisions: z.array(
@@ -80,6 +105,38 @@ export type Determination =
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
+export type MissingSubjectsByTier = {
+  tier1: string[];
+  tier2: string[];
+};
+
+export type TranscriptSourceInfo = {
+  /** Which transcript pool drove matching. */
+  kind: "bachelor" | "master" | "master_fallback" | "mixed" | "unknown";
+  /** Human-readable label for the Step 3 UI. */
+  label: string;
+};
+
+/** One occupation evaluated against the transcript (top-N candidates). */
+export type AnzscoCandidate = {
+  anzscoCode: string;
+  title: string;
+  foundationalMatched: number;
+  foundationalExpected: number;
+  foundationalPct: number;
+  coreMatched: number;
+  coreExpected: number;
+  corePct: number;
+  tier3GateMet: boolean;
+  matches: SubjectMatch[];
+  missingSubjects: MissingSubjectsByTier;
+  unmatched: Array<{
+    name: string;
+    code: string | null;
+    qualification: QualificationType;
+  }>;
+};
+
 export type AssessmentResult = {
   anzscoCode: string | null;
   title: string | null;
@@ -103,6 +160,14 @@ export type AssessmentResult = {
     code: string | null;
     qualification: QualificationType;
   }>;
+  /** Canonical rubric subjects with no transcript match (by tier). */
+  missingSubjects?: MissingSubjectsByTier;
+  /** Which transcript drove the match (bachelor vs masters fallback). */
+  transcriptSource?: TranscriptSourceInfo;
+  /** True when bachelor core was weak and masters subjects were included. */
+  mastersFallbackUsed?: boolean;
+  /** Ranked occupation candidates (currently 1; UI supports up to 3). */
+  candidates?: AnzscoCandidate[];
   /** Raw rows from transcript extraction (before rubric matching). */
   extractedSubjects: ExtractedSubjectRow[];
   explanation: string;

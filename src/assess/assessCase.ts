@@ -8,13 +8,21 @@ import {
   hashAssessmentInput,
   type TranscriptSource,
 } from "./extractSubjects.js";
-import { flattenRubricSubjects, loadRubric } from "./loadRubric.js";
+import {
+  flattenRubricSubjects,
+  loadRubric,
+  scoringSubjects,
+  type Rubric,
+} from "./loadRubric.js";
 import { matchSubjects, matchSubjectsSync } from "./matchSubjects.js";
 import type {
+  AnzscoCandidate,
   AssessmentResult,
   ExtractedSubjectRow,
+  MissingSubjectsByTier,
   QualificationType,
   SubjectMatch,
+  TranscriptSourceInfo,
 } from "./schemas.js";
 import { needsMastersFallback, scoreAssessment } from "./score.js";
 
@@ -178,6 +186,8 @@ export async function assessCase(
     rubric,
   });
 
+  let mastersFallbackUsed = false;
+
   // If core weak and masters exist, include masters and re-score
   if (
     masterRows.length &&
@@ -200,6 +210,7 @@ export async function assessCase(
       workExperienceBoost: boost.related,
       rubric,
     });
+    mastersFallbackUsed = true;
   }
 
   const unmatched = matchResult.unmatched.map((u) => ({
@@ -207,6 +218,21 @@ export async function assessCase(
     code: u.code ?? null,
     qualification: u.qualification as QualificationType,
   }));
+
+  // Keep positive matches + none rows that are unmatched for UI clarity
+  const matches = dedupeMatchRows(matchResult.matches);
+  const missingSubjects = computeMissingSubjects(matches, rubric);
+  const transcriptSource = buildTranscriptSource(
+    qualificationsUsed,
+    mastersFallbackUsed,
+  );
+  const candidate = buildCandidate(
+    rubric,
+    scored,
+    matches,
+    missingSubjects,
+    unmatched,
+  );
 
   const result: AssessmentResult = {
     anzscoCode: scored.anzscoCode,
@@ -225,14 +251,15 @@ export async function assessCase(
     tier3GateMet: scored.tier3GateMet,
     workExperienceBoost: boost.related,
     qualificationsUsed,
-    matches: matchResult.matches.filter((m) => m.method !== "none" || !m.rubricSubject),
+    matches,
     unmatched,
+    missingSubjects,
+    transcriptSource,
+    mastersFallbackUsed,
+    candidates: [candidate],
     extractedSubjects: extracted,
     explanation: "",
   };
-
-  // Keep positive matches + none rows that are unmatched for UI clarity
-  result.matches = dedupeMatchRows(matchResult.matches);
 
   result.explanation = await writeExplanation(result, {
     useLlm: useLlm && assessConfig.llmExplanation,
@@ -296,6 +323,25 @@ export async function assessCase(
 }
 
 function emptyNoMatch(explanation: string): AssessmentResult {
+  const rubric = loadRubric("233111");
+  const missingSubjects: MissingSubjectsByTier = {
+    tier1: scoringSubjects(rubric, "tier1").map((s) => s.name),
+    tier2: scoringSubjects(rubric, "tier2").map((s) => s.name),
+  };
+  const candidate: AnzscoCandidate = {
+    anzscoCode: rubric.anzscoCode,
+    title: rubric.title,
+    foundationalMatched: 0,
+    foundationalExpected: rubric.tiers.tier1.scoreDenominator,
+    foundationalPct: 0,
+    coreMatched: 0,
+    coreExpected: rubric.tiers.tier2.scoreDenominator,
+    corePct: 0,
+    tier3GateMet: false,
+    matches: [],
+    missingSubjects,
+    unmatched: [],
+  };
   return {
     anzscoCode: null,
     title: null,
@@ -303,10 +349,10 @@ function emptyNoMatch(explanation: string): AssessmentResult {
     confidence: null,
     determination: "no_match",
     foundationalMatched: 0,
-    foundationalExpected: 5,
+    foundationalExpected: rubric.tiers.tier1.scoreDenominator,
     foundationalPct: 0,
     coreMatched: 0,
-    coreExpected: 9,
+    coreExpected: rubric.tiers.tier2.scoreDenominator,
     corePct: 0,
     tier1Outcome: null,
     tier2Outcome: null,
@@ -315,6 +361,13 @@ function emptyNoMatch(explanation: string): AssessmentResult {
     qualificationsUsed: [],
     matches: [],
     unmatched: [],
+    missingSubjects,
+    transcriptSource: {
+      kind: "unknown",
+      label: "Matched using: no transcript available",
+    },
+    mastersFallbackUsed: false,
+    candidates: [candidate],
     extractedSubjects: [],
     explanation,
   };
@@ -357,6 +410,93 @@ function dedupeMatchRows(matches: SubjectMatch[]): SubjectMatch[] {
   return out;
 }
 
+function computeMissingSubjects(
+  matches: SubjectMatch[],
+  rubric: Rubric,
+): MissingSubjectsByTier {
+  const covered = new Set(
+    matches
+      .filter((m) => m.rubricSubject && m.method !== "none")
+      .map((m) => m.rubricSubject!),
+  );
+  return {
+    tier1: scoringSubjects(rubric, "tier1")
+      .map((s) => s.name)
+      .filter((name) => !covered.has(name)),
+    tier2: scoringSubjects(rubric, "tier2")
+      .map((s) => s.name)
+      .filter((name) => !covered.has(name)),
+  };
+}
+
+function buildTranscriptSource(
+  qualificationsUsed: QualificationType[],
+  mastersFallbackUsed: boolean,
+): TranscriptSourceInfo {
+  if (mastersFallbackUsed) {
+    return {
+      kind: "master_fallback",
+      label:
+        "Matched using: Master's transcript (fallback — Bachelor's core coverage was below threshold)",
+    };
+  }
+  const hasBachelor = qualificationsUsed.includes("bachelor");
+  const hasMaster = qualificationsUsed.includes("master");
+  if (hasBachelor && !hasMaster) {
+    return {
+      kind: "bachelor",
+      label: "Matched using: Bachelor's transcript",
+    };
+  }
+  if (hasMaster && !hasBachelor) {
+    return {
+      kind: "master",
+      label: "Matched using: Master's transcript",
+    };
+  }
+  if (hasBachelor && hasMaster) {
+    return {
+      kind: "mixed",
+      label: "Matched using: Bachelor's and Master's transcript subjects",
+    };
+  }
+  return {
+    kind: "unknown",
+    label: "Matched using: transcript subjects (degree level not specified)",
+  };
+}
+
+function buildCandidate(
+  rubric: Rubric,
+  scored: {
+    foundationalMatched: number;
+    foundationalExpected: number;
+    foundationalPct: number;
+    coreMatched: number;
+    coreExpected: number;
+    corePct: number;
+    tier3GateMet: boolean;
+  },
+  matches: SubjectMatch[],
+  missingSubjects: MissingSubjectsByTier,
+  unmatched: AnzscoCandidate["unmatched"],
+): AnzscoCandidate {
+  return {
+    anzscoCode: rubric.anzscoCode,
+    title: rubric.title,
+    foundationalMatched: scored.foundationalMatched,
+    foundationalExpected: scored.foundationalExpected,
+    foundationalPct: scored.foundationalPct,
+    coreMatched: scored.coreMatched,
+    coreExpected: scored.coreExpected,
+    corePct: scored.corePct,
+    tier3GateMet: scored.tier3GateMet,
+    matches,
+    missingSubjects,
+    unmatched,
+  };
+}
+
 /** Pure scoring path for unit tests (no DB / LLM). */
 export function assessExtractedSubjects(
   extracted: ExtractedSubjectRow[],
@@ -384,6 +524,7 @@ export function assessExtractedSubjects(
     rubric,
   });
 
+  let mastersFallbackUsed = false;
   if (
     masterRows.length &&
     scored.tier2Outcome &&
@@ -400,7 +541,27 @@ export function assessExtractedSubjects(
       workExperienceBoost: opts?.workExperienceBoost ?? false,
       rubric,
     });
+    mastersFallbackUsed = true;
   }
+
+  const deduped = dedupeMatchRows(matches);
+  const unmatchedRows = unmatched.map((u) => ({
+    name: u.name,
+    code: u.code ?? null,
+    qualification: u.qualification as QualificationType,
+  }));
+  const missingSubjects = computeMissingSubjects(deduped, rubric);
+  const transcriptSource = buildTranscriptSource(
+    qualificationsUsed,
+    mastersFallbackUsed,
+  );
+  const candidate = buildCandidate(
+    rubric,
+    scored,
+    deduped,
+    missingSubjects,
+    unmatchedRows,
+  );
 
   const result: AssessmentResult = {
     anzscoCode: scored.anzscoCode,
@@ -419,12 +580,12 @@ export function assessExtractedSubjects(
     tier3GateMet: scored.tier3GateMet,
     workExperienceBoost: opts?.workExperienceBoost ?? false,
     qualificationsUsed,
-    matches: dedupeMatchRows(matches),
-    unmatched: unmatched.map((u) => ({
-      name: u.name,
-      code: u.code ?? null,
-      qualification: u.qualification as QualificationType,
-    })),
+    matches: deduped,
+    unmatched: unmatchedRows,
+    missingSubjects,
+    transcriptSource,
+    mastersFallbackUsed,
+    candidates: [candidate],
     extractedSubjects: extracted,
     explanation: "",
   };
