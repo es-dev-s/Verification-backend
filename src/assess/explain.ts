@@ -25,8 +25,13 @@ export function buildExplanationFallback(result: AssessmentResult): string {
       `major project/thesis gate: ${result.tier3GateMet ? "met" : "not met"}.`
     );
   }
+  const analysis =
+    result.candidates?.find((c) => c.anzscoCode === result.anzscoCode)
+      ?.workExperienceAnalysis ?? null;
   const boost = result.workExperienceBoost
-    ? ` Related ${title} work experience provided a positive confidence boost.`
+    ? analysis?.analysis
+      ? ` ${analysis.analysis}`
+      : ` Related ${title} work experience provided a positive confidence boost.`
     : "";
   return (
     `Recommended ANZSCO ${result.anzscoCode} (${title}) with ${result.confidence} confidence ` +

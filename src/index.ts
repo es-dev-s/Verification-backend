@@ -7,6 +7,7 @@ import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod
 import { config } from "./config.js";
 import clientIdPlugin from "./plugins/clientId.js";
 import { assessRoutes } from "./assess/routes.js";
+import { riskRoutes } from "./risk/routes.js";
 import { caseRoutes } from "./routes/cases.js";
 import { documentRoutes } from "./routes/documents.js";
 import { jobRoutes } from "./routes/jobs.js";
@@ -61,6 +62,7 @@ async function main() {
   await app.register(documentRoutes);
   await app.register(jobRoutes);
   await app.register(assessRoutes);
+  await app.register(riskRoutes);
 
   await app.listen({ port: config.port, host: "0.0.0.0" });
   app.log.info(`API listening on :${config.port}`);

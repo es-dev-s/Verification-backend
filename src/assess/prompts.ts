@@ -70,36 +70,44 @@ ${unclear.map((n, i) => `${i + 1}. ${n}`).join("\n")}
 Return one decision per transcript subject.`;
 }
 
-export function workExperienceSystemPrompt(
-  occupationTitle = "the target occupation",
-  anzscoCode?: string,
-): string {
-  const label = anzscoCode
-    ? `${occupationTitle} (ANZSCO ${anzscoCode})`
-    : occupationTitle;
-  return `Decide whether the candidate's work experience is related to ${label}.
+/** Multi-occupation work relevance (Groq) for top ANZSCO candidates. */
+export function workExperienceTop3SystemPrompt(): string {
+  return `You assess whether confirmed work-experience jobs support each suggested ANZSCO occupation.
 
 Return JSON only:
 {
-  "related": boolean,
-  "confidence": number,
-  "reason": string
+  "occupations": [
+    {
+      "anzscoCode": string,
+      "related": boolean,
+      "matchedJobs": [{ "title": string, "employer": string|null }],
+      "analysis": string
+    }
+  ]
 }
 
-Related means work that clearly aligns with ${occupationTitle} duties and knowledge areas.
-Generic "engineer" titles without occupation-specific content are NOT related.
-Be conservative.`;
+Rules:
+- Use ONLY the jobs listed in the user message (from the confirmed form / database).
+- Prefer jobs marked engineeringRelated=true when judging relevance; still allow a clear occupation match if duties/title align.
+- related=true only when at least one job clearly aligns with that ANZSCO's duties/knowledge.
+- Generic "engineer" titles without occupation-specific content are NOT related.
+- matchedJobs must be a subset of the provided jobs (copy title/employer exactly). Empty when related=false.
+- analysis: 1–2 short lines max explaining why the matched job(s) raise confidence for that ANZSCO. Empty string when related=false.
+- Include exactly one occupations[] entry per ANZSCO provided, using the same anzscoCode.
+- Be conservative. Do not invent jobs or ANZSCO codes.`;
 }
 
-export function workExperienceUserPrompt(
-  experienceSummary: string,
-  cvSnippet: string | null,
+export function workExperienceTop3UserPrompt(
+  jobsSummary: string,
+  occupationsSummary: string,
 ): string {
-  return `Experience rows:
-${experienceSummary || "(none)"}
+  return `Confirmed work experience jobs:
+${jobsSummary || "(none)"}
 
-CV snippet (optional):
-${cvSnippet ? cvSnippet.slice(0, 4000) : "(none)"}`;
+Top ANZSCO candidates (academic ranking):
+${occupationsSummary || "(none)"}
+
+For each ANZSCO, decide if any listed job is relevant and return matchedJobs + a 1–2 line analysis.`;
 }
 
 export function explanationSystemPrompt(

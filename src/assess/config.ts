@@ -41,8 +41,11 @@ export const assessConfig = {
   llmUnclearMatches: boolEnv("ASSESS_LLM_UNCLEAR", false),
   /** Use LLM to write explanation (slow). Default off — use template. */
   llmExplanation: boolEnv("ASSESS_LLM_EXPLAIN", false),
-  /** Use LLM for work-experience relevance (heuristic first). Default off. */
-  llmWorkExperience: boolEnv("ASSESS_LLM_EXPERIENCE", false),
+  /**
+   * Use Groq to judge confirmed work rows against top ANZSCO candidates.
+   * Default on — academic ranking still runs without work; boost is positive-only.
+   */
+  llmWorkExperience: boolEnv("ASSESS_LLM_EXPERIENCE", true),
   /**
    * Gap in dataFlow overallDetermination: Tier1=flag + Tier2=medium_risk.
    * Default: treat as conditional (manual review).

@@ -66,6 +66,7 @@ export const llmMatchDecisionSchema = z.object({
 
 export type LlmMatchDecision = z.infer<typeof llmMatchDecisionSchema>;
 
+/** Legacy single-occupation shape (kept for older callers/tests). */
 export const workExperienceRelevanceSchema = z.object({
   related: z.boolean(),
   confidence: z.number().min(0).max(1),
@@ -75,6 +76,45 @@ export const workExperienceRelevanceSchema = z.object({
 export type WorkExperienceRelevance = z.infer<
   typeof workExperienceRelevanceSchema
 >;
+
+export const workExperienceMatchedJobSchema = z.object({
+  title: z.string(),
+  employer: z.string().nullable().optional().default(null),
+});
+
+/** Groq response: relevance of confirmed jobs to each top ANZSCO. */
+export const workExperienceTop3AnalysisSchema = z.object({
+  occupations: z.array(
+    z.object({
+      anzscoCode: z.string(),
+      related: z.boolean(),
+      matchedJobs: z.array(workExperienceMatchedJobSchema).default([]),
+      /** 1–2 lines max on why this raises profile confidence. */
+      analysis: z.string(),
+    }),
+  ),
+});
+
+export type WorkExperienceTop3Analysis = z.infer<
+  typeof workExperienceTop3AnalysisSchema
+>;
+
+export type MatchedJob = {
+  title: string;
+  employer: string | null;
+};
+
+/** Per-candidate work-experience boost details for UI. */
+export type WorkExperienceCandidateAnalysis = {
+  related: boolean;
+  matchedJobs: MatchedJob[];
+  /** 1–2 line rationale from Groq (empty when not related). */
+  analysis: string;
+  /** Academic-only confidence before applying the boost. */
+  confidenceScoreBefore: number;
+  /** Confidence after applying the boost (same as before when not related). */
+  confidenceScoreAfter: number;
+};
 
 export type MatchMethod = "exact" | "fuzzy" | "llm" | "none";
 
@@ -141,6 +181,10 @@ export type AnzscoCandidate = {
   confidenceScore: number;
   determination: Determination;
   recommended: boolean;
+  /** True when Groq judged confirmed work relevant to this occupation. */
+  workExperienceBoost?: boolean;
+  /** Matched jobs + short analysis + before/after confidence %. */
+  workExperienceAnalysis?: WorkExperienceCandidateAnalysis | null;
   matches: SubjectMatch[];
   missingSubjects: MissingSubjectsByTier;
   unmatched: Array<{

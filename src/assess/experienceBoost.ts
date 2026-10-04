@@ -1,9 +1,18 @@
-import { generateJson } from "../lib/gemini.js";
 import {
-  workExperienceSystemPrompt,
-  workExperienceUserPrompt,
+  generateJsonGroq,
+  groqIsConfigured,
+  loadGroqKeys,
+} from "../lib/groqClient.js";
+import { assessConfig } from "./config.js";
+import {
+  workExperienceTop3SystemPrompt,
+  workExperienceTop3UserPrompt,
 } from "./prompts.js";
-import { workExperienceRelevanceSchema } from "./schemas.js";
+import {
+  workExperienceTop3AnalysisSchema,
+  type MatchedJob,
+  type WorkExperienceTop3Analysis,
+} from "./schemas.js";
 
 export type ExperienceRowLike = {
   employer?: string | null;
@@ -12,101 +21,183 @@ export type ExperienceRowLike = {
   domainSuggested?: boolean | null;
 };
 
-export type ExperienceBoostOpts = {
+export type OccupationCandidateLike = {
+  anzscoCode: string;
+  title: string;
+};
+
+export type OccupationWorkJudgement = {
+  anzscoCode: string;
+  related: boolean;
+  matchedJobs: MatchedJob[];
+  analysis: string;
+};
+
+export type AnalyzeWorkExperienceOpts = {
   useLlm?: boolean;
   deadlineMs?: number;
-  /** Occupation being scored — used for keyword + LLM relevance. */
-  occupationTitle?: string;
-  anzscoCode?: string;
 };
 
 /**
- * Heuristic + optional LLM: is work experience related to the occupation?
- * Positive boost only — never the main measure.
+ * Ask Groq whether confirmed DB work rows are relevant to each top ANZSCO.
+ * Positive signal only — never used as the main academic measure.
+ * No keyword heuristics: if LLM is off/unavailable, all return related=false.
  */
-export async function judgeWorkExperienceBoost(
+export async function analyzeWorkExperienceForCandidates(
   rows: ExperienceRowLike[],
-  cvText: string | null,
-  opts?: ExperienceBoostOpts,
-): Promise<{ related: boolean; reason: string }> {
-  const occupationTitle = opts?.occupationTitle ?? "Chemical Engineer";
-  const anzscoCode = opts?.anzscoCode;
+  occupations: OccupationCandidateLike[],
+  opts?: AnalyzeWorkExperienceOpts,
+): Promise<OccupationWorkJudgement[]> {
+  const empty = occupations.map((o) => ({
+    anzscoCode: o.anzscoCode,
+    related: false,
+    matchedJobs: [] as MatchedJob[],
+    analysis: "",
+  }));
 
-  const heuristic = heuristicOccupationRelated(
-    rows,
-    cvText,
-    occupationTitle,
+  if (!occupations.length) return empty;
+  if (opts?.useLlm === false) return empty;
+  if (!rows.some((r) => (r.title ?? "").trim() || (r.employer ?? "").trim())) {
+    return empty;
+  }
+  if (!groqIsConfigured()) {
+    console.warn(
+      "[assess] work experience analysis skipped: Groq not configured",
+    );
+    return empty;
+  }
+  if (Date.now() >= (opts?.deadlineMs ?? Infinity)) return empty;
+
+  const apiKey = loadGroqKeys()[0];
+  if (!apiKey) return empty;
+
+  const jobsSummary = rows
+    .map((r, i) => {
+      const related = r.domainFinal ?? r.domainSuggested;
+      const relatedLabel =
+        related == null ? "unknown" : related ? "true" : "false";
+      return `${i + 1}. title=${r.title?.trim() || "?"} | employer=${r.employer?.trim() || "?"} | engineeringRelated=${relatedLabel}`;
+    })
+    .join("\n");
+
+  const occupationsSummary = occupations
+    .map((o, i) => `${i + 1}. ANZSCO ${o.anzscoCode} — ${o.title}`)
+    .join("\n");
+
+  const requestMs = Math.min(
+    assessConfig.extractRequestTimeoutMs,
+    Math.max(8_000, (opts?.deadlineMs ?? Date.now() + 45_000) - Date.now() - 1_000),
   );
-  if (heuristic.related) return heuristic;
-
-  if (opts?.useLlm === false) return heuristic;
-  if (!rows.length && !cvText?.trim()) return heuristic;
-  if (Date.now() >= (opts?.deadlineMs ?? Infinity)) return heuristic;
 
   try {
-    const summary = rows
-      .map(
-        (r, i) =>
-          `${i + 1}. ${r.title ?? "?"} @ ${r.employer ?? "?"} (domainFinal=${r.domainFinal ?? r.domainSuggested ?? "?"})`,
-      )
-      .join("\n");
-    const { data } = await generateJson(
-      workExperienceUserPrompt(summary, cvText),
-      workExperienceSystemPrompt(occupationTitle, anzscoCode),
+    const { data } = await generateJsonGroq(
+      workExperienceTop3UserPrompt(jobsSummary, occupationsSummary),
+      workExperienceTop3SystemPrompt(),
       {
-        deadlineMs: opts?.deadlineMs,
-        maxTokens: 512,
-        responseSchema: workExperienceRelevanceSchema,
+        apiKey,
+        maxTokens: 1024,
+        requestTimeoutMs: requestMs,
+        responseSchema: workExperienceTop3AnalysisSchema,
       },
     );
-    const parsed = workExperienceRelevanceSchema.parse(data);
-    return { related: parsed.related, reason: parsed.reason };
+    const parsed = workExperienceTop3AnalysisSchema.parse(
+      data,
+    ) as WorkExperienceTop3Analysis;
+    return mergeJudgements(occupations, parsed, rows);
   } catch (err) {
     console.error(
-      "[assess] work experience LLM failed:",
+      "[assess] work experience Groq failed:",
       err instanceof Error ? err.message : err,
     );
-    return heuristic;
+    return empty;
   }
 }
 
-function heuristicOccupationRelated(
+function mergeJudgements(
+  occupations: OccupationCandidateLike[],
+  parsed: WorkExperienceTop3Analysis,
   rows: ExperienceRowLike[],
-  cvText: string | null,
-  occupationTitle: string,
-): { related: boolean; reason: string } {
-  const tokens = occupationTitle
-    .toLowerCase()
-    .replace(/[/()]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length > 3 && t !== "engineer" && t !== "engineering");
+): OccupationWorkJudgement[] {
+  const byCode = new Map(
+    parsed.occupations.map((o) => [normalizeCode(o.anzscoCode), o]),
+  );
 
-  const keywordRe =
-    tokens.length > 0
-      ? new RegExp(`\\b(${tokens.map(escapeRegex).join("|")})\\b`, "i")
-      : null;
-
-  for (const r of rows) {
-    const blob = `${r.title ?? ""} ${r.employer ?? ""}`;
-    if (keywordRe?.test(blob)) {
+  return occupations.map((occ) => {
+    const hit = byCode.get(normalizeCode(occ.anzscoCode));
+    if (!hit) {
       return {
-        related: true,
-        reason: `Title/employer keywords indicate ${occupationTitle}-related work.`,
+        anzscoCode: occ.anzscoCode,
+        related: false,
+        matchedJobs: [],
+        analysis: "",
       };
     }
-  }
-  if (cvText && keywordRe?.test(cvText.slice(0, 8000))) {
+
+    const matchedJobs = (hit.matchedJobs ?? [])
+      .map((j) => sanitizeMatchedJob(j, rows))
+      .filter((j): j is MatchedJob => j != null);
+
+    const related = Boolean(hit.related) && matchedJobs.length > 0;
+    const analysis = related ? truncateAnalysis(hit.analysis ?? "") : "";
+
     return {
-      related: true,
-      reason: `CV text indicates ${occupationTitle}-related experience.`,
+      anzscoCode: occ.anzscoCode,
+      related,
+      matchedJobs: related ? matchedJobs : [],
+      analysis,
+    };
+  });
+}
+
+function sanitizeMatchedJob(
+  job: { title?: string; employer?: string | null },
+  rows: ExperienceRowLike[],
+): MatchedJob | null {
+  const title = (job.title ?? "").trim();
+  if (!title) return null;
+
+  const titleLower = title.toLowerCase();
+  const row =
+    rows.find((r) => (r.title ?? "").trim().toLowerCase() === titleLower) ??
+    rows.find((r) =>
+      (r.title ?? "").trim().toLowerCase().includes(titleLower),
+    ) ??
+    rows.find((r) =>
+      titleLower.includes((r.title ?? "").trim().toLowerCase()) &&
+      (r.title ?? "").trim().length > 0,
+    );
+
+  if (!row?.title?.trim()) {
+    // Still accept LLM title if it roughly matches some row text
+    const blobHit = rows.find((r) => {
+      const blob = `${r.title ?? ""} ${r.employer ?? ""}`.toLowerCase();
+      return blob.includes(titleLower) || titleLower.includes(blob.trim());
+    });
+    if (!blobHit) return null;
+    return {
+      title: blobHit.title?.trim() || title,
+      employer: blobHit.employer?.trim() || job.employer?.trim() || null,
     };
   }
+
   return {
-    related: false,
-    reason: `No ${occupationTitle}-specific experience detected.`,
+    title: row.title.trim(),
+    employer: row.employer?.trim() || job.employer?.trim() || null,
   };
 }
 
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function truncateAnalysis(text: string): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  const sentences = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [cleaned];
+  return sentences
+    .slice(0, 2)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 280);
+}
+
+function normalizeCode(code: string): string {
+  return code.replace(/\s+/g, "").toLowerCase();
 }

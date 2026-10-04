@@ -1,6 +1,9 @@
 import { prisma } from "../lib/prisma.js";
 import { assessConfig } from "./config.js";
-import { judgeWorkExperienceBoost } from "./experienceBoost.js";
+import {
+  analyzeWorkExperienceForCandidates,
+  type OccupationWorkJudgement,
+} from "./experienceBoost.js";
 import { buildExplanationFallback, writeExplanation } from "./explain.js";
 import {
   degreeLevelToQualification,
@@ -24,6 +27,7 @@ import type {
   QualificationType,
   SubjectMatch,
   TranscriptSourceInfo,
+  WorkExperienceCandidateAnalysis,
 } from "./schemas.js";
 import {
   needsMastersFallback,
@@ -53,6 +57,9 @@ type ScoredOccupation = {
   qualificationsUsed: QualificationType[];
   mastersFallbackUsed: boolean;
   workExperienceBoost: boolean;
+  /** Academic-only score before work boost (for UI before→after %). */
+  confidenceScoreBefore: number;
+  workExperienceAnalysis: WorkExperienceCandidateAnalysis | null;
 };
 
 /**
@@ -173,21 +180,12 @@ export async function assessCase(
     ? [loadRubric(opts.occupationId)]
     : loadAllAcademicRubrics();
 
-  // Sync-match every occupation first (fast). LLM unclear-match only for the winner if enabled.
+  // Academic sync-match every occupation first (no work experience in ranking).
   const scoredAll: ScoredOccupation[] = [];
   for (const rubric of rubrics) {
-    const boost = await judgeWorkExperienceBoost(
-      caseRow.experienceRows,
-      cvText,
-      {
-        useLlm: false, // heuristic only in the ranking loop
-        occupationTitle: rubric.title,
-        anzscoCode: rubric.anzscoCode,
-      },
-    );
     scoredAll.push(
       scoreOccupation(extracted, rubric, {
-        workExperienceBoost: boost.related,
+        workExperienceBoost: false,
       }),
     );
   }
@@ -195,36 +193,30 @@ export async function assessCase(
   scoredAll.sort(compareScoredOccupations);
   let top = scoredAll.slice(0, assessConfig.maxCandidates);
 
-  // Optional: refine the best occupation with LLM unclear matching + experience LLM
+  // Optional: refine the best occupation with LLM unclear subject matching
   const best = top[0];
-  if (best && useLlm) {
-    const refineBoost = await judgeWorkExperienceBoost(
+  if (best && useLlm && assessConfig.llmUnclearMatches) {
+    const refined = await scoreOccupationWithLlm(extracted, best.rubric, {
+      workExperienceBoost: false,
+      deadlineMs,
+    });
+    top = [refined, ...top.slice(1)];
+    top.sort(compareScoredOccupations);
+    top = top.slice(0, assessConfig.maxCandidates);
+  }
+
+  // After top-N academics: Groq judges confirmed DB jobs vs those occupations.
+  if (top.length && useLlm && assessConfig.llmWorkExperience) {
+    const judgements = await analyzeWorkExperienceForCandidates(
       caseRow.experienceRows,
-      cvText,
-      {
-        useLlm: assessConfig.llmWorkExperience,
-        deadlineMs,
-        occupationTitle: best.rubric.title,
-        anzscoCode: best.rubric.anzscoCode,
-      },
+      top.map((s) => ({
+        anzscoCode: s.rubric.anzscoCode,
+        title: s.rubric.title,
+      })),
+      { useLlm: true, deadlineMs },
     );
-    if (assessConfig.llmUnclearMatches) {
-      const refined = await scoreOccupationWithLlm(extracted, best.rubric, {
-        workExperienceBoost: refineBoost.related,
-        deadlineMs,
-      });
-      top = [refined, ...top.slice(1)];
-      top.sort(compareScoredOccupations);
-      top = top.slice(0, assessConfig.maxCandidates);
-    } else if (refineBoost.related !== best.workExperienceBoost) {
-      best.workExperienceBoost = refineBoost.related;
-      best.scored = scoreAssessment({
-        matches: best.matches,
-        qualificationsUsed: best.qualificationsUsed,
-        workExperienceBoost: refineBoost.related,
-        rubric: best.rubric,
-      });
-    }
+    applyWorkExperienceJudgements(top, judgements);
+    top.sort(compareScoredOccupations);
   }
 
   const winner = top[0];
@@ -255,6 +247,10 @@ export async function assessCase(
         code: u.code ?? null,
         qualification: u.qualification as QualificationType,
       })),
+      {
+        workExperienceBoost: s.workExperienceBoost,
+        workExperienceAnalysis: s.workExperienceAnalysis,
+      },
     );
   });
 
@@ -418,7 +414,49 @@ function scoreOccupation(
     qualificationsUsed,
     mastersFallbackUsed,
     workExperienceBoost: opts.workExperienceBoost,
+    confidenceScoreBefore: scored.confidenceScore,
+    workExperienceAnalysis: null,
   };
+}
+
+/** Apply Groq judgements: re-score with boost and attach UI analysis. */
+function applyWorkExperienceJudgements(
+  top: ScoredOccupation[],
+  judgements: OccupationWorkJudgement[],
+): void {
+  const byCode = new Map(
+    judgements.map((j) => [j.anzscoCode.replace(/\s+/g, "").toLowerCase(), j]),
+  );
+
+  for (const occ of top) {
+    const before = occ.confidenceScoreBefore || occ.scored.confidenceScore;
+    const judgement = byCode.get(
+      occ.rubric.anzscoCode.replace(/\s+/g, "").toLowerCase(),
+    );
+    const related = Boolean(judgement?.related);
+
+    if (related) {
+      occ.workExperienceBoost = true;
+      occ.scored = scoreAssessment({
+        matches: occ.matches,
+        qualificationsUsed: occ.qualificationsUsed,
+        workExperienceBoost: true,
+        rubric: occ.rubric,
+      });
+    } else {
+      occ.workExperienceBoost = false;
+    }
+
+    const after = occ.scored.confidenceScore;
+    occ.confidenceScoreBefore = before;
+    occ.workExperienceAnalysis = {
+      related,
+      matchedJobs: related ? judgement?.matchedJobs ?? [] : [],
+      analysis: related ? judgement?.analysis ?? "" : "",
+      confidenceScoreBefore: before,
+      confidenceScoreAfter: after,
+    };
+  }
 }
 
 /** Prefer recommended occupations, then higher numeric confidence, then coverage. */
@@ -629,6 +667,10 @@ function buildCandidate(
   matches: SubjectMatch[],
   missingSubjects: MissingSubjectsByTier,
   unmatched: AnzscoCandidate["unmatched"],
+  work?: {
+    workExperienceBoost?: boolean;
+    workExperienceAnalysis?: WorkExperienceCandidateAnalysis | null;
+  },
 ): AnzscoCandidate {
   return {
     anzscoCode: rubric.anzscoCode,
@@ -644,6 +686,8 @@ function buildCandidate(
     confidenceScore: scored.confidenceScore,
     determination: scored.determination,
     recommended: scored.recommended,
+    workExperienceBoost: work?.workExperienceBoost ?? false,
+    workExperienceAnalysis: work?.workExperienceAnalysis ?? null,
     matches,
     missingSubjects,
     unmatched,
@@ -685,6 +729,25 @@ export function assessExtractedSubjects(
   );
   const candidates = top.map((s) => {
     const m = dedupeMatchRows(s.matches);
+    const boosted = opts?.workExperienceBoost ?? false;
+    const before = boosted
+      ? Math.max(0, s.scored.confidenceScore - 4)
+      : s.scored.confidenceScore;
+    const analysis: WorkExperienceCandidateAnalysis | null = boosted
+      ? {
+          related: true,
+          matchedJobs: [],
+          analysis: "Work experience boost applied (test path).",
+          confidenceScoreBefore: before,
+          confidenceScoreAfter: s.scored.confidenceScore,
+        }
+      : {
+          related: false,
+          matchedJobs: [],
+          analysis: "",
+          confidenceScoreBefore: s.scored.confidenceScore,
+          confidenceScoreAfter: s.scored.confidenceScore,
+        };
     return buildCandidate(
       s.rubric,
       s.scored,
@@ -695,6 +758,10 @@ export function assessExtractedSubjects(
         code: u.code ?? null,
         qualification: u.qualification as QualificationType,
       })),
+      {
+        workExperienceBoost: boosted,
+        workExperienceAnalysis: analysis,
+      },
     );
   });
 
@@ -803,5 +870,7 @@ export async function scoreOccupationWithLlm(
     qualificationsUsed,
     mastersFallbackUsed,
     workExperienceBoost: opts.workExperienceBoost,
+    confidenceScoreBefore: scored.confidenceScore,
+    workExperienceAnalysis: null,
   };
 }
