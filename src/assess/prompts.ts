@@ -26,8 +26,14 @@ ${chunk}
 ---`;
 }
 
-export function unclearMatchSystemPrompt(): string {
-  return `You match transcript subject names to a fixed Chemical Engineer (ANZSCO 233111) rubric subject list.
+export function unclearMatchSystemPrompt(
+  occupationTitle = "the target occupation",
+  anzscoCode?: string,
+): string {
+  const label = anzscoCode
+    ? `${occupationTitle} (ANZSCO ${anzscoCode})`
+    : occupationTitle;
+  return `You match transcript subject names to a fixed ${label} rubric subject list.
 
 Return JSON only:
 {
@@ -64,8 +70,14 @@ ${unclear.map((n, i) => `${i + 1}. ${n}`).join("\n")}
 Return one decision per transcript subject.`;
 }
 
-export function workExperienceSystemPrompt(): string {
-  return `Decide whether the candidate's work experience is related to Chemical Engineering (ANZSCO 233111).
+export function workExperienceSystemPrompt(
+  occupationTitle = "the target occupation",
+  anzscoCode?: string,
+): string {
+  const label = anzscoCode
+    ? `${occupationTitle} (ANZSCO ${anzscoCode})`
+    : occupationTitle;
+  return `Decide whether the candidate's work experience is related to ${label}.
 
 Return JSON only:
 {
@@ -74,8 +86,8 @@ Return JSON only:
   "reason": string
 }
 
-Related means process/plant chemical engineering work (process design, reaction engineering, heat/mass transfer operations, petrochemical, pharmaceuticals process, etc.).
-Generic "engineer" titles without chemical/process content are NOT related.
+Related means work that clearly aligns with ${occupationTitle} duties and knowledge areas.
+Generic "engineer" titles without occupation-specific content are NOT related.
 Be conservative.`;
 }
 
@@ -90,8 +102,14 @@ CV snippet (optional):
 ${cvSnippet ? cvSnippet.slice(0, 4000) : "(none)"}`;
 }
 
-export function explanationSystemPrompt(): string {
-  return `Write a short assessor-facing explanation (2–4 sentences) for an ANZSCO 233111 Chemical Engineer academic assessment.
+export function explanationSystemPrompt(
+  occupationTitle = "the target occupation",
+  anzscoCode?: string,
+): string {
+  const label = anzscoCode
+    ? `ANZSCO ${anzscoCode} ${occupationTitle}`
+    : occupationTitle;
+  return `Write a short assessor-facing explanation (2–4 sentences) for an ${label} academic assessment.
 Use ONLY the computed numbers and outcomes provided. Do not invent subjects or change the determination.
 Return JSON: { "explanation": string }`;
 }

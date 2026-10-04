@@ -63,7 +63,7 @@ describe("normalizeSubjectName", () => {
 
 describe("matchSubjectsSync", () => {
   it("exact-matches Chemical Engineering core subjects", () => {
-    const rubric = loadRubric("233111");
+    const rubric = loadRubric("chemical-engineer");
     const subjects = flattenRubricSubjects(rubric);
     const { matches } = matchSubjectsSync(CHEM_ENG_TRANSCRIPT, subjects);
     const cores = matches.filter(
@@ -74,7 +74,7 @@ describe("matchSubjectsSync", () => {
   });
 
   it("does not match unrelated IT units to chemical cores", () => {
-    const rubric = loadRubric("233111");
+    const rubric = loadRubric("chemical-engineer");
     const subjects = flattenRubricSubjects(rubric);
     const { matches } = matchSubjectsSync(IT_TRANSCRIPT, subjects);
     const cores = matches.filter(
@@ -85,7 +85,7 @@ describe("matchSubjectsSync", () => {
 
   it("fuzzy-matches close names above threshold", () => {
     assert.ok(bestSimilarity("Heat Transfer Fundamentals", "Heat Transfer") > 0.5);
-    const rubric = loadRubric("233111");
+    const rubric = loadRubric("chemical-engineer");
     const subjects = flattenRubricSubjects(rubric);
     const { matches } = matchSubjectsSync(
       [sub("Process Heat Transfer")],
@@ -103,9 +103,17 @@ describe("scoreAssessment / assessExtractedSubjects", () => {
     assert.equal(result.recommended, true);
     assert.equal(result.anzscoCode, "233111");
     assert.ok(result.confidence === "high" || result.confidence === "medium");
+    assert.ok(
+      typeof result.confidenceScore === "number" && result.confidenceScore >= 70,
+      `expected confidenceScore ≥ 70, got ${result.confidenceScore}`,
+    );
     assert.ok(result.foundationalMatched >= 4);
     assert.ok(result.coreMatched >= 6);
     assert.equal(result.tier3GateMet, true);
+    assert.ok((result.candidates?.length ?? 0) >= 1);
+    assert.ok(
+      (result.candidates?.[0]?.confidenceScore ?? 0) >= 70,
+    );
   });
 
   it("returns no match for an unrelated IT transcript", () => {
@@ -134,7 +142,9 @@ describe("scoreAssessment / assessExtractedSubjects", () => {
       sub("Process Dynamics and Control", "master"),
       sub("Engineering Economy", "master"),
     ];
-    const result = assessExtractedSubjects(weakBachelor);
+    const result = assessExtractedSubjects(weakBachelor, {
+      occupationId: "chemical-engineer",
+    });
     assert.ok(result.qualificationsUsed.includes("master"));
     assert.ok(result.coreMatched >= 6);
   });
@@ -146,7 +156,7 @@ describe("scoreAssessment / assessExtractedSubjects", () => {
   });
 
   it("optional subjects do not reduce core score", () => {
-    const rubric = loadRubric("233111");
+    const rubric = loadRubric("chemical-engineer");
     const subjects = flattenRubricSubjects(rubric);
     const withOptional = [
       ...CHEM_ENG_TRANSCRIPT,
@@ -160,7 +170,9 @@ describe("scoreAssessment / assessExtractedSubjects", () => {
       workExperienceBoost: false,
       rubric,
     });
-    const baseline = assessExtractedSubjects(CHEM_ENG_TRANSCRIPT);
+    const baseline = assessExtractedSubjects(CHEM_ENG_TRANSCRIPT, {
+      occupationId: "chemical-engineer",
+    });
     assert.equal(scored.coreMatched, baseline.coreMatched);
   });
 
@@ -180,9 +192,11 @@ describe("scoreAssessment / assessExtractedSubjects", () => {
     ];
     const noBoost = assessExtractedSubjects(conditionalSubjects, {
       workExperienceBoost: false,
+      occupationId: "chemical-engineer",
     });
     const boosted = assessExtractedSubjects(conditionalSubjects, {
       workExperienceBoost: true,
+      occupationId: "chemical-engineer",
     });
     if (noBoost.recommended && noBoost.determination === "conditional") {
       assert.equal(noBoost.confidence, "medium");
@@ -191,5 +205,13 @@ describe("scoreAssessment / assessExtractedSubjects", () => {
       // If thresholds land differently, at least boost must not worsen
       assert.ok(boosted.recommended === noBoost.recommended);
     }
+  });
+
+  it("loads civil engineer rubric from multi-ANZSCO files", () => {
+    const rubric = loadRubric("civil-engineer");
+    assert.equal(rubric.anzscoCode, "233211");
+    assert.equal(rubric.tiers.tier1.scoreDenominator, 5);
+    assert.equal(rubric.tiers.tier2.scoreDenominator, 8);
+    assert.ok(rubric.tiers.tier1.subjects.some((s) => s.name === "Engineering Mathematics"));
   });
 });

@@ -12,20 +12,24 @@ const explanationSchema = z.object({
 
 /** Deterministic fallback explanation from computed numbers. */
 export function buildExplanationFallback(result: AssessmentResult): string {
+  const title =
+    result.title ??
+    result.candidates?.[0]?.title ??
+    "occupation";
   if (!result.recommended) {
     return (
-      `No ANZSCO 233111 (Chemical Engineer) match. ` +
-      `Foundational ${result.foundationalMatched}/${result.foundationalExpected} (${result.foundationalPct}%), ` +
+      `No ANZSCO occupation match. ` +
+      `Best coverage against ${title}: foundational ${result.foundationalMatched}/${result.foundationalExpected} (${result.foundationalPct}%), ` +
       `core ${result.coreMatched}/${result.coreExpected} (${result.corePct}%). ` +
       `Tier 1: ${result.tier1Outcome ?? "n/a"}; Tier 2: ${result.tier2Outcome ?? "n/a"}; ` +
       `major project/thesis gate: ${result.tier3GateMet ? "met" : "not met"}.`
     );
   }
   const boost = result.workExperienceBoost
-    ? " Related chemical-engineering work experience provided a positive confidence boost."
+    ? ` Related ${title} work experience provided a positive confidence boost.`
     : "";
   return (
-    `Recommended ANZSCO ${result.anzscoCode} (Chemical Engineer) with ${result.confidence} confidence ` +
+    `Recommended ANZSCO ${result.anzscoCode} (${title}) with ${result.confidence} confidence ` +
     `(${result.determination.replace(/_/g, " ")}). ` +
     `Foundational ${result.foundationalMatched}/${result.foundationalExpected} (${result.foundationalPct}%), ` +
     `core ${result.coreMatched}/${result.coreExpected} (${result.corePct}%). ` +
@@ -46,6 +50,7 @@ export async function writeExplanation(
     const { data } = await generateJson(
       explanationUserPrompt({
         anzscoCode: result.anzscoCode,
+        title: result.title,
         recommended: result.recommended,
         confidence: result.confidence,
         determination: result.determination,
@@ -60,7 +65,7 @@ export async function writeExplanation(
         tier3GateMet: result.tier3GateMet,
         workExperienceBoost: result.workExperienceBoost,
       }),
-      explanationSystemPrompt(),
+      explanationSystemPrompt(result.title ?? undefined, result.anzscoCode ?? undefined),
       {
         deadlineMs: opts?.deadlineMs,
         maxTokens: 512,

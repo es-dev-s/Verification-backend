@@ -12,17 +12,31 @@ export type ExperienceRowLike = {
   domainSuggested?: boolean | null;
 };
 
+export type ExperienceBoostOpts = {
+  useLlm?: boolean;
+  deadlineMs?: number;
+  /** Occupation being scored — used for keyword + LLM relevance. */
+  occupationTitle?: string;
+  anzscoCode?: string;
+};
+
 /**
- * Heuristic + optional LLM: is work experience related to chemical engineering?
+ * Heuristic + optional LLM: is work experience related to the occupation?
  * Positive boost only — never the main measure.
  */
 export async function judgeWorkExperienceBoost(
   rows: ExperienceRowLike[],
   cvText: string | null,
-  opts?: { useLlm?: boolean; deadlineMs?: number },
+  opts?: ExperienceBoostOpts,
 ): Promise<{ related: boolean; reason: string }> {
-  // Fast path: existing domain flags + keyword heuristics
-  const heuristic = heuristicChemicalEng(rows, cvText);
+  const occupationTitle = opts?.occupationTitle ?? "Chemical Engineer";
+  const anzscoCode = opts?.anzscoCode;
+
+  const heuristic = heuristicOccupationRelated(
+    rows,
+    cvText,
+    occupationTitle,
+  );
   if (heuristic.related) return heuristic;
 
   if (opts?.useLlm === false) return heuristic;
@@ -38,7 +52,7 @@ export async function judgeWorkExperienceBoost(
       .join("\n");
     const { data } = await generateJson(
       workExperienceUserPrompt(summary, cvText),
-      workExperienceSystemPrompt(),
+      workExperienceSystemPrompt(occupationTitle, anzscoCode),
       {
         deadlineMs: opts?.deadlineMs,
         maxTokens: 512,
@@ -56,28 +70,43 @@ export async function judgeWorkExperienceBoost(
   }
 }
 
-const CHEM_KEYWORDS =
-  /\b(chemical engineer|process engineer|petrochemical|refinery|reactor|heat exchanger|mass transfer|process design|process control|polymer|pharmaceutical process|plant design)\b/i;
-
-function heuristicChemicalEng(
+function heuristicOccupationRelated(
   rows: ExperienceRowLike[],
   cvText: string | null,
+  occupationTitle: string,
 ): { related: boolean; reason: string } {
+  const tokens = occupationTitle
+    .toLowerCase()
+    .replace(/[/()]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 3 && t !== "engineer" && t !== "engineering");
+
+  const keywordRe =
+    tokens.length > 0
+      ? new RegExp(`\\b(${tokens.map(escapeRegex).join("|")})\\b`, "i")
+      : null;
+
   for (const r of rows) {
     const blob = `${r.title ?? ""} ${r.employer ?? ""}`;
-    if (CHEM_KEYWORDS.test(blob)) {
+    if (keywordRe?.test(blob)) {
       return {
         related: true,
-        reason: "Title/employer keywords indicate chemical/process engineering work.",
+        reason: `Title/employer keywords indicate ${occupationTitle}-related work.`,
       };
     }
   }
-  if (cvText && CHEM_KEYWORDS.test(cvText.slice(0, 8000))) {
+  if (cvText && keywordRe?.test(cvText.slice(0, 8000))) {
     return {
       related: true,
-      reason: "CV text indicates chemical/process engineering experience.",
+      reason: `CV text indicates ${occupationTitle}-related experience.`,
     };
   }
-  // Domain flags alone are "engineering-related", not chemical-specific — do not boost
-  return { related: false, reason: "No chemical-engineering-specific experience detected." };
+  return {
+    related: false,
+    reason: `No ${occupationTitle}-specific experience detected.`,
+  };
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

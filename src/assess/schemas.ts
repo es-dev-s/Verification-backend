@@ -117,6 +117,14 @@ export type TranscriptSourceInfo = {
   label: string;
 };
 
+/** Canonical rubric subject with naming variants (for UI drill-down). */
+export type RubricSubjectCatalogEntry = {
+  name: string;
+  tier: "tier1" | "tier2" | "tier3";
+  category: string;
+  variants: string[];
+};
+
 /** One occupation evaluated against the transcript (top-N candidates). */
 export type AnzscoCandidate = {
   anzscoCode: string;
@@ -128,6 +136,11 @@ export type AnzscoCandidate = {
   coreExpected: number;
   corePct: number;
   tier3GateMet: boolean;
+  confidence: ConfidenceLevel | null;
+  /** 0–100 numeric confidence for ranking and display. */
+  confidenceScore: number;
+  determination: Determination;
+  recommended: boolean;
   matches: SubjectMatch[];
   missingSubjects: MissingSubjectsByTier;
   unmatched: Array<{
@@ -135,6 +148,8 @@ export type AnzscoCandidate = {
     code: string | null;
     qualification: QualificationType;
   }>;
+  /** Tier 1 / Tier 2 subjects with naming variants for the breakdown popup. */
+  subjectCatalog: RubricSubjectCatalogEntry[];
 };
 
 export type AssessmentResult = {
@@ -142,6 +157,8 @@ export type AssessmentResult = {
   title: string | null;
   recommended: boolean;
   confidence: ConfidenceLevel | null;
+  /** 0–100 numeric confidence (highest recommended occupation). */
+  confidenceScore?: number;
   determination: Determination;
   foundationalMatched: number;
   foundationalExpected: number;
@@ -166,7 +183,7 @@ export type AssessmentResult = {
   transcriptSource?: TranscriptSourceInfo;
   /** True when bachelor core was weak and masters subjects were included. */
   mastersFallbackUsed?: boolean;
-  /** Ranked occupation candidates (currently 1; UI supports up to 3). */
+  /** Ranked occupation candidates (top-N across all academic ANZSCO rubrics). */
   candidates?: AnzscoCandidate[];
   /** Raw rows from transcript extraction (before rubric matching). */
   extractedSubjects: ExtractedSubjectRow[];

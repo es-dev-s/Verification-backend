@@ -50,15 +50,19 @@ export const assessConfig = {
   flagPlusMediumRisk: (process.env.ASSESS_FLAG_PLUS_MEDIUM ??
     "conditional") as "conditional" | "not_verified",
   /**
-   * When Tier 3 gate (major project/thesis/capstone) is missing:
+   * When Tier 3 gate (major project/thesis/capstone) is missing and the
+   * occupation rubric does not set tier3GateDowngradeVerifiedOnly:
    * default forces not_verified even if Tier1/2 would verify.
+   * Multi-ANZSCO academic rubrics downgrade verified → conditional instead.
    */
   missingTier3Action: (process.env.ASSESS_MISSING_TIER3 ??
     "not_verified") as "not_verified" | "conditional",
+  /** Max occupation cards returned to the wizard (ranked). */
+  maxCandidates: intEnv("ASSESS_MAX_CANDIDATES", 3),
   /**
    * Confidence mapping from determination + optional CV boost.
    * verified_no_risk → high
-   * conditional → medium (boost → high if CV chemical-eng related)
+   * conditional → medium (boost → high if CV related to the occupation)
    * not_verified → no_match (do not recommend)
    */
   confidence: {

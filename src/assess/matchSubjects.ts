@@ -80,7 +80,12 @@ function tryFuzzy(
 export async function matchSubjects(
   extracted: ExtractedSubjectRow[],
   rubricSubjects: RubricSubject[],
-  opts?: { useLlm?: boolean; deadlineMs?: number },
+  opts?: {
+    useLlm?: boolean;
+    deadlineMs?: number;
+    occupationTitle?: string;
+    anzscoCode?: string;
+  },
 ): Promise<{ matches: SubjectMatch[]; unmatched: ExtractedSubjectRow[] }> {
   const index = buildVariantIndex(rubricSubjects);
   const matches: SubjectMatch[] = [];
@@ -113,6 +118,8 @@ export async function matchSubjects(
       unclear,
       rubricSubjects,
       opts?.deadlineMs ?? Date.now() + 20_000,
+      opts?.occupationTitle,
+      opts?.anzscoCode,
     );
     const stillUnmatched: ExtractedSubjectRow[] = [];
     for (const row of unclear) {
@@ -211,6 +218,8 @@ async function matchUnclearWithLlm(
   unclear: ExtractedSubjectRow[],
   rubricSubjects: RubricSubject[],
   deadlineMs: number,
+  occupationTitle?: string,
+  anzscoCode?: string,
 ): Promise<
   Map<
     string,
@@ -245,7 +254,7 @@ async function matchUnclearWithLlm(
             variants: s.variants.slice(0, 8),
           })),
         ),
-        unclearMatchSystemPrompt(),
+        unclearMatchSystemPrompt(occupationTitle, anzscoCode),
         {
           deadlineMs,
           maxTokens: 2048,
