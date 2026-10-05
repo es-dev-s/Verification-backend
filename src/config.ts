@@ -24,10 +24,11 @@ export const config = {
   ),
   maxUploadBytes: intEnv("MAX_UPLOAD_BYTES", 10 * 1024 * 1024),
   blobTtlSeconds: intEnv("BLOB_TTL_SECONDS", 3600),
-  extractTimeoutMs: intEnv("EXTRACT_TIMEOUT_MS", 120_000),
+  // PaddleOCR on CPU often needs several minutes per scanned transcript page.
+  extractTimeoutMs: intEnv("EXTRACT_TIMEOUT_MS", 900_000),
   parseTimeoutMs: intEnv("PARSE_TIMEOUT_MS", 10_000),
   extractAttempts: intEnv("EXTRACT_ATTEMPTS", 3),
-  stuckExtractMinutes: intEnv("STUCK_EXTRACT_MINUTES", 10),
+  stuckExtractMinutes: intEnv("STUCK_EXTRACT_MINUTES", 20),
   uploadsPerMinute: intEnv("UPLOADS_PER_MINUTE", 20),
   readsPerMinute: intEnv("READS_PER_MINUTE", 30),
   maxInFlightJobsPerCase: intEnv("MAX_IN_FLIGHT_JOBS_PER_CASE", 4),
