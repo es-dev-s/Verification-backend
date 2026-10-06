@@ -28,6 +28,35 @@ export type HistoricalStats = {
   positivePct: number;
 };
 
+/** Per-case precedent risk reused from datasheet `outcomePossibility`. */
+export type PrecedentRiskLevel = "no_risk" | "slight_risk" | "high_risk";
+
+export type PrecedentCaseRow = {
+  id: string;
+  occupation: string;
+  degree: string | null;
+  university: string | null;
+  country: string | null;
+  /** Historical risk from datasheet `outcomePossibility`. */
+  matchRisk: PrecedentRiskLevel;
+  /** Historical final result from datasheet `outcome`. */
+  outcome: string | null;
+  verifiedDate: string | null;
+};
+
+export type PrecedentCheck = {
+  matchingCases: number;
+  positiveOutcomeRate: number;
+  /** Most common historical risk among matched past cases. */
+  overallRisk: PrecedentRiskLevel | null;
+  riskCounts: {
+    no_risk: number;
+    slight_risk: number;
+    high_risk: number;
+  };
+  cases: PrecedentCaseRow[];
+};
+
 export type RiskAssessmentResult = {
   anzscoCode: string;
   title: string;
@@ -36,6 +65,11 @@ export type RiskAssessmentResult = {
   corePct: number;
   historicalPct: number;
   historical: HistoricalStats;
+  /**
+   * Past-cases precedent check (occupation / degree / university / country).
+   * Separate from subject-weighted scoring.
+   */
+  precedent: PrecedentCheck;
   /** Weighted overall before work-experience adjustment. */
   overallPctBeforeWork: number;
   workExperienceBoost: boolean;

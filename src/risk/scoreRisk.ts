@@ -1,5 +1,7 @@
+import { emptyPrecedentCheck } from "./precedent.js";
 import type {
   HistoricalStats,
+  PrecedentCheck,
   RiskAssessmentResult,
   RiskLevel,
 } from "./schemas.js";
@@ -128,6 +130,7 @@ export function computeRiskScores(input: {
   fundamentalPct: number;
   corePct: number;
   historical: HistoricalStats;
+  precedent?: PrecedentCheck;
   workExperienceBoost: boolean;
   missingCore: string[];
 }): Omit<
@@ -164,6 +167,7 @@ export function computeRiskScores(input: {
     corePct,
     historicalPct,
     historical: input.historical,
+    precedent: input.precedent ?? emptyPrecedentCheck(),
     overallPctBeforeWork,
     workExperienceBoost: input.workExperienceBoost,
     workExperienceDelta,

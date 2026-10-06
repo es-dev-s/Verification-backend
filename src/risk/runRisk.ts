@@ -2,9 +2,18 @@ import { prisma } from "../lib/prisma.js";
 import { assessConfig } from "../assess/config.js";
 import type { AssessmentResult } from "../assess/schemas.js";
 import { historicalStatsForAnzsco } from "./historical.js";
+import { buildPrecedentCheck, emptyPrecedentCheck } from "./precedent.js";
 import { judgeRiskWithLlm } from "./analyzeRisk.js";
 import { computeRiskScores } from "./scoreRisk.js";
 import type { Competence, RiskAssessmentResult } from "./schemas.js";
+
+const QUAL_PRIORITY = [
+  "bachelor",
+  "master",
+  "diploma",
+  "advanced_diploma",
+  "phd",
+] as const;
 
 type StoredAssessment = AssessmentResult & {
   risk?: RiskAssessmentResult;
@@ -57,7 +66,7 @@ export async function runRiskAssessment(
 
   const caseRow = await prisma.case.findUnique({
     where: { id: caseId },
-    include: { assessment: true },
+    include: { assessment: true, qualifications: true },
   });
   if (!caseRow?.assessment?.resultJson) {
     throw new Error("Run ANZSCO assessment before risk analysis.");
@@ -73,6 +82,25 @@ export async function runRiskAssessment(
 
   const title = opts.title?.trim() || candidate.title;
   const historical = historicalStatsForAnzsco(opts.anzscoCode);
+
+  const quals = [...(caseRow.qualifications ?? [])].sort((a, b) => {
+    const ia = QUAL_PRIORITY.indexOf(
+      a.degreeLevel as (typeof QUAL_PRIORITY)[number],
+    );
+    const ib = QUAL_PRIORITY.indexOf(
+      b.degreeLevel as (typeof QUAL_PRIORITY)[number],
+    );
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+  const primaryQual = quals[0] ?? null;
+  const precedent = buildPrecedentCheck({
+    anzscoCode: candidate.anzscoCode,
+    occupationTitle: title,
+    degreeTitle: primaryQual?.degreeTitle ?? null,
+    university: primaryQual?.institution ?? null,
+    country: primaryQual?.country ?? null,
+  });
+
   const workExperienceBoost = Boolean(
     candidate.workExperienceBoost ??
       candidate.workExperienceAnalysis?.related ??
@@ -86,6 +114,7 @@ export async function runRiskAssessment(
     fundamentalPct: candidate.foundationalPct,
     corePct: candidate.corePct,
     historical,
+    precedent,
     workExperienceBoost,
     missingCore,
   });
@@ -116,7 +145,11 @@ export async function getStoredRisk(
   const row = await prisma.assessment.findUnique({ where: { caseId } });
   if (!row?.resultJson) return null;
   const json = row.resultJson as StoredAssessment;
-  return json.risk ?? null;
+  if (!json.risk) return null;
+  return {
+    ...json.risk,
+    precedent: json.risk.precedent ?? emptyPrecedentCheck(),
+  };
 }
 
 export async function patchRiskCompetence(
@@ -133,6 +166,7 @@ export async function patchRiskCompetence(
   }
   const next: RiskAssessmentResult = {
     ...assessment.risk,
+    precedent: assessment.risk.precedent ?? emptyPrecedentCheck(),
     competence,
     competenceSource: "manual",
   };
