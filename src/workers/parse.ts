@@ -1,8 +1,13 @@
 import { config } from "../config.js";
-import { generateJson } from "../lib/gemini.js";
 import { prisma } from "../lib/prisma.js";
 import { acquireParseSlot } from "../lib/rateLimit.js";
 import { computeDuration } from "../parse/duration.js";
+import {
+  generateJsonGroqSplit,
+  mergeCvEducationParts,
+  mergeEducationMultiParts,
+  mergeExperienceParts,
+} from "../parse/groqFormParse.js";
 import {
   heuristicsCvEducationEntries,
   heuristicsEducationMulti,
@@ -32,9 +37,6 @@ import {
   sanitizeExtractedLabel,
 } from "../parse/sanitizeExtracted.js";
 
-/** Soft cap for Gemini before falling back to heuristics. */
-const GEMINI_SOFT_DEADLINE_MS = 10_000;
-
 const emptyExtract = (): EducationExtract => ({
   degreeTitle: null,
   institution: null,
@@ -58,20 +60,19 @@ export async function parseCvEducationEntries(
 
   try {
     await acquireParseSlot(config.parseRpm);
-    const out = await generateJson(
-      `--- CV text ---\n${cleaned}`,
-      cvEducationSystemPrompt(),
-      {
-        deadlineMs: Date.now() + GEMINI_SOFT_DEADLINE_MS,
-        maxTokens: 3072,
-        responseSchema: cvEducationExtractSchema,
-      },
-    );
+    const out = await generateJsonGroqSplit({
+      bodyText: cleaned,
+      header: "--- CV text ---",
+      systemPrompt: cvEducationSystemPrompt(),
+      responseSchema: cvEducationExtractSchema,
+      mergeParts: mergeCvEducationParts,
+      maxTokens: 3072,
+    });
     data = out.data;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(
-      `[parse/cv-education] Gemini failed (${message}) — heuristics fallback`,
+      `[parse/cv-education] Groq failed (${message}) — heuristics fallback`,
     );
     data = heuristicsCvEducationEntries(cleaned);
     fallback = true;
@@ -81,7 +82,7 @@ export async function parseCvEducationEntries(
   if (!parsed.success || !parsed.data.entries.length) {
     if (!fallback) {
       console.warn(
-        "[parse/cv-education] empty/invalid Gemini entries — heuristics fallback",
+        "[parse/cv-education] empty/invalid Groq entries — heuristics fallback",
       );
     }
     data = heuristicsCvEducationEntries(cleaned);
@@ -197,34 +198,32 @@ export async function parseEducation(
   let geminiMeta: { keyUsed?: string; modelUsed?: string } = {};
   let cvGeminiRaw: unknown = null;
 
-  // Transcript / certificate for this level
+  // Transcript / certificate for this level — Groq split across keys
   if (labeled.length) {
     await acquireParseSlot(config.parseRpm);
-    const userPrompt =
-      `Target degreeLevel=${degreeLevel}. Extract only fields for this level.\n\n` +
-      labeled
-        .map(
-          (d) =>
-            `=== SOURCE documentId=${d.documentId} documentType=${d.documentType} ===\n${d.text}`,
-        )
-        .join("\n\n");
+    const bodyText = labeled
+      .map(
+        (d) =>
+          `=== SOURCE documentId=${d.documentId} documentType=${d.documentType} ===\n${d.text}`,
+      )
+      .join("\n\n");
+    const header = `Target degreeLevel=${degreeLevel}. Extract only fields for this level.`;
 
     try {
-      const out = await generateJson(
-        userPrompt,
-        educationMultiSystemPrompt(),
-        {
-          deadlineMs: Date.now() + GEMINI_SOFT_DEADLINE_MS,
-          maxTokens: 2048,
-          responseSchema: educationMultiExtractSchema,
-        },
-      );
+      const out = await generateJsonGroqSplit({
+        bodyText,
+        header,
+        systemPrompt: educationMultiSystemPrompt(),
+        responseSchema: educationMultiExtractSchema,
+        mergeParts: mergeEducationMultiParts,
+        maxTokens: 2048,
+      });
       data = out.data;
       geminiMeta = { keyUsed: out.keyUsed, modelUsed: out.modelUsed };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(
-        `[parse/education/${degreeLevel}] Gemini failed (${message}) — heuristics fallback`,
+        `[parse/education/${degreeLevel}] Groq failed (${message}) — heuristics fallback`,
       );
       data = heuristicsEducationMulti(labeled) as unknown as Record<
         string,
@@ -269,7 +268,7 @@ export async function parseEducation(
     );
     if (!anyValue) {
       console.warn(
-        `[parse/education/${degreeLevel}] empty Gemini fields — heuristics fallback`,
+        `[parse/education/${degreeLevel}] empty Groq fields — heuristics fallback`,
       );
       sources = heuristicsPerSource(labeled).map((s) => ({
         ...s,
@@ -423,21 +422,20 @@ export async function parseExperience(caseId: string) {
   let geminiMeta: { keyUsed?: string; modelUsed?: string } = {};
 
   try {
-    const out = await generateJson(
-      `--- CV text ---\n${cvText}`,
-      experienceSystemPrompt(),
-      {
-        deadlineMs: Date.now() + GEMINI_SOFT_DEADLINE_MS,
-        maxTokens: 2048,
-        responseSchema: experienceExtractSchema,
-      },
-    );
+    const out = await generateJsonGroqSplit({
+      bodyText: cvText,
+      header: "--- CV text ---",
+      systemPrompt: experienceSystemPrompt(),
+      responseSchema: experienceExtractSchema,
+      mergeParts: mergeExperienceParts,
+      maxTokens: 2048,
+    });
     data = out.data;
     geminiMeta = { keyUsed: out.keyUsed, modelUsed: out.modelUsed };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(
-      `[parse/experience] Gemini failed (${message}) — using heuristics fallback`,
+      `[parse/experience] Groq failed (${message}) — using heuristics fallback`,
     );
     data = heuristicsExperienceFromText(cvText) as unknown as Record<
       string,
@@ -450,7 +448,7 @@ export async function parseExperience(caseId: string) {
   if (!parsed.success || !parsed.data.rows.length) {
     if (!fallback) {
       console.warn(
-        "[parse/experience] empty/invalid Gemini rows — heuristics fallback",
+        "[parse/experience] empty/invalid Groq rows — heuristics fallback",
       );
     }
     data = heuristicsExperienceFromText(cvText) as unknown as Record<
