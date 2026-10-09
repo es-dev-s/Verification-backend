@@ -11,6 +11,7 @@ import { riskRoutes } from "./risk/routes.js";
 import { careerEpisodeRoutes } from "./routes/careerEpisodes.js";
 import { caseReviewRoutes } from "./routes/caseReview.js";
 import { caseRoutes } from "./routes/cases.js";
+import { clientRoutes } from "./routes/clients.js";
 import { documentRoutes } from "./routes/documents.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { prisma } from "./lib/prisma.js";
@@ -64,6 +65,7 @@ async function main() {
   await app.register(documentRoutes);
   await app.register(careerEpisodeRoutes);
   await app.register(caseReviewRoutes);
+  await app.register(clientRoutes);
   await app.register(jobRoutes);
   await app.register(assessRoutes);
   await app.register(riskRoutes);
