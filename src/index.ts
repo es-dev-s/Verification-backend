@@ -8,6 +8,8 @@ import { config } from "./config.js";
 import clientIdPlugin from "./plugins/clientId.js";
 import { assessRoutes } from "./assess/routes.js";
 import { riskRoutes } from "./risk/routes.js";
+import { careerEpisodeRoutes } from "./routes/careerEpisodes.js";
+import { caseReviewRoutes } from "./routes/caseReview.js";
 import { caseRoutes } from "./routes/cases.js";
 import { documentRoutes } from "./routes/documents.js";
 import { jobRoutes } from "./routes/jobs.js";
@@ -60,6 +62,8 @@ async function main() {
 
   await app.register(caseRoutes);
   await app.register(documentRoutes);
+  await app.register(careerEpisodeRoutes);
+  await app.register(caseReviewRoutes);
   await app.register(jobRoutes);
   await app.register(assessRoutes);
   await app.register(riskRoutes);

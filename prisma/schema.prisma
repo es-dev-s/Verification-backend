@@ -45,6 +45,19 @@ enum ReadJobStatus {
 }
 
 /// Selected / document-scoped education level. Null on CV documents and experience read jobs.
+/// Career episode / project source (Step 1 upload only — not used by any other step yet).
+/// Step 6 manual decision. No row = pending (not decided yet).
+enum CaseReviewStatus {
+  APPROVED
+  REJECTED
+}
+
+enum ProjectSource {
+  WORK_BASED
+  ACADEMIC_PERSONAL
+  FIRM_PREPARED
+}
+
 enum DegreeLevel {
   diploma
   advanced_diploma
@@ -73,6 +86,8 @@ model Case {
   draftJson         Json?
   assessment        Assessment?
   extractedSubjects ExtractedSubject[]
+  careerEpisodes    CareerEpisode[]
+  review            CaseReview?
 
   @@index([clientId])
 }
@@ -229,4 +244,53 @@ model FieldSource {
   @@unique([caseId, field, degreeLevel])
   @@index([caseId])
   @@index([caseId, degreeLevel])
+}
+
+/// Career episode / project document uploaded in Step 1. Stored only — never OCR'd,
+/// parsed, or used by assessment / risk (kept out of `Document` on purpose so no
+/// worker or pipeline picks it up).
+model CareerEpisode {
+  id              String         @id @default(cuid())
+  caseId          String
+  /// WORK_BASED | ACADEMIC_PERSONAL | FIRM_PREPARED (null until the user picks one).
+  projectSource   ProjectSource?
+  /// ExperienceRow.id selected at link time. Plain id (no FK) because experience rows
+  /// are re-created on draft save / Read; `experienceLabel` keeps the link readable.
+  experienceRowId String?
+  /// Snapshot of the linked role, e.g. "Site Engineer — ABC Pvt Ltd (Jan 2020 – Present)".
+  experienceLabel String?
+  originalName    String
+  format          DocumentFormat
+  sizeBytes       Int
+  sha256          String
+  /// Original file bytes (max upload size applies).
+  fileData        Bytes
+  sortOrder       Int            @default(0)
+  /// Evidence checkboxes the user ticks manually (stored only; not used by other steps).
+  hasCalculations         Boolean @default(false)
+  hasDrawingsCad          Boolean @default(false)
+  hasDataTables           Boolean @default(false)
+  hasSiteProductImages    Boolean @default(false)
+  hasStandardsReferenced  Boolean @default(false)
+  hasQuantifiableOutcomes Boolean @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+/// Step 6 approve / reject decision for a case (one per case; saving again overwrites).
+model CaseReview {
+  id         String           @id @default(cuid())
+  caseId     String           @unique
+  status     CaseReviewStatus
+  comment    String?
+  /// When the current decision was saved (updated on every change).
+  reviewedAt DateTime
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 }
