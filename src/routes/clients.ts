@@ -9,7 +9,9 @@ import {
   verificationOf,
   type ClientFilter,
 } from "../lib/clientSummary.js";
+import { deleteBlob } from "../lib/blob.js";
 import { prisma } from "../lib/prisma.js";
+import { getExtractQueue } from "../lib/queues.js";
 
 /**
  * Clients list (one row per case for this browser's client id). Read-only:
@@ -160,5 +162,39 @@ export const clientRoutes: FastifyPluginAsync = async (app) => {
       clients:
         filter === "all" ? rows : rows.filter((r) => r.verification === filter),
     };
+  });
+
+  /**
+   * Delete a client (= one case) and everything attached to it. Every child
+   * table (Document, ExtractedSubject, ReadJob, ExperienceRow, Qualification,
+   * FieldSource, Assessment, CareerEpisode incl. file bytes, CaseReview) has
+   * ON DELETE CASCADE to Case, so one owned delete removes it all atomically.
+   */
+  app.delete("/cases/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const owned = await prisma.case.findFirst({
+      where: { id, clientId: req.clientId },
+      select: { id: true, documents: { select: { id: true } } },
+    });
+    if (!owned) return reply.code(404).send({ error: "Case not found" });
+
+    const deleted = await prisma.case.deleteMany({
+      where: { id, clientId: req.clientId },
+    });
+    if (!deleted.count) return reply.code(404).send({ error: "Case not found" });
+
+    // Best effort: drop pending upload bytes and queued extract jobs (jobId = document id).
+    // Both expire on their own, so failures here are ignored.
+    const docIds = owned.documents.map((d) => d.id);
+    await Promise.all(
+      docIds.flatMap((docId) => [
+        deleteBlob(docId).catch(() => undefined),
+        getExtractQueue()
+          .remove(docId)
+          .catch(() => undefined),
+      ]),
+    );
+
+    return reply.code(204).send();
   });
 };
