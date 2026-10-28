@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -86,7 +87,14 @@ export type RubricSubject = z.infer<typeof subjectSchema> & {
   tier: "tier1" | "tier2" | "tier3";
 };
 
-type NamedSubject = { name?: string; label?: string; status?: string; aliases?: string[] };
+type NamedSubject = {
+  name?: string;
+  label?: string;
+  status?: string;
+  aliases?: string[];
+  /** Free-text assessor note, e.g. "Includes Mathematics I/II/III, Numerical Methods, etc." */
+  matchingNote?: string;
+};
 type OccupationRaw = {
   id: string;
   anzsco: string;
@@ -150,6 +158,7 @@ const libDir = resolve(__dirname, "../lib");
 
 let rubricsFile: RubricsFile | null = null;
 let subjectsFile: SubjectsEntry[] | null = null;
+let rubricFingerprintCache: string | null = null;
 const rubricCache = new Map<string, Rubric>();
 
 const OUTCOME_MAP: Record<string, string> = {
@@ -162,6 +171,76 @@ const OUTCOME_MAP: Record<string, string> = {
   notVerified: "not_verified",
   conditional: "conditional",
 };
+
+/**
+ * Stable hash of the rubric + variant JSON files. Part of the assessment cache
+ * key so a rubric edit invalidates cached scores.
+ */
+export function rubricFingerprint(): string {
+  if (rubricFingerprintCache) return rubricFingerprintCache;
+  const h = createHash("sha256");
+  for (const name of ["anzsco-verification-rubrics.json", "anzsco_subjects.json"]) {
+    h.update(name);
+    h.update("\0");
+    h.update(readFileSync(resolve(libDir, name)));
+    h.update("\0");
+  }
+  rubricFingerprintCache = h.digest("hex").slice(0, 16);
+  return rubricFingerprintCache;
+}
+
+/**
+ * Turn a rubric matchingNote into extra synonyms.
+ * "Includes Engineering/Applied/General Chemistry variants." →
+ *   ["Engineering Chemistry", "Applied Chemistry", "General Chemistry"]
+ * Notes that say the subject is not used for suitability yield nothing.
+ */
+export function synonymsFromMatchingNote(note: string | undefined): string[] {
+  if (!note?.trim()) return [];
+  if (/not used/i.test(note)) return [];
+  let text = note
+    .replace(/\s+[—–-]\s+.*$/s, "") // drop trailing commentary after a dash
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/^\s*includes?\s+/i, "")
+    .replace(/\betc\.?/gi, " ")
+    .replace(/\band similar\b.*$/i, " ")
+    .replace(/\bvariants?\b\.?/gi, " ")
+    .replace(/\.\s*$/, " ");
+  text = text.replace(/\s+/g, " ").trim();
+  const out = new Set<string>();
+  for (const pieceRaw of text.split(/\s*[,;]\s*|\s+\/\s+|\s+and\s+(?=[A-Z])/)) {
+    const piece = pieceRaw.trim().replace(/^and\s+/i, "");
+    if (!piece) continue;
+    for (const v of expandSlashAlternatives(piece)) {
+      const t = v.trim();
+      const words = t.split(/\s+/);
+      if (t.length < 4 && !/^[A-Z]{3,}$/.test(t)) continue;
+      if (words.length === 1 && /^(engineering|engineers?|general|applied|basic|lab|laboratory)$/i.test(t)) continue;
+      out.add(t);
+    }
+  }
+  return [...out];
+}
+
+/**
+ * "Engineering/Applied/General Chemistry" → three names;
+ * "Physics I/II" and "Mathematics I/II/III" keep roman numerals attached to the base.
+ */
+function expandSlashAlternatives(piece: string): string[] {
+  const words = piece.split(/\s+/);
+  const idx = words.findIndex((w) => w.includes("/"));
+  if (idx < 0) return [piece];
+  const alts = words[idx]!.split("/").filter(Boolean);
+  if (alts.every((a) => /^(I|II|III|IV|V|VI|\d+)$/i.test(a))) {
+    const base = words.slice(0, idx).join(" ");
+    return alts.map((a) => `${base} ${a}`.trim());
+  }
+  return alts.flatMap((a) =>
+    expandSlashAlternatives(
+      [...words.slice(0, idx), a, ...words.slice(idx + 1)].join(" "),
+    ),
+  );
+}
 
 function loadRubricsFile(): RubricsFile {
   if (rubricsFile) return rubricsFile;
@@ -354,20 +433,30 @@ function buildRubricFromOccupation(occupation: OccupationRaw): Rubric {
   const byName = variantsIndexForOccupation(occupation);
   const defaults = file.defaults?.outcomes;
 
+  const extras = (s: NamedSubject) => [
+    ...(s.aliases ?? []),
+    ...synonymsFromMatchingNote(s.matchingNote),
+  ];
+
   const tier1Subjects = (occupation.tier1.subjects ?? []).map((s) => {
     const name = subjectName(s);
     const status = (s.status ?? "expected").toLowerCase();
+    // "contextual" catch-alls ("Others (general electives)") never count toward tier 1.
     const category =
-      status === "optional" || status === "elective" ? "optional" : "expected";
-    return withVariants(name, category, byName, s.aliases ?? []);
+      status === "optional" || status === "elective"
+        ? "optional"
+        : status === "contextual"
+          ? "contextual"
+          : "expected";
+    return withVariants(name, category, byName, extras(s));
   });
 
   const tier2Subjects = [
     ...(occupation.tier2.core ?? []).map((s) =>
-      withVariants(subjectName(s), "core", byName, s.aliases ?? []),
+      withVariants(subjectName(s), "core", byName, extras(s)),
     ),
     ...(occupation.tier2.optional ?? []).map((s) =>
-      withVariants(subjectName(s), "optional", byName, s.aliases ?? []),
+      withVariants(subjectName(s), "optional", byName, extras(s)),
     ),
   ];
 
@@ -379,10 +468,10 @@ function buildRubricFromOccupation(occupation: OccupationRaw): Rubric {
   const tier3Subjects = [
     withVariants(gateLabel, "core", byName, gateAliases),
     ...(occupation.tier3?.supporting ?? []).map((s) =>
-      withVariants(subjectName(s), "core", byName, s.aliases ?? []),
+      withVariants(subjectName(s), "core", byName, extras(s)),
     ),
     ...(occupation.tier3?.optional ?? []).map((s) =>
-      withVariants(subjectName(s), "optional", byName, s.aliases ?? []),
+      withVariants(subjectName(s), "optional", byName, extras(s)),
     ),
   ];
 
@@ -503,6 +592,8 @@ export function flattenRubricSubjects(rubric: Rubric): RubricSubject[] {
   for (const tier of ["tier1", "tier2", "tier3"] as const) {
     for (const s of rubric.tiers[tier].subjects) {
       if (s.category === "catchAll" && s.name === "Others") continue;
+      // Contextual catch-alls are informational only — never matched or scored.
+      if (s.category === "contextual") continue;
       out.push({ ...s, tier });
     }
   }

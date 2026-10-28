@@ -17,6 +17,8 @@ export const extractedSubjectSchema = z.object({
   qualification: qualificationTypeSchema.default("unknown"),
   sourceSnippet: z.string().nullable().optional().default(null),
   isRepeat: z.boolean().optional().default(false),
+  /** Transcript Document id this row was extracted from (null when unknown). */
+  documentId: z.string().nullable().optional(),
 });
 
 export type ExtractedSubjectRow = z.infer<typeof extractedSubjectSchema>;
@@ -232,4 +234,27 @@ export type AssessmentResult = {
   /** Raw rows from transcript extraction (before rubric matching). */
   extractedSubjects: ExtractedSubjectRow[];
   explanation: string;
+  /**
+   * User-facing warnings (e.g. incomplete subject extraction). Empty / absent
+   * when the run was clean.
+   */
+  warnings?: string[];
+  /** Subject-extraction bookkeeping used for caching (see assessCase). */
+  extraction?: ExtractionReport;
+};
+
+/** Completeness of the subject-extraction step for one assessment run. */
+export type ExtractionReport = {
+  /** Hash of transcript ids/texts/degree levels the subjects were extracted from. */
+  subjectHash: string;
+  /** False when any transcript part failed, was skipped, or no LLM keys were set. */
+  complete: boolean;
+  /** "llm" = freshly extracted, "persisted" = reused saved subjects, "injected" = tests. */
+  source: "llm" | "persisted" | "injected";
+  totalParts: number;
+  failedParts: number;
+  /** Parts not attempted because the assessment time limit was reached. */
+  skippedParts: number;
+  /** True when no Groq key was configured. */
+  missingKeys: boolean;
 };

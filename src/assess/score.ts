@@ -126,14 +126,52 @@ function mapConfidence(
  * Numeric 0–100 confidence from determination + coverage + gate + CV boost.
  * Always computed (including non-recommended) so candidates can be ranked.
  */
+/**
+ * Coverage % for ranking: blends matched/total with an absolute matched count
+ * (see assessConfig.coverage) so tiny denominators do not dominate.
+ */
+export function blendedCoveragePct(
+  matched: number,
+  total: number,
+  ref: number,
+  absWeight = assessConfig.coverage.absWeight,
+): number {
+  if (total <= 0) return 0;
+  const w = Math.min(1, Math.max(0, absWeight));
+  const rate = Math.min(1, matched / total);
+  const abs = ref > 0 ? Math.min(1, matched / ref) : rate;
+  return 100 * ((1 - w) * rate + w * abs);
+}
+
 export function computeConfidenceScore(input: {
   rawDetermination: Determination;
   foundationalPct: number;
   corePct: number;
   tier3GateMet: boolean;
   workExperienceBoost: boolean;
+  /** When provided with totals, coverage uses the blended (size-aware) formula. */
+  foundationalMatched?: number;
+  foundationalExpected?: number;
+  coreMatched?: number;
+  coreExpected?: number;
 }): number {
-  const coverage = input.corePct * 0.65 + input.foundationalPct * 0.35;
+  const corePct =
+    input.coreMatched != null && input.coreExpected
+      ? blendedCoveragePct(
+          input.coreMatched,
+          input.coreExpected,
+          assessConfig.coverage.coreRef,
+        )
+      : input.corePct;
+  const foundationalPct =
+    input.foundationalMatched != null && input.foundationalExpected
+      ? blendedCoveragePct(
+          input.foundationalMatched,
+          input.foundationalExpected,
+          assessConfig.coverage.foundationRef,
+        )
+      : input.foundationalPct;
+  const coverage = corePct * 0.65 + foundationalPct * 0.35;
   let score: number;
 
   switch (input.rawDetermination) {
@@ -235,6 +273,10 @@ export function scoreAssessment(input: ScoreInput): ScoreResult {
     corePct,
     tier3GateMet,
     workExperienceBoost,
+    foundationalMatched,
+    foundationalExpected,
+    coreMatched,
+    coreExpected,
   });
 
   // Prefer determination-based label when recommended; otherwise derive from score

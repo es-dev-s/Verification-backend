@@ -63,6 +63,28 @@ export const assessConfig = {
   /** Max occupation cards returned to the wizard (ranked). */
   maxCandidates: intEnv("ASSESS_MAX_CANDIDATES", 3),
   /**
+   * How many academically-ranked occupations are sent to the work-experience
+   * judge before the final cut to maxCandidates (so a related job can lift a
+   * 4th–6th academic candidate into the shortlist).
+   */
+  boostShortlist: intEnv("ASSESS_BOOST_SHORTLIST", 6),
+  /**
+   * Coverage used inside confidenceScore (ranking), per tier:
+   *
+   *   coverage% = 100 × [ (1 − W) × matched/total + W × min(1, matched/REF) ]
+   *
+   * W blends the plain percentage with an absolute matched count so a rubric
+   * with a tiny denominator (e.g. 2/5 core) cannot outrank one with many more
+   * matched subjects (e.g. 6/10). REF is the matched count treated as "full"
+   * absolute evidence. Displayed foundationalPct / corePct stay plain matched/total.
+   * W = 0 restores the old behaviour.
+   */
+  coverage: {
+    absWeight: floatEnv("ASSESS_COVERAGE_ABS_WEIGHT", 0.4),
+    coreRef: floatEnv("ASSESS_COVERAGE_CORE_REF", 8),
+    foundationRef: floatEnv("ASSESS_COVERAGE_FOUNDATION_REF", 5),
+  },
+  /**
    * Confidence mapping from determination + optional CV boost.
    * verified_no_risk → high
    * conditional → medium (boost → high if CV related to the occupation)
