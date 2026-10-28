@@ -16,6 +16,7 @@ export function buildExplanationFallback(result: AssessmentResult): string {
     result.title ??
     result.candidates?.[0]?.title ??
     "occupation";
+  if (result.assessmentFlow === "vocational_units") return vocationalExplanation(result, title);
   if (!result.recommended) {
     return (
       `No ANZSCO occupation match. ` +
@@ -39,8 +40,41 @@ export function buildExplanationFallback(result: AssessmentResult): string {
     `Foundational ${result.foundationalMatched}/${result.foundationalExpected} (${result.foundationalPct}%), ` +
     `core ${result.coreMatched}/${result.coreExpected} (${result.corePct}%). ` +
     `Major project/thesis gate ${result.tier3GateMet ? "met" : "not met"}.` +
-    boost
+    boost +
+    qualificationSentence(result)
   );
+}
+
+const BAND_LABEL: Record<string, string> = {
+  no_risk: "No Risk",
+  low_risk: "Low Risk",
+  medium_risk: "Medium Risk",
+  high_risk: "High Risk",
+};
+
+/** Unit-code occupations: core units, band, electives, qualification. */
+function vocationalExplanation(result: AssessmentResult, title: string): string {
+  const cand =
+    result.candidates?.find((c) => c.vocational && c.anzscoCode === result.anzscoCode) ??
+    result.candidates?.find((c) => c.vocational);
+  const v = cand?.vocational;
+  const band = BAND_LABEL[v?.coreBand ?? result.tier2Outcome ?? ""] ?? "n/a";
+  const head = result.recommended
+    ? `Recommended ANZSCO ${result.anzscoCode} (${title}) with ${result.confidence} confidence ` +
+      `(${result.determination.replace(/_/g, " ")}). `
+    : `No ANZSCO occupation match. Best unit-code coverage against ${cand?.title ?? title}: `;
+  return (
+    head +
+    `Core units ${result.coreMatched}/${result.coreExpected} (${band}).` +
+    (v ? ` Electives: ${v.electiveNote}` : "") +
+    qualificationSentence(result)
+  );
+}
+
+/** Step 1 qualification-check notes, as one trailing sentence (or ""). */
+function qualificationSentence(result: AssessmentResult): string {
+  const notes = result.qualificationNotes ?? [];
+  return notes.length ? ` Qualification check: ${notes.join(" ")}` : "";
 }
 
 export async function writeExplanation(
@@ -49,6 +83,8 @@ export async function writeExplanation(
 ): Promise<string> {
   const fallback = buildExplanationFallback(result);
   if (opts?.useLlm === false) return fallback;
+  // Unit-code occupations: the deterministic text is exact (no tier wording).
+  if (result.assessmentFlow === "vocational_units") return fallback;
   if (Date.now() >= (opts?.deadlineMs ?? Infinity)) return fallback;
 
   try {

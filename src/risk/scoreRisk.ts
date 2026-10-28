@@ -6,16 +6,98 @@ import type {
   RiskLevel,
 } from "./schemas.js";
 
-/** Weights from Academic_Risk_Scoring_Proposed_Update_Report.md */
+/**
+ * Step 4 risk (aligned to the Step 3 bands).
+ *
+ * The risk level comes from the Step 3 determination and tier bands:
+ *   Verified + every tier No Risk   → No risk
+ *   Verified + any tier Low Risk    → Low risk
+ *   Conditional                     → Medium risk
+ *   Not verified / no match         → High risk
+ * Step 3 caps already live in the determination: a missing major-project gate
+ * (Tier 3) and the Step 1 qualification / route caps turn Verified into
+ * Conditional, so those cases are Medium here.
+ *
+ * Historical outcomes are a modifier only: with at least
+ * HISTORICAL_MIN_CASES past cases for the ANZSCO and a positive rate below
+ * HISTORICAL_POSITIVE_FLOOR %, the level moves one step worse (with a note).
+ * Otherwise the history is context. Work experience is a note only.
+ * Foundational / core % and the old weighted alignment are display-only.
+ */
+
+/** Old weighted formula — display-only (no longer decides the level). */
 export const RISK_WEIGHTS = {
   fundamental: 0.3,
   core: 0.5,
   historical: 0.2,
 } as const;
 
-/** Related work experience reduces risk (alignment boost), capped. */
-export const WORK_EXPERIENCE_DELTA = 5;
+/** Historical modifier: minimum past cases for the ANZSCO. */
+export const HISTORICAL_MIN_CASES = 20;
+/** Historical modifier: positive-outcome rate (%) below which risk worsens one level. */
+export const HISTORICAL_POSITIVE_FLOOR = 40;
 
+const LEVEL_ORDER: RiskLevel[] = ["no_risk", "low", "medium", "high"];
+
+export type StepThreeDetermination =
+  | "verified_no_risk"
+  | "conditional"
+  | "not_verified"
+  | "no_match";
+
+export type RiskBandInput = {
+  /** Step 3 determination before surfacing (bandDetermination), else determination. */
+  determination: StepThreeDetermination;
+  /** Tier band outcomes (null / undefined when a tier is not used). */
+  tierOutcomes: Array<string | null | undefined>;
+  /** Why Step 3 is conditional (gate / qualification / route caps), for the basis text. */
+  capReasons?: string[];
+};
+
+const BAND_LABEL: Record<string, string> = {
+  no_risk: "No Risk",
+  low_risk: "Low Risk",
+  medium_risk: "Medium Risk",
+  high_risk: "High Risk",
+  flag: "Flag",
+};
+
+/** Base Step 4 level from the Step 3 determination + bands, with a plain-language basis. */
+export function baseRiskFromBands(input: RiskBandInput): { level: RiskLevel; basis: string } {
+  const bands = input.tierOutcomes.filter((t): t is string => Boolean(t));
+  const bandText = bands.length ? ` (${bands.map((b) => BAND_LABEL[b] ?? b).join(", ")})` : "";
+  const caps = input.capReasons?.length ? ` — ${input.capReasons.join("; ")}` : "";
+  switch (input.determination) {
+    case "verified_no_risk": {
+      const allNoRisk = bands.every((b) => b === "no_risk");
+      return allNoRisk
+        ? { level: "no_risk", basis: `Step 3: Verified – No Risk${bandText}` }
+        : { level: "low", basis: `Step 3: Verified – Low Risk${bandText}` };
+    }
+    case "conditional":
+      return { level: "medium", basis: `Step 3: Conditional${bandText}${caps}` };
+    case "not_verified":
+      return { level: "high", basis: `Step 3: Not verified${bandText}` };
+    default:
+      return { level: "high", basis: "Step 3: no occupation match" };
+  }
+}
+
+/** One level worse (High stays High). */
+export function worsenRiskLevel(level: RiskLevel): RiskLevel {
+  const i = LEVEL_ORDER.indexOf(level);
+  return LEVEL_ORDER[Math.min(LEVEL_ORDER.length - 1, i + 1)]!;
+}
+
+/** Does the historical modifier apply (≥ 20 cases and < 40 % positive)? */
+export function historicalModifierApplies(h: HistoricalStats): boolean {
+  return h.totalCases >= HISTORICAL_MIN_CASES && h.positivePct < HISTORICAL_POSITIVE_FLOOR;
+}
+
+/**
+ * Legacy score → level bands (old formula). Kept for reference / old saved
+ * results only; Step 4 no longer uses it to decide the level.
+ */
 export function riskLevelFromScore(overallPct: number): RiskLevel {
   if (overallPct >= 85) return "no_risk";
   if (overallPct >= 75) return "low";
@@ -102,7 +184,7 @@ export function buildRiskDrivers(input: {
 
   if (input.workExperienceBoost) {
     reducingRisk.push(
-      `Related work experience in the field (−${WORK_EXPERIENCE_DELTA} pts risk).`,
+      "Related work experience in the field (context only; does not change the risk level).",
     );
   }
 
@@ -133,6 +215,9 @@ export function computeRiskScores(input: {
   precedent?: PrecedentCheck;
   workExperienceBoost: boolean;
   missingCore: string[];
+  /** Step 3 determination + bands (decides the level). */
+  bands: RiskBandInput;
+  assessmentFlow?: "academic" | "vocational_units";
 }): Omit<
   RiskAssessmentResult,
   "competence" | "competenceSource" | "insight"
@@ -141,17 +226,34 @@ export function computeRiskScores(input: {
   const corePct = clampPct(input.corePct);
   const historicalPct = clampPct(input.historical.positivePct);
 
-  const overallPctBeforeWork = clampPct(
+  // Display-only: the old weighted alignment (no work-experience points).
+  const overallPct = clampPct(
     fundamentalPct * RISK_WEIGHTS.fundamental +
       corePct * RISK_WEIGHTS.core +
       historicalPct * RISK_WEIGHTS.historical,
   );
 
-  const workExperienceDelta = input.workExperienceBoost
-    ? WORK_EXPERIENCE_DELTA
-    : 0;
-  const overallPct = clampPct(overallPctBeforeWork + workExperienceDelta);
-  const riskLevel = riskLevelFromScore(overallPct);
+  const base = baseRiskFromBands(input.bands);
+  const riskNotes: string[] = [];
+  const historicalModifierApplied = historicalModifierApplies(input.historical);
+  let riskLevel = base.level;
+  if (historicalModifierApplied) {
+    const worse = worsenRiskLevel(base.level);
+    riskNotes.push(
+      worse === base.level
+        ? `Historical outcomes for ${input.anzscoCode} are weak (${input.historical.positivePct}% positive of ${input.historical.totalCases} cases); already High risk.`
+        : `Moved one level worse (${riskLevelLabel(base.level)} → ${riskLevelLabel(worse)}): historical outcomes for ${input.anzscoCode} are ${input.historical.positivePct}% positive across ${input.historical.totalCases} cases (below ${HISTORICAL_POSITIVE_FLOOR}% with at least ${HISTORICAL_MIN_CASES} cases).`,
+    );
+    riskLevel = worse;
+  } else if (input.historical.totalCases > 0) {
+    riskNotes.push(
+      `Historical outcomes (context only): ${input.historical.positivePct}% positive across ${input.historical.totalCases} cases.`,
+    );
+  }
+  if (input.workExperienceBoost) {
+    riskNotes.push("Related work experience noted (context only; it does not change the risk level).");
+  }
+
   const { reducingRisk, increasingRisk } = buildRiskDrivers({
     fundamentalPct,
     corePct,
@@ -168,11 +270,17 @@ export function computeRiskScores(input: {
     historicalPct,
     historical: input.historical,
     precedent: input.precedent ?? emptyPrecedentCheck(),
-    overallPctBeforeWork,
+    overallPctBeforeWork: overallPct,
     workExperienceBoost: input.workExperienceBoost,
-    workExperienceDelta,
+    workExperienceDelta: 0,
     overallPct,
     riskLevel,
+    baseRiskLevel: base.level,
+    riskBasis: base.basis,
+    stepThreeDetermination: input.bands.determination,
+    historicalModifierApplied,
+    riskNotes,
+    assessmentFlow: input.assessmentFlow ?? "academic",
     reducingRisk,
     increasingRisk,
     missingMajorDomains: buildMissingMajorDomainsSentence(input.missingCore),

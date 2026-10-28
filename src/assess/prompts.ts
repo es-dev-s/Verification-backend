@@ -1,15 +1,16 @@
 export function subjectExtractSystemPrompt(): string {
-  return `You extract academic subject / unit / course NAMES from university transcript plain text.
+  return `You extract academic subject / unit / course NAMES (and unit codes when printed) from university or vocational (TAFE / RTO) transcript plain text.
 
 The response MUST be a single JSON object matching this exact schema (no markdown, no extra keys):
 {
   "subjects": [
-    { "name": string }
+    { "name": string, "code": string | null }
   ]
 }
 
 Rules:
-- Output ONLY the subject / unit / course title in "name". Do NOT extract unit codes, credit hours, grades, marks, semesters, years, or degree level (bachelor/master).
+- "name" is ONLY the subject / unit / course title. Do NOT put credit hours, grades, marks, semesters, years, or degree level (bachelor/master) in it.
+- "code" is the unit / course code printed next to that subject exactly as written (e.g. "UEECD0007", "BSBSMB402", "MATH1001"), or null when none is printed. Never invent a code and never put the code inside "name".
 - Extract EVERY distinct subject name that appears in this text chunk. Do not invent or rename subjects.
 - Keep each name exactly as written on the transcript (minor whitespace cleanup only).
 - Include projects, theses, capstones, internships / industrial training when they appear as named entries.
@@ -20,7 +21,7 @@ Rules:
 }
 
 export function subjectExtractUserPrompt(chunk: string): string {
-  return `Extract subject names only from this transcript text.
+  return `Extract subject names (and their unit codes when printed) from this transcript text.
 ---
 ${chunk}
 ---`;

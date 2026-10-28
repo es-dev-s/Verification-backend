@@ -2,12 +2,14 @@
   {
     "anzscoCode": "233211",
     "title": "Civil Engineer",
+    "occupationId": "civil-engineer",
     "sourceSheet": "Civil Engineer subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233211-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Engineering Mathematics - I",
@@ -43,6 +45,7 @@
             ]
           },
           {
+            "id": "233211-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Engineering Physics",
@@ -60,6 +63,7 @@
             ]
           },
           {
+            "id": "233211-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "Engineering Chemistry",
@@ -76,6 +80,7 @@
             ]
           },
           {
+            "id": "233211-T1.4",
             "name": "Engineering Mechanics / Mechanics of Solids",
             "variants": [
               "Engineering Mechanics",
@@ -112,6 +117,7 @@
             ]
           },
           {
+            "id": "233211-T1.5",
             "name": "Engineering Drawing / CAD / Graphics",
             "variants": [
               "Engineering Drawing",
@@ -138,6 +144,7 @@
             ]
           },
           {
+            "id": "233211-T1.6",
             "name": "Computer Programming / Computing (Optional)",
             "variants": [
               "Programming for Problem Solving Using C",
@@ -174,6 +181,7 @@
             ]
           },
           {
+            "id": "233211-T1.7",
             "name": "Communication, Ethics & Professional Practice (Optional)",
             "variants": [
               "English for Communication",
@@ -216,6 +224,7 @@
             ]
           },
           {
+            "id": "233211-T1.X1",
             "name": "Others",
             "variants": [
               "Basic Electrical Engineering",
@@ -264,6 +273,7 @@
         "categoryLabel": "CORE CIVIL ENGINEERING SPECIFIC SUBJECTS",
         "subjects": [
           {
+            "id": "233211-T2.1",
             "name": "Structural Analysis/ Structural Design (Concrete / Steel / Timber / Prestressed)",
             "variants": [
               "Design of Reinforced Concrete Structures",
@@ -333,6 +343,7 @@
             ]
           },
           {
+            "id": "233211-T2.2",
             "name": "Concrete Technology & Construction Materials",
             "variants": [
               "Construction Materials",
@@ -363,6 +374,7 @@
             ]
           },
           {
+            "id": "233211-T2.3",
             "name": "Geotechnical Engineering / Soil Mechanics / Foundations/ Engineering Geology",
             "variants": [
               "Engineering Geology",
@@ -393,6 +405,7 @@
             ]
           },
           {
+            "id": "233211-T2.4",
             "name": "Surveying / Geomatics / GIS",
             "variants": [
               "Surveying",
@@ -430,6 +443,7 @@
             ]
           },
           {
+            "id": "233211-T2.5",
             "name": "Fluid Mechanics & Hydraulics",
             "variants": [
               "Fluid Mechanics",
@@ -461,6 +475,7 @@
             ]
           },
           {
+            "id": "233211-T2.6",
             "name": "Water Resources Engineering / Hydrology / Irrigation",
             "variants": [
               "Hydrology and Water Resources Engineering",
@@ -489,6 +504,7 @@
             ]
           },
           {
+            "id": "233211-T2.7",
             "name": "Transportation / Highway / Traffic Engineering",
             "variants": [
               "Highway Engineering",
@@ -523,6 +539,7 @@
             ]
           },
           {
+            "id": "233211-T2.8",
             "name": "Construction Management / Estimation & Contracts",
             "variants": [
               "Construction Management and Equipment",
@@ -562,6 +579,7 @@
             ]
           },
           {
+            "id": "233211-T2.X1",
             "name": "OTHERS",
             "variants": [
               "Elective(Open): Renewable Energy Resources",
@@ -576,6 +594,7 @@
         "categoryLabel": "Optional/ Elective subjects",
         "subjects": [
           {
+            "id": "233211-T2.O1",
             "name": "Environmental / Water & Wastewater Engineering",
             "variants": [
               "Environmental Studies",
@@ -596,6 +615,7 @@
             ]
           },
           {
+            "id": "233211-T2.O2",
             "name": "Building Planning, Architecture & Town Planning",
             "variants": [
               "Introduction to Architecture and Town Planning",
@@ -610,6 +630,7 @@
             ]
           },
           {
+            "id": "233211-T2.O3",
             "name": "Earthquake Engineering",
             "variants": [
               "Elective-III: Earthquake Resistant Design of Structures",
@@ -618,6 +639,7 @@
             ]
           },
           {
+            "id": "233211-T2.O4",
             "name": "Marine / Airport / Specialized Infrastructure",
             "variants": [
               "Dock Harbour & Airport Engineering",
@@ -629,6 +651,7 @@
             ]
           },
           {
+            "id": "233211-T2.O5",
             "name": "Computational Methods for Civil Engineering",
             "variants": [
               "Introduction to the Finite Element Method",
@@ -638,6 +661,7 @@
             ]
           },
           {
+            "id": "233211-T2.O6",
             "name": "Risk, Hazard & Disaster Management",
             "variants": [
               "Disaster Management",
@@ -646,6 +670,7 @@
             ]
           },
           {
+            "id": "233211-T2.X2",
             "name": "OTHERS",
             "variants": [
               "Bio Engineering (Elective I)",
@@ -662,6 +687,7 @@
         "categoryLabel": "Capstone Project, Practical Training Subjects",
         "subjects": [
           {
+            "id": "233211-T3.G",
             "name": "Final-Year / Capstone Project/ Major Project / Thesis",
             "variants": [
               "Major Project - Phase I",
@@ -683,6 +709,7 @@
             ]
           },
           {
+            "id": "233211-T3.1",
             "name": "Minor Project",
             "variants": [
               "Mini Project",
@@ -690,12 +717,14 @@
             ]
           },
           {
+            "id": "233211-T3.2",
             "name": "Industrial Training / OJT / Internship",
             "variants": [
               "Industrial Training (OJT)"
             ]
           },
           {
+            "id": "233211-T3.X1",
             "name": "OTHERS",
             "variants": []
           }
@@ -705,6 +734,7 @@
         "categoryLabel": "Optional Subjects",
         "subjects": [
           {
+            "id": "233211-T3.O1",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Seminar",
@@ -712,6 +742,7 @@
             ]
           },
           {
+            "id": "233211-T3.O2",
             "name": "Workshop Practice / Engineering Shop",
             "variants": [
               "Workshop Practice",
@@ -721,12 +752,14 @@
             ]
           },
           {
+            "id": "233211-T3.O3",
             "name": "Entrepreneurship / Engineering Management",
             "variants": [
               "— not present on any transcript —"
             ]
           },
           {
+            "id": "233211-T3.X2",
             "name": "OTHERS",
             "variants": []
           }
@@ -737,12 +770,14 @@
   {
     "anzscoCode": "233611",
     "title": "Mining Engineer",
+    "occupationId": "mining-engineer",
     "sourceSheet": "Mining Engineer Subjetcs",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233611-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Applied Mathematics-I",
@@ -782,6 +817,7 @@
             ]
           },
           {
+            "id": "233611-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Physics 1",
@@ -800,6 +836,7 @@
             ]
           },
           {
+            "id": "233611-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "General Chemistry I",
@@ -816,6 +853,7 @@
             ]
           },
           {
+            "id": "233611-T1.4",
             "name": "Engineering Mechanics / Mechanics of Solids / Strength of Materials",
             "variants": [
               "Engineering Mechanics",
@@ -840,6 +878,7 @@
             ]
           },
           {
+            "id": "233611-T1.5",
             "name": "Engineering Drawing / Graphics / CAD",
             "variants": [
               "Engineering Graphics",
@@ -862,6 +901,7 @@
             ]
           },
           {
+            "id": "233611-T1.6",
             "name": "Computer Programming / Computing",
             "variants": [
               "Computer Programming",
@@ -881,6 +921,7 @@
             ]
           },
           {
+            "id": "233611-T1.7",
             "name": "Communication, Ethics & Professional Practice (Optional)",
             "variants": [
               "Communication Skills",
@@ -922,6 +963,7 @@
             ]
           },
           {
+            "id": "233611-T1.8",
             "name": "Others (General Engineering / Electrical / Environmental / Workshop)",
             "variants": [
               "Basic Electrical Engineering",
@@ -973,6 +1015,7 @@
         "categoryLabel": "Core Discipline-Specific Subjects",
         "subjects": [
           {
+            "id": "233611-T2.1",
             "name": "Mining Geology / Engineering Geology",
             "variants": [
               "Mining Geology-I",
@@ -1006,6 +1049,7 @@
             ]
           },
           {
+            "id": "233611-T2.2",
             "name": "Mine Surveying / Surveying / Geomatics",
             "variants": [
               "Mine Surveying-I",
@@ -1028,6 +1072,7 @@
             ]
           },
           {
+            "id": "233611-T2.3",
             "name": "Underground Mining Methods / Technology",
             "variants": [
               "Underground Coal Mining Technology",
@@ -1056,6 +1101,7 @@
             ]
           },
           {
+            "id": "233611-T2.4",
             "name": "Surface Mining Technology",
             "variants": [
               "Surface Mining",
@@ -1073,6 +1119,7 @@
             ]
           },
           {
+            "id": "233611-T2.5",
             "name": "Mining Machinery / Mine Equipment & Mechanization",
             "variants": [
               "Mining Machinery-I",
@@ -1099,6 +1146,7 @@
             ]
           },
           {
+            "id": "233611-T2.6",
             "name": "Drilling & Blasting Engineering",
             "variants": [
               "Drilling and Blasting",
@@ -1120,6 +1168,7 @@
             ]
           },
           {
+            "id": "233611-T2.7",
             "name": "Rock Mechanics / Ground Control / Strata Control",
             "variants": [
               "Rock Mechanics",
@@ -1141,6 +1190,7 @@
             ]
           },
           {
+            "id": "233611-T2.8",
             "name": "Mineral Processing",
             "variants": [
               "Mineral Processing",
@@ -1167,6 +1217,7 @@
             ]
           },
           {
+            "id": "233611-T2.9",
             "name": "Mine Ventilation / Mine Environmental & Climate Engineering",
             "variants": [
               "Mine Ventilation",
@@ -1190,6 +1241,7 @@
             ]
           },
           {
+            "id": "233611-T2.10",
             "name": "Mine Economics / Mineral Economics / Mine Management",
             "variants": [
               "Mine Economics",
@@ -1213,6 +1265,7 @@
             ]
           },
           {
+            "id": "233611-T2.11",
             "name": "Mine Legislation & Safety / Mine Health and Safety",
             "variants": [
               "Mine Legislation",
@@ -1232,6 +1285,7 @@
             ]
           },
           {
+            "id": "233611-T2.12",
             "name": "Mine Electrical / Mechanical & Fluid Systems in Mining",
             "variants": [
               "Mine Electrical Engineering",
@@ -1248,6 +1302,7 @@
         "categoryLabel": "Optional / Elective Subjects",
         "subjects": [
           {
+            "id": "233611-T2.O1",
             "name": "Coal Preparation / Clean Coal Technology",
             "variants": [
               "Clean Coal Technology",
@@ -1262,6 +1317,7 @@
             ]
           },
           {
+            "id": "233611-T2.O2",
             "name": "Petroleum & Reservoir Engineering (dual Mining/Petroleum programs)",
             "variants": [
               "Reservoir Rock and Fluid Properties",
@@ -1282,6 +1338,7 @@
             ]
           },
           {
+            "id": "233611-T2.O3",
             "name": "Materials & Metallurgy Electives",
             "variants": [
               "Cement Technology",
@@ -1294,6 +1351,7 @@
             ]
           },
           {
+            "id": "233611-T2.O4",
             "name": "Sustainability, Rehabilitation & Site Remediation",
             "variants": [
               "Sustainability for Engineers, Scientists and Professionals",
@@ -1306,6 +1364,7 @@
             ]
           },
           {
+            "id": "233611-T2.O5",
             "name": "Entrepreneurship / Engineering Economics Electives",
             "variants": [
               "Entrepreneurship",
@@ -1325,6 +1384,7 @@
         "categoryLabel": "Project, Capstone & Practical-Training Reference",
         "subjects": [
           {
+            "id": "233611-T3.G",
             "name": "Final-Year / Capstone Project / Thesis / Graduation Project",
             "variants": [
               "Project",
@@ -1347,6 +1407,7 @@
             ]
           },
           {
+            "id": "233611-T3.1",
             "name": "Minor / Mini Project",
             "variants": [
               "Mini Project – I",
@@ -1356,6 +1417,7 @@
             ]
           },
           {
+            "id": "233611-T3.2",
             "name": "Industrial Training / Internship / Vocational Training",
             "variants": [
               "Internship – 2 Evaluation",
@@ -1375,6 +1437,7 @@
         "categoryLabel": "Optional / Elective Subjects",
         "subjects": [
           {
+            "id": "233611-T3.O1",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Seminar",
@@ -1385,6 +1448,7 @@
             ]
           },
           {
+            "id": "233611-T3.O2",
             "name": "Survey Camp / Field Camp",
             "variants": [
               "Survey Camp (Practical)",
@@ -1398,14 +1462,16 @@
     }
   },
   {
-    "anzscoCode": null,
+    "anzscoCode": "233999",
     "title": "Automation / Control Engineer",
+    "occupationId": "automation-control-engineer",
     "sourceSheet": "Automation Control Subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "TIER 1 — Foundational Subjects",
         "subjects": [
           {
+            "id": "233999-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Engineering Mathematics I",
@@ -1423,6 +1489,7 @@
             ]
           },
           {
+            "id": "233999-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Engineering Physics",
@@ -1434,6 +1501,7 @@
             ]
           },
           {
+            "id": "233999-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "Engineering Chemistry",
@@ -1444,6 +1512,7 @@
             ]
           },
           {
+            "id": "233999-T1.4",
             "name": "Engineering Mechanics (Statics & Dynamics)",
             "variants": [
               "Engineering Mechanics",
@@ -1455,6 +1524,7 @@
             ]
           },
           {
+            "id": "233999-T1.5",
             "name": "Engineering Drawing / Graphics / CAD",
             "variants": [
               "Engineering Drawing",
@@ -1465,6 +1535,7 @@
             ]
           },
           {
+            "id": "233999-T1.6",
             "name": "Computer Programming / Computing (Optional)",
             "variants": [
               "Computer Programming",
@@ -1476,6 +1547,7 @@
             ]
           },
           {
+            "id": "233999-T1.7",
             "name": "Basic Electrical & Electronics (Optional)",
             "variants": [
               "Basic Electrical Engineering",
@@ -1486,6 +1558,7 @@
             ]
           },
           {
+            "id": "233999-T1.8",
             "name": "Communication, Ethics & Professional Practice (Optional)",
             "variants": [
               "Technical Communication",
@@ -1502,6 +1575,7 @@
         "categoryLabel": "TIER 2 — Core Discipline-Specific Subjects (Automation & Control)",
         "subjects": [
           {
+            "id": "233999-T2.1",
             "name": "Control Systems / Control Engineering",
             "variants": [
               "Control Systems",
@@ -1520,6 +1594,7 @@
             ]
           },
           {
+            "id": "233999-T2.2",
             "name": "Process Dynamics, Control & Instrumentation",
             "variants": [
               "Process Dynamics and Control",
@@ -1531,6 +1606,7 @@
             ]
           },
           {
+            "id": "233999-T2.3",
             "name": "Instrumentation & Measurement",
             "variants": [
               "Instrumentation & Measurement",
@@ -1546,6 +1622,7 @@
             ]
           },
           {
+            "id": "233999-T2.4",
             "name": "Industrial Automation / PLC / SCADA",
             "variants": [
               "Industrial Automation",
@@ -1560,6 +1637,7 @@
             ]
           },
           {
+            "id": "233999-T2.5",
             "name": "Mechatronics / Robotics",
             "variants": [
               "Mechatronics",
@@ -1571,6 +1649,7 @@
             ]
           },
           {
+            "id": "233999-T2.6",
             "name": "Sensors, Actuators & Transducers",
             "variants": [
               "Sensors and Transducers",
@@ -1580,6 +1659,7 @@
             ]
           },
           {
+            "id": "233999-T2.7",
             "name": "Digital Electronics / Logic Design (supporting)",
             "variants": [
               "Digital Electronics",
@@ -1592,6 +1672,7 @@
             ]
           },
           {
+            "id": "233999-T2.8",
             "name": "Microprocessors, Microcontrollers & Embedded Systems",
             "variants": [
               "Microprocessors and Microcontrollers",
@@ -1607,6 +1688,7 @@
             ]
           },
           {
+            "id": "233999-T2.9",
             "name": "Power Electronics / Drives for Automation",
             "variants": [
               "Power Electronics",
@@ -1619,6 +1701,7 @@
             ]
           },
           {
+            "id": "233999-T2.10",
             "name": "Industrial Communication Networks / Fieldbus",
             "variants": [
               "Industrial Communication Networks",
@@ -1629,6 +1712,7 @@
             ]
           },
           {
+            "id": "233999-T2.11",
             "name": "Process Control Systems Design",
             "variants": [
               "Design process control systems",
@@ -1638,6 +1722,7 @@
             ]
           },
           {
+            "id": "233999-T2.12",
             "name": "Others / Special Topics",
             "variants": [
               "Signals and Systems",
@@ -1657,6 +1742,7 @@
         "categoryLabel": "TIER 3 — Project, Capstone & Practical Training",
         "subjects": [
           {
+            "id": "233999-T3.G",
             "name": "Final-Year / Capstone Project / Major Project / Thesis",
             "variants": [
               "Final Year Project",
@@ -1673,6 +1759,7 @@
             ]
           },
           {
+            "id": "233999-T3.1",
             "name": "Minor / Mini Project",
             "variants": [
               "Minor Project",
@@ -1683,6 +1770,7 @@
             ]
           },
           {
+            "id": "233999-T3.2",
             "name": "Industrial Training / OJT / Internship",
             "variants": [
               "Industrial Training",
@@ -1695,6 +1783,7 @@
             ]
           },
           {
+            "id": "233999-T3.O1",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Seminar",
@@ -1704,6 +1793,7 @@
             ]
           },
           {
+            "id": "233999-T3.O2",
             "name": "Workshop Practice / Engineering Shop",
             "variants": [
               "Workshop Practice",
@@ -1714,6 +1804,7 @@
             ]
           },
           {
+            "id": "233999-T3.O3",
             "name": "Entrepreneurship / Engineering Management",
             "variants": [
               "Entrepreneurship Development",
@@ -1731,12 +1822,14 @@
   {
     "anzscoCode": "233112",
     "title": "Materials Engineer",
+    "occupationId": "materials-engineer",
     "sourceSheet": "Material Engineering",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233112-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Engineering Mathematics I–IV",
@@ -1772,6 +1865,7 @@
             ]
           },
           {
+            "id": "233112-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Engineering Physics",
@@ -1788,6 +1882,7 @@
             ]
           },
           {
+            "id": "233112-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "Engineering Chemistry",
@@ -1805,6 +1900,7 @@
             ]
           },
           {
+            "id": "233112-T1.4",
             "name": "Engineering Mechanics / Mechanics of Solids",
             "variants": [
               "Engineering Mechanics",
@@ -1821,6 +1917,7 @@
             ]
           },
           {
+            "id": "233112-T1.5",
             "name": "Engineering Drawing / CAD / Graphics",
             "variants": [
               "Engineering Drawing",
@@ -1837,6 +1934,7 @@
             ]
           },
           {
+            "id": "233112-T1.X2",
             "name": "Computer Programming / Computing",
             "variants": [
               "Computer Programming in C",
@@ -1855,6 +1953,7 @@
             ]
           },
           {
+            "id": "233112-T1.X3",
             "name": "Communication, Ethics & Professional Practice",
             "variants": [
               "Communicative/Professional English",
@@ -1876,6 +1975,7 @@
             ]
           },
           {
+            "id": "233112-T1.X4",
             "name": "Others (foundational, discipline-adjacent)",
             "variants": [
               "Basic Electrical & Electronics Engineering",
@@ -1897,6 +1997,11 @@
         "categoryLabel": "Core Subjects (expected on every transcript)",
         "subjects": [
           {
+            "id": "233112-T2.1",
+            "alsoIds": [
+              "233112-T2.2",
+              "233112-T2.O6"
+            ],
             "name": "Materials Science / Physical Metallurgy",
             "variants": [
               "Material Science and Metallurgy",
@@ -1913,6 +2018,7 @@
             ]
           },
           {
+            "id": "233112-T2.5",
             "name": "Thermodynamics & Kinetics of Materials",
             "variants": [
               "Thermodynamics of Materials",
@@ -1927,6 +2033,7 @@
             ]
           },
           {
+            "id": "233112-T2.X2",
             "name": "Phase Diagrams, Transformations & Solidification",
             "variants": [
               "Phase Diagrams",
@@ -1939,6 +2046,7 @@
             ]
           },
           {
+            "id": "233112-T2.4",
             "name": "Materials Characterization & Testing",
             "variants": [
               "Materials Characterization I/II",
@@ -1956,6 +2064,7 @@
             ]
           },
           {
+            "id": "233112-T2.3",
             "name": "Mechanical Behavior & Deformation of Materials",
             "variants": [
               "Mechanical Behavior of Materials",
@@ -1970,6 +2079,7 @@
             ]
           },
           {
+            "id": "233112-T2.O4",
             "name": "Extractive Metallurgy",
             "variants": [
               "Principles of Extractive Metallurgy (and Lab)",
@@ -1992,6 +2102,7 @@
             ]
           },
           {
+            "id": "233112-T2.X6",
             "name": "Mineral Processing / Beneficiation",
             "variants": [
               "Mineral Processing (Lab)",
@@ -2004,6 +2115,7 @@
             ]
           },
           {
+            "id": "233112-T2.6",
             "name": "Materials Processing, Forming & Manufacturing",
             "variants": [
               "Materials Processing I/II",
@@ -2022,6 +2134,7 @@
             ]
           },
           {
+            "id": "233112-T2.O5",
             "name": "Welding & Joining Processes",
             "variants": [
               "Welding Metallurgy (and Lab)",
@@ -2039,6 +2152,7 @@
             ]
           },
           {
+            "id": "233112-T2.X9",
             "name": "Heat Treatment",
             "variants": [
               "Heat Treatment (and Processes, Lab)",
@@ -2048,6 +2162,7 @@
             ]
           },
           {
+            "id": "233112-T2.7",
             "name": "Corrosion & Degradation of Materials",
             "variants": [
               "Corrosion & Protection",
@@ -2058,6 +2173,7 @@
             ]
           },
           {
+            "id": "233112-T2.8",
             "name": "Ceramics, Polymers & Composite Materials",
             "variants": [
               "Science and Technology of Ceramics",
@@ -2070,6 +2186,10 @@
             ]
           },
           {
+            "id": "233112-T2.O1",
+            "alsoIds": [
+              "233112-T2.O2"
+            ],
             "name": "Advanced & Functional Materials",
             "variants": [
               "Advanced Materials (and Composites)",
@@ -2086,6 +2206,7 @@
             ]
           },
           {
+            "id": "233112-T2.X13",
             "name": "Transport Phenomena & Fluid Mechanics in Materials Processing",
             "variants": [
               "Transport Phenomena",
@@ -2097,6 +2218,7 @@
             ]
           },
           {
+            "id": "233112-T2.X14",
             "name": "Instrumentation, Process Control & Simulation",
             "variants": [
               "Process Control & Instrumentation",
@@ -2113,6 +2235,7 @@
             ]
           },
           {
+            "id": "233112-T2.X15",
             "name": "Materials/Metallurgical Engineering Economics & Management",
             "variants": [
               "Industrial Economics & Management",
@@ -2133,6 +2256,7 @@
         "categoryLabel": "Others",
         "subjects": [
           {
+            "id": "233112-T2.X16",
             "name": "OTHERS",
             "variants": [
               "Environmental Engineering / Environmental Science and Sustainability",
@@ -2153,6 +2277,7 @@
         "categoryLabel": "Core (expected on every transcript)",
         "subjects": [
           {
+            "id": "233112-T3.G",
             "name": "Final-Year / Capstone Project / Thesis",
             "variants": [
               "Major Project (Phase I/II)",
@@ -2167,6 +2292,7 @@
             ]
           },
           {
+            "id": "233112-T3.1",
             "name": "Minor / Mini Project",
             "variants": [
               "Mini Project",
@@ -2175,6 +2301,7 @@
             ]
           },
           {
+            "id": "233112-T3.2",
             "name": "Industrial Training / OJT / Internship",
             "variants": [
               "Industrial Training",
@@ -2194,6 +2321,7 @@
         "categoryLabel": "Optional / Elective",
         "subjects": [
           {
+            "id": "233112-T3.O1",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Seminar",
@@ -2204,6 +2332,7 @@
             ]
           },
           {
+            "id": "233112-T3.O2",
             "name": "Workshop Practice / Engineering Shop",
             "variants": [
               "Workshop Practice A/B",
@@ -2213,6 +2342,7 @@
             ]
           },
           {
+            "id": "233112-T2.O8",
             "name": "Entrepreneurship / Engineering Management",
             "variants": [
               "Entrepreneurship (and Small Business Enterprise)",
@@ -2229,12 +2359,14 @@
   {
     "anzscoCode": "233513",
     "title": "Production or Plant Engineer",
+    "occupationId": "production-plant-engineer",
     "sourceSheet": "Production Plant Engineer",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233513-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Applied Mathematics-I",
@@ -2261,6 +2393,7 @@
             ]
           },
           {
+            "id": "233513-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Physics-I",
@@ -2272,6 +2405,7 @@
             ]
           },
           {
+            "id": "233513-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "Chemistry-I",
@@ -2284,6 +2418,7 @@
             ]
           },
           {
+            "id": "233513-T1.4",
             "name": "Engineering Mechanics / Mechanics of Solids / Strength of Materials",
             "variants": [
               "Engineering Mechanics",
@@ -2295,6 +2430,7 @@
             ]
           },
           {
+            "id": "233513-T1.5",
             "name": "Engineering Drawing / Graphics / CAD",
             "variants": [
               "Engineering Drawing",
@@ -2306,6 +2442,7 @@
             ]
           },
           {
+            "id": "233513-T1.X2",
             "name": "Computer Programming / Computing (Optional)",
             "variants": [
               "Fundamentals of Computing and Computer Programming",
@@ -2320,6 +2457,7 @@
             ]
           },
           {
+            "id": "233513-T1.X3",
             "name": "Communication, Humanities & Professional Practice (Optional)",
             "variants": [
               "English-I",
@@ -2347,6 +2485,7 @@
             ]
           },
           {
+            "id": "233513-T1.X4",
             "name": "Others (Foundational)",
             "variants": [
               "Environmental Studies",
@@ -2371,6 +2510,7 @@
         "categoryLabel": "Core Subjects (expected on every transcript)",
         "subjects": [
           {
+            "id": "233513-T2.1",
             "name": "Manufacturing Technology / Processes",
             "variants": [
               "Manufacturing Technology-I",
@@ -2391,6 +2531,7 @@
             ]
           },
           {
+            "id": "233513-T2.X2",
             "name": "Production Technology / Production Engineering",
             "variants": [
               "Production Technology",
@@ -2401,6 +2542,7 @@
             ]
           },
           {
+            "id": "233513-T2.X3",
             "name": "Machine Design / Design of Machine Elements",
             "variants": [
               "Design of Machine Members-I",
@@ -2416,6 +2558,7 @@
             ]
           },
           {
+            "id": "233513-T2.6",
             "name": "Manufacturing Materials, Metallurgy & Composites",
             "variants": [
               "Metallurgy & Material Science",
@@ -2432,6 +2575,7 @@
             ]
           },
           {
+            "id": "233513-T2.X5",
             "name": "Kinematics & Dynamics of Machinery",
             "variants": [
               "Kinematics of Machinery",
@@ -2443,6 +2587,7 @@
             ]
           },
           {
+            "id": "233513-T2.X6",
             "name": "Metrology & Measurement Systems",
             "variants": [
               "Metrology & Surface Engineering",
@@ -2454,6 +2599,7 @@
             ]
           },
           {
+            "id": "233513-T2.X7",
             "name": "Thermodynamics & Heat Transfer",
             "variants": [
               "Engineering Thermodynamics",
@@ -2470,6 +2616,7 @@
             ]
           },
           {
+            "id": "233513-T2.X8",
             "name": "Fluid Mechanics & Hydraulic Machinery",
             "variants": [
               "Fluid Mechanics",
@@ -2483,6 +2630,7 @@
             ]
           },
           {
+            "id": "233513-T2.4",
             "name": "Industrial Engineering / Operations Management",
             "variants": [
               "Industrial Engineering",
@@ -2497,6 +2645,7 @@
             ]
           },
           {
+            "id": "233513-T2.X10",
             "name": "CAD/CAM & Computer Aided Manufacturing",
             "variants": [
               "CAD/CAM",
@@ -2508,6 +2657,7 @@
             ]
           },
           {
+            "id": "233513-T2.X11",
             "name": "Quality Control & Total Quality Management",
             "variants": [
               "Quality Control",
@@ -2521,6 +2671,7 @@
         "categoryLabel": "Optional / Elective Subjects",
         "subjects": [
           {
+            "id": "233513-T2.X12",
             "name": "Automobile & Power Plant Engineering",
             "variants": [
               "Automobile Engineering",
@@ -2528,6 +2679,7 @@
             ]
           },
           {
+            "id": "233513-T2.O5",
             "name": "Robotics, Mechatronics & Automation",
             "variants": [
               "Robotics",
@@ -2539,6 +2691,7 @@
             ]
           },
           {
+            "id": "233513-T2.O4",
             "name": "Maintenance & Reliability Engineering",
             "variants": [
               "Maintenance Engineering",
@@ -2548,6 +2701,7 @@
             ]
           },
           {
+            "id": "233513-T2.X14",
             "name": "Refrigeration, Air Conditioning & HVAC",
             "variants": [
               "Refrigeration and Air Conditioning",
@@ -2555,6 +2709,7 @@
             ]
           },
           {
+            "id": "233513-T2.O8",
             "name": "Supply Chain, Entrepreneurship & Strategic Management",
             "variants": [
               "Supply Chain Management & Logistics",
@@ -2567,6 +2722,7 @@
             ]
           },
           {
+            "id": "233513-T2.X16",
             "name": "Finite Element Analysis / Simulation",
             "variants": [
               "Finite Element Analysis",
@@ -2575,6 +2731,7 @@
             ]
           },
           {
+            "id": "233513-T2.X17",
             "name": "Alternate / Renewable Energy Systems",
             "variants": [
               "Renewable Energy Sources",
@@ -2585,6 +2742,7 @@
             ]
           },
           {
+            "id": "233513-T2.X18",
             "name": "Gas Dynamics & Jet Propulsion",
             "variants": [
               "Gas Dynamics and Jet Propulsion"
@@ -2596,6 +2754,7 @@
         "categoryLabel": "Petroleum / Process Engineering Programme Subjects",
         "subjects": [
           {
+            "id": "233513-T3.X1",
             "name": "Petroleum Engineering Fundamentals",
             "variants": [
               "Elements of Petroleum Engineering",
@@ -2605,6 +2764,7 @@
             ]
           },
           {
+            "id": "233513-T3.X2",
             "name": "Drilling & Well Engineering",
             "variants": [
               "Drilling Engineering-I",
@@ -2616,6 +2776,7 @@
             ]
           },
           {
+            "id": "233513-T3.X3",
             "name": "Reservoir & Production Engineering",
             "variants": [
               "Reservoir Engineering-I",
@@ -2624,6 +2785,7 @@
             ]
           },
           {
+            "id": "233513-T3.X4",
             "name": "Refining, Gas & Pipeline Engineering",
             "variants": [
               "Refining Technology-I",
@@ -2633,6 +2795,7 @@
             ]
           },
           {
+            "id": "233513-T3.X5",
             "name": "Environment & Safety",
             "variants": [
               "Environment & Safety",
@@ -2640,6 +2803,7 @@
             ]
           },
           {
+            "id": "233513-T3.X6",
             "name": "Communication Skill & Computer Application (Discipline-linked)",
             "variants": [
               "Communication Skill & Computer Application/Mud Engineering"
@@ -2651,6 +2815,7 @@
         "categoryLabel": "Electrical / Electronics / Mechatronics Stream Subjects",
         "subjects": [
           {
+            "id": "233513-T3.X7",
             "name": "Electrical Machines & Power Systems",
             "variants": [
               "Electrical Drives and Controls",
@@ -2669,6 +2834,7 @@
             ]
           },
           {
+            "id": "233513-T3.X8",
             "name": "Control Systems & Instrumentation",
             "variants": [
               "Control Systems Engineering",
@@ -2688,6 +2854,7 @@
             ]
           },
           {
+            "id": "233513-T3.X9",
             "name": "Electronics & Digital Systems",
             "variants": [
               "Digital Electronic Circuits",
@@ -2704,6 +2871,7 @@
             ]
           },
           {
+            "id": "233513-T3.X10",
             "name": "Robotics, AI & Advanced Automation",
             "variants": [
               "Advanced Robotics",
@@ -2720,6 +2888,7 @@
         "categoryLabel": "Core (expected on every transcript)",
         "subjects": [
           {
+            "id": "233513-T3.G",
             "name": "Final-Year / Capstone Project / Major Project / Thesis / Dissertation",
             "variants": [
               "Project Work",
@@ -2738,6 +2907,7 @@
             ]
           },
           {
+            "id": "233513-T3.1",
             "name": "Minor / Mini Project",
             "variants": [
               "Mini Project",
@@ -2746,6 +2916,7 @@
             ]
           },
           {
+            "id": "233513-T3.2",
             "name": "Industrial Training / OJT / Internship",
             "variants": [
               "Industrial Training/Tour",
@@ -2758,6 +2929,7 @@
         "categoryLabel": "Optional / Elective",
         "subjects": [
           {
+            "id": "233513-T3.X13",
             "name": "Practice School / Field Attachment",
             "variants": [
               "Project Work/Practice School"
@@ -2769,6 +2941,7 @@
         "categoryLabel": "Core (expected on every transcript)",
         "subjects": [
           {
+            "id": "233513-T3.O1",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Seminar",
@@ -2776,6 +2949,7 @@
             ]
           },
           {
+            "id": "233513-T3.O2",
             "name": "Workshop Practice / Engineering Shop",
             "variants": [
               "Basic Workshop Practice",
@@ -2789,6 +2963,7 @@
         "categoryLabel": "Optional / Elective",
         "subjects": [
           {
+            "id": "233513-T2.O6",
             "name": "Management & Engineering Economics",
             "variants": [
               "Essentials of Management & Engineering Economics",
@@ -2805,12 +2980,14 @@
   {
     "anzscoCode": "233511",
     "title": "Industrial Engineer",
+    "occupationId": "industrial-engineer",
     "sourceSheet": "Industrial Engineering",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233511-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Calculus I",
@@ -2852,6 +3029,7 @@
             ]
           },
           {
+            "id": "233511-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "General Physics",
@@ -2868,6 +3046,7 @@
             ]
           },
           {
+            "id": "233511-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "General Chemistry",
@@ -2883,6 +3062,7 @@
             ]
           },
           {
+            "id": "233511-T1.4",
             "name": "Engineering Mechanics / Statics & Strength of Materials",
             "variants": [
               "Mechanics",
@@ -2894,6 +3074,7 @@
             ]
           },
           {
+            "id": "233511-T1.5",
             "name": "Engineering Drawing / CAD / Graphics",
             "variants": [
               "Engineering Drawing I/II",
@@ -2904,6 +3085,7 @@
             ]
           },
           {
+            "id": "233511-T1.X2",
             "name": "Computer Programming / Computing",
             "variants": [
               "Introduction to Programming",
@@ -2923,6 +3105,7 @@
             ]
           },
           {
+            "id": "233511-T1.X3",
             "name": "Electricity, Electronics & Instrumentation",
             "variants": [
               "Applied Electricity",
@@ -2937,6 +3120,7 @@
             ]
           },
           {
+            "id": "233511-T1.X4",
             "name": "Materials Science",
             "variants": [
               "Materials Science and Technology",
@@ -2949,6 +3133,7 @@
             ]
           },
           {
+            "id": "233511-T1.X5",
             "name": "Communication, Ethics & Professional Practice",
             "variants": [
               "English I/II/III/IV",
@@ -2981,6 +3166,7 @@
             ]
           },
           {
+            "id": "233511-T1.X6",
             "name": "Others",
             "variants": [
               "Economics",
@@ -3010,6 +3196,7 @@
         "categoryLabel": "Core Discipline-Specific Subjects",
         "subjects": [
           {
+            "id": "233511-T2.X1",
             "name": "Introduction to Industrial / Production Engineering",
             "variants": [
               "Introduction to Production Engineering",
@@ -3020,6 +3207,7 @@
             ]
           },
           {
+            "id": "233511-T2.3",
             "name": "Production Planning & Control",
             "variants": [
               "Production Planning and Control I/II",
@@ -3032,6 +3220,7 @@
             ]
           },
           {
+            "id": "233511-T2.1",
             "name": "Operations Research / Optimisation",
             "variants": [
               "Operations Research I/II",
@@ -3045,6 +3234,7 @@
             ]
           },
           {
+            "id": "233511-T2.X4",
             "name": "Quality Management / Quality Engineering",
             "variants": [
               "Quality Engineering",
@@ -3056,6 +3246,7 @@
             ]
           },
           {
+            "id": "233511-T2.2",
             "name": "Methods Engineering / Work Study / Ergonomics",
             "variants": [
               "Methods and Process Engineering",
@@ -3070,6 +3261,7 @@
             ]
           },
           {
+            "id": "233511-T2.7",
             "name": "Manufacturing / Production Processes",
             "variants": [
               "Manufacturing Processes",
@@ -3087,6 +3279,7 @@
             ]
           },
           {
+            "id": "233511-T2.5",
             "name": "Facilities Design / Plant Layout",
             "variants": [
               "Factory Design",
@@ -3100,6 +3293,7 @@
             ]
           },
           {
+            "id": "233511-T2.6",
             "name": "Logistics & Supply Chain Management",
             "variants": [
               "Logistics I – Supplies",
@@ -3115,6 +3309,7 @@
             ]
           },
           {
+            "id": "233511-T2.O2",
             "name": "Simulation & Modelling",
             "variants": [
               "Process Simulation",
@@ -3126,6 +3321,7 @@
             ]
           },
           {
+            "id": "233511-T2.O4",
             "name": "Maintenance Management / Reliability",
             "variants": [
               "Maintenance Management",
@@ -3136,6 +3332,7 @@
             ]
           },
           {
+            "id": "233511-T2.X11",
             "name": "Automation & Control",
             "variants": [
               "Automation and Control",
@@ -3144,6 +3341,7 @@
             ]
           },
           {
+            "id": "233511-T2.8",
             "name": "Engineering Economics & Cost Management",
             "variants": [
               "Engineering Economics",
@@ -3162,6 +3360,7 @@
             ]
           },
           {
+            "id": "233511-T2.X13",
             "name": "Business & Organisational Management",
             "variants": [
               "Business Organisation",
@@ -3179,6 +3378,7 @@
             ]
           },
           {
+            "id": "233511-T2.O7",
             "name": "Occupational Health, Safety & Environmental Management",
             "variants": [
               "Occupational Hygiene, Health and Safety",
@@ -3194,6 +3394,7 @@
             ]
           },
           {
+            "id": "233511-T2.X15",
             "name": "Marketing & Sales Management",
             "variants": [
               "Marketing Management",
@@ -3205,6 +3406,7 @@
             ]
           },
           {
+            "id": "233511-T2.X16",
             "name": "Statistics & Probability Applied to Industry",
             "variants": [
               "Statistics I/II/III",
@@ -3214,6 +3416,7 @@
             ]
           },
           {
+            "id": "233511-T2.O5",
             "name": "Project Formulation & Evaluation / Project Management",
             "variants": [
               "Project Formulation and Evaluation",
@@ -3223,6 +3426,7 @@
             ]
           },
           {
+            "id": "233511-T2.X18",
             "name": "Transport Phenomena & Thermodynamics",
             "variants": [
               "Transport Phenomena",
@@ -3236,6 +3440,7 @@
         "categoryLabel": "Optional / Elective Subjects",
         "subjects": [
           {
+            "id": "233511-T2.X19",
             "name": "Human Capital / Industrial Psychology & Sociology",
             "variants": [
               "Human Capital Management",
@@ -3246,6 +3451,7 @@
             ]
           },
           {
+            "id": "233511-T2.O8",
             "name": "Entrepreneurship & Innovation Management",
             "variants": [
               "Entrepreneurship and Business Plan",
@@ -3257,6 +3463,7 @@
             ]
           },
           {
+            "id": "233511-T2.O6",
             "name": "Information Systems & ERP",
             "variants": [
               "Management Information Systems",
@@ -3266,6 +3473,7 @@
             ]
           },
           {
+            "id": "233511-T2.X22",
             "name": "Intellectual Property & Legal Studies",
             "variants": [
               "Intellectual Property and Technology Transfer",
@@ -3274,6 +3482,7 @@
             ]
           },
           {
+            "id": "233511-T2.X23",
             "name": "Service Operations Management",
             "variants": [
               "Service Operations Management",
@@ -3282,6 +3491,7 @@
             ]
           },
           {
+            "id": "233511-T2.X24",
             "name": "Industrial Competitiveness & Emerging / Special Topics",
             "variants": [
               "Emerging Topics in Production Systems I/II/IV",
@@ -3291,6 +3501,7 @@
             ]
           },
           {
+            "id": "233511-T2.X25",
             "name": "OTHERS",
             "variants": [
               "Family & Population Planning",
@@ -3311,6 +3522,7 @@
         "categoryLabel": "Core (expected on every transcript)",
         "subjects": [
           {
+            "id": "233511-T3.G",
             "name": "Final-Year / Capstone Project / Thesis",
             "variants": [
               "Final Course Project I/II",
@@ -3326,6 +3538,7 @@
             ]
           },
           {
+            "id": "233511-T3.2",
             "name": "Industrial Training / Internship / Practicum",
             "variants": [
               "Supervised Internship",
@@ -3343,6 +3556,7 @@
         "categoryLabel": "Optional / Elective",
         "subjects": [
           {
+            "id": "233511-T3.X3",
             "name": "Complementary / Extracurricular Activities",
             "variants": [
               "Complementary Activities I–X – Production Engineering",
@@ -3350,6 +3564,7 @@
             ]
           },
           {
+            "id": "233511-T3.X4",
             "name": "Interactive & Project-Based Qualifying Projects",
             "variants": [
               "Interactive Qualifying Project (IQP)",
@@ -3359,6 +3574,7 @@
             ]
           },
           {
+            "id": "233511-T3.O1",
             "name": "Seminar / Research Methodology / Technical Communication",
             "variants": [
               "Scientific Methodology in Production Engineering",
@@ -3376,14 +3592,16 @@
     }
   },
   {
-    "anzscoCode": null,
+    "anzscoCode": "233999",
     "title": "Mechatronics Engineer",
+    "occupationId": "mechatronics-engineer",
     "sourceSheet": "Mechatronics Subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233999-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Calculus and Analytical Geometry",
@@ -3401,6 +3619,7 @@
             ]
           },
           {
+            "id": "233999-T1.2",
             "name": "Linear Algebra & Vector Calculus",
             "variants": [
               "Linear Algebra",
@@ -3411,6 +3630,7 @@
             ]
           },
           {
+            "id": "233999-T1.3",
             "name": "Differential Equations & Transforms",
             "variants": [
               "Ordinary Differential Equations & Linear Algebra",
@@ -3426,6 +3646,7 @@
             ]
           },
           {
+            "id": "233999-T1.4",
             "name": "Probability & Statistics",
             "variants": [
               "Probability and Statistics",
@@ -3436,6 +3657,7 @@
             ]
           },
           {
+            "id": "233999-T1.5",
             "name": "Applied Geometry",
             "variants": [
               "Applied Geometry",
@@ -3443,6 +3665,7 @@
             ]
           },
           {
+            "id": "233999-T1.6",
             "name": "Engineering Physics",
             "variants": [
               "Engineering Physics",
@@ -3454,6 +3677,7 @@
             ]
           },
           {
+            "id": "233999-T1.7",
             "name": "Engineering Chemistry",
             "variants": [
               "Engineering Chemistry",
@@ -3464,6 +3688,7 @@
             ]
           },
           {
+            "id": "233999-T1.8",
             "name": "Computer Programming (Foundational)",
             "variants": [
               "Introduction to Computer Programming",
@@ -3477,6 +3702,7 @@
             ]
           },
           {
+            "id": "233999-T1.9",
             "name": "Engineering Drawing / CAD / Graphics",
             "variants": [
               "Engineering Drawing I & II",
@@ -3490,6 +3716,7 @@
             ]
           },
           {
+            "id": "233999-T1.10",
             "name": "Engineering Mechanics / Mechanics of Solids",
             "variants": [
               "Engineering Statics",
@@ -3506,6 +3733,7 @@
             ]
           },
           {
+            "id": "233999-T1.11",
             "name": "Others (General/Support Subjects)",
             "variants": [
               "Environmental Studies/Science",
@@ -3530,6 +3758,7 @@
         "categoryLabel": "Core Discipline-Specific Subjects",
         "subjects": [
           {
+            "id": "233999-T2.1",
             "name": "Electric Circuits & Circuit Analysis",
             "variants": [
               "Electric Circuits",
@@ -3543,6 +3772,7 @@
             ]
           },
           {
+            "id": "233999-T2.2",
             "name": "Electronics (Analog & Digital)",
             "variants": [
               "Electronic Devices and Circuits I & II",
@@ -3557,6 +3787,7 @@
             ]
           },
           {
+            "id": "233999-T2.3",
             "name": "Electrical Machines & Power Systems",
             "variants": [
               "Electrical Machines and Drives",
@@ -3567,6 +3798,7 @@
             ]
           },
           {
+            "id": "233999-T2.4",
             "name": "Power Electronics & Drives",
             "variants": [
               "Power Electronics",
@@ -3577,6 +3809,7 @@
             ]
           },
           {
+            "id": "233999-T2.5",
             "name": "Microprocessors, Microcontrollers & Embedded Systems",
             "variants": [
               "Microprocessors and Applications",
@@ -3589,6 +3822,7 @@
             ]
           },
           {
+            "id": "233999-T2.6",
             "name": "Sensors, Actuators & Instrumentation",
             "variants": [
               "Sensors, Actuators and Instrumentation",
@@ -3601,6 +3835,7 @@
             ]
           },
           {
+            "id": "233999-T2.7",
             "name": "Control Systems",
             "variants": [
               "Control Systems I & II",
@@ -3616,6 +3851,7 @@
             ]
           },
           {
+            "id": "233999-T2.8",
             "name": "Robotics & Machine Vision",
             "variants": [
               "Robotics",
@@ -3629,6 +3865,7 @@
             ]
           },
           {
+            "id": "233999-T2.9",
             "name": "Mechatronics System Design & Fundamentals",
             "variants": [
               "Elements of Mechatronics Systems",
@@ -3645,6 +3882,7 @@
             ]
           },
           {
+            "id": "233999-T2.10",
             "name": "Signal Processing & Communication Systems",
             "variants": [
               "Digital Signal Processing",
@@ -3656,6 +3894,7 @@
             ]
           },
           {
+            "id": "233999-T2.11",
             "name": "Machine Theory, Kinematics & Vibration",
             "variants": [
               "Theory of Machines/Mechanism",
@@ -3674,6 +3913,7 @@
             ]
           },
           {
+            "id": "233999-T2.12",
             "name": "Thermodynamics, Fluid Mechanics & Heat Transfer",
             "variants": [
               "Thermodynamics/Termodinamik",
@@ -3691,6 +3931,7 @@
             ]
           },
           {
+            "id": "233999-T2.13",
             "name": "Materials Science & Manufacturing Processes",
             "variants": [
               "Materials Science",
@@ -3709,6 +3950,7 @@
             ]
           },
           {
+            "id": "233999-T2.14",
             "name": "Industrial Automation & PLC",
             "variants": [
               "Industrial Automation/Endüstriyel Otomasyon",
@@ -3722,6 +3964,7 @@
             ]
           },
           {
+            "id": "233999-T2.15",
             "name": "Electro-Mechanical & Mechanical Systems",
             "variants": [
               "Electro-Mechanical Systems",
@@ -3738,6 +3981,7 @@
         "categoryLabel": "Optional / Elective Subjects",
         "subjects": [
           {
+            "id": "233999-T2.O1",
             "name": "Artificial Intelligence & Simulation Tools (Elective)",
             "variants": [
               "Artificial Intelligence",
@@ -3747,6 +3991,7 @@
             ]
           },
           {
+            "id": "233999-T2.O2",
             "name": "Specialized / Applied Engineering Electives",
             "variants": [
               "Introduction to Biomedical Engineering",
@@ -3761,6 +4006,7 @@
             ]
           },
           {
+            "id": "233999-T2.O3",
             "name": "Engineering Management, Economics & Quality (Elective)",
             "variants": [
               "Engineering Economics/Economy",
@@ -3784,6 +4030,7 @@
         "categoryLabel": "Specialized / Advanced Topics",
         "subjects": [
           {
+            "id": "233999-T2.O4",
             "name": "Rapid Prototyping & Additive Manufacturing",
             "variants": [
               "Rapid Prototyping",
@@ -3792,6 +4039,7 @@
             ]
           },
           {
+            "id": "233999-T2.O5",
             "name": "Renewable Energy & Sustainability",
             "variants": [
               "Renewable Energy System",
@@ -3799,6 +4047,7 @@
             ]
           },
           {
+            "id": "233999-T2.O6",
             "name": "Innovative Engineering Design",
             "variants": [
               "Innovative Engineering Analysis and Design",
@@ -3807,6 +4056,7 @@
             ]
           },
           {
+            "id": "233999-T3.X1",
             "name": "OTHERS",
             "variants": [
               "— not present on any transcript —"
@@ -3818,6 +4068,7 @@
         "categoryLabel": "Project, Capstone & Practical-Training Reference",
         "subjects": [
           {
+            "id": "233999-T3.G",
             "name": "Final-Year / Capstone Project / Final Design Project",
             "variants": [
               "Final Design Project I & II",
@@ -3836,12 +4087,14 @@
             ]
           },
           {
+            "id": "233999-T3.1",
             "name": "Minor Project",
             "variants": [
               "Minor Project"
             ]
           },
           {
+            "id": "233999-T3.2",
             "name": "Industrial Training / OJT / Internship",
             "variants": [
               "Summer Training I & II",
@@ -3861,6 +4114,7 @@
         "categoryLabel": "Optional / Elective",
         "subjects": [
           {
+            "id": "233999-T3.O1",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Technical Seminar I & II",
@@ -3868,6 +4122,7 @@
             ]
           },
           {
+            "id": "233999-T3.O2",
             "name": "Workshop Practice / Engineering Shop",
             "variants": [
               "Workshop Practice",
@@ -3876,6 +4131,7 @@
             ]
           },
           {
+            "id": "233999-T2.O7",
             "name": "Entrepreneurship / Engineering Management",
             "variants": [
               "Entrepreneurship Development",
@@ -3885,6 +4141,7 @@
             ]
           },
           {
+            "id": "233999-T3.X2",
             "name": "OTHERS",
             "variants": [
               "— not present on any transcript —"
@@ -3897,12 +4154,14 @@
   {
     "anzscoCode": "233111",
     "title": "Chemical Engineer",
+    "occupationId": "chemical-engineer",
     "sourceSheet": "Chemical Engineer subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233111-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Algebra",
@@ -3928,6 +4187,7 @@
             ]
           },
           {
+            "id": "233111-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Engineering Physics 1 / 2",
@@ -3938,6 +4198,7 @@
             ]
           },
           {
+            "id": "233111-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "General and Inorganic Chemistry",
@@ -3958,6 +4219,7 @@
             ]
           },
           {
+            "id": "233111-T1.4",
             "name": "Engineering Mechanics",
             "variants": [
               "Statics of Rigid Bodies",
@@ -3971,6 +4233,7 @@
             ]
           },
           {
+            "id": "233111-T1.5",
             "name": "Engineering Drawing / CAD / Graphics",
             "variants": [
               "Engineering Graphics 1",
@@ -3983,6 +4246,7 @@
             ]
           },
           {
+            "id": "233111-T1.6",
             "name": "Basic Electrical & Electronics Engineering (Optional)",
             "variants": [
               "Basic Electrical and Electronics Engineering",
@@ -3994,6 +4258,7 @@
             ]
           },
           {
+            "id": "233111-T1.7",
             "name": "Computer Programming / Computing (Optional)",
             "variants": [
               "Computer Fundamentals and Programming",
@@ -4009,6 +4274,7 @@
             ]
           },
           {
+            "id": "233111-T1.8",
             "name": "Communication, Ethics & Professional Practice (Optional)",
             "variants": [
               "Communication Arts",
@@ -4021,6 +4287,7 @@
             ]
           },
           {
+            "id": "233111-T1.X1",
             "name": "Others",
             "variants": [
               "General Proficiency",
@@ -4034,6 +4301,7 @@
         "categoryLabel": "CORE CHEMICAL ENGINEERING SPECIFIC SUBJECTS",
         "subjects": [
           {
+            "id": "233111-T2.1",
             "name": "Material & Energy Balances / Process Calculations",
             "variants": [
               "ChE Calculations 1 / 2",
@@ -4044,6 +4312,7 @@
             ]
           },
           {
+            "id": "233111-T2.2",
             "name": "Chemical Engineering Thermodynamics",
             "variants": [
               "ChE Thermodynamics 1 / 2",
@@ -4056,6 +4325,7 @@
             ]
           },
           {
+            "id": "233111-T2.3",
             "name": "Fluid Mechanics / Fluid Flow Operations",
             "variants": [
               "Fluid Mechanics I, II",
@@ -4067,6 +4337,7 @@
             ]
           },
           {
+            "id": "233111-T2.4",
             "name": "Heat Transfer",
             "variants": [
               "Heat Transfer",
@@ -4077,6 +4348,7 @@
             ]
           },
           {
+            "id": "233111-T2.5",
             "name": "Mass Transfer / Separation Processes",
             "variants": [
               "Mass Transfer I / II",
@@ -4092,6 +4364,7 @@
             ]
           },
           {
+            "id": "233111-T2.6",
             "name": "Chemical Reaction Engineering",
             "variants": [
               "Chemical Reaction Engineering I / II",
@@ -4103,6 +4376,7 @@
             ]
           },
           {
+            "id": "233111-T2.7",
             "name": "Process/Plant Design, Simulation, Optimization & Safety",
             "variants": [
               "ChE Plant Design",
@@ -4124,6 +4398,7 @@
             ]
           },
           {
+            "id": "233111-T2.8",
             "name": "Process Dynamics, Control & Instrumentation",
             "variants": [
               "Process Dynamics and Control",
@@ -4137,6 +4412,7 @@
             ]
           },
           {
+            "id": "233111-T2.9",
             "name": "Chemical Engineering Economics / Project Economics",
             "variants": [
               "Engineering Economy",
@@ -4147,6 +4423,7 @@
             ]
           },
           {
+            "id": "233111-T2.X1",
             "name": "Others",
             "variants": [
               "Environmental Engineering",
@@ -4159,6 +4436,7 @@
         "categoryLabel": "Optional/ Elective subjects",
         "subjects": [
           {
+            "id": "233111-T2.O1",
             "name": "Chemical Process Industries / Chemical Technology",
             "variants": [
               "Chemical Process Industries",
@@ -4172,6 +4450,7 @@
             ]
           },
           {
+            "id": "233111-T2.O2",
             "name": "Materials Science / Engineering Materials",
             "variants": [
               "Engineering Materials",
@@ -4182,6 +4461,7 @@
             ]
           },
           {
+            "id": "233111-T2.O3",
             "name": "Environmental Engineering / Pollution Control",
             "variants": [
               "Environmental Engineering",
@@ -4196,6 +4476,7 @@
             ]
           },
           {
+            "id": "233111-T2.X2",
             "name": "Others",
             "variants": [
               "Engineering Management"
@@ -4207,6 +4488,7 @@
         "categoryLabel": "Capstone Project, Practical Training Subjects",
         "subjects": [
           {
+            "id": "233111-T3.G",
             "name": "Major Project / Thesis / Final-Year Project/ Capstone Project",
             "variants": [
               "ChE Research 1 / 2",
@@ -4222,6 +4504,7 @@
             ]
           },
           {
+            "id": "233111-T3.1",
             "name": "Minor Project",
             "variants": [
               "ChE Research 1",
@@ -4229,6 +4512,7 @@
             ]
           },
           {
+            "id": "233111-T3.2",
             "name": "Industrial Training / OJT / Internship",
             "variants": [
               "Industry Immersion / OJT",
@@ -4241,6 +4525,7 @@
             ]
           },
           {
+            "id": "233111-T3.X1",
             "name": "Others",
             "variants": []
           }
@@ -4250,6 +4535,7 @@
         "categoryLabel": "Optional Subjects",
         "subjects": [
           {
+            "id": "233111-T3.O1",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Seminar",
@@ -4257,6 +4543,7 @@
             ]
           },
           {
+            "id": "233111-T3.O2",
             "name": "Workshop Practice / Engineering Shop",
             "variants": [
               "Workshop Practices",
@@ -4264,6 +4551,7 @@
             ]
           },
           {
+            "id": "233111-T2.O4",
             "name": "Entrepreneurship / Engineering Management",
             "variants": [
               "Engineering Management",
@@ -4276,6 +4564,7 @@
             ]
           },
           {
+            "id": "233111-T3.X2",
             "name": "Others",
             "variants": []
           }
@@ -4286,12 +4575,14 @@
   {
     "anzscoCode": "233512",
     "title": "Mechanical Engineer",
+    "occupationId": "mechanical-engineer",
     "sourceSheet": "Mechanical Engineer subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational subjects",
         "subjects": [
           {
+            "id": "233512-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Applied Mathematics-III",
@@ -4347,6 +4638,7 @@
             ]
           },
           {
+            "id": "233512-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "General Physics I",
@@ -4367,6 +4659,7 @@
             ]
           },
           {
+            "id": "233512-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "General Chemistry",
@@ -4381,6 +4674,7 @@
             ]
           },
           {
+            "id": "233512-T1.4",
             "name": "Engineering Mechanics (Statics & Dynamics)",
             "variants": [
               "Engineering Mechanics",
@@ -4402,6 +4696,7 @@
             ]
           },
           {
+            "id": "233512-T1.5",
             "name": "Engineering Drawing / Graphics / CAD",
             "variants": [
               "Machine Drawing (Practical)",
@@ -4436,6 +4731,7 @@
             ]
           },
           {
+            "id": "233512-T1.X1",
             "name": "OTHERS",
             "variants": [
               "Environmental Studies",
@@ -4556,6 +4852,7 @@
         "categoryLabel": "Core discipline-specific subjects",
         "subjects": [
           {
+            "id": "233512-T2.1",
             "name": "Thermodynamics / Heat Transfer",
             "variants": [
               "Engineering Thermodynamics",
@@ -4610,6 +4907,7 @@
             ]
           },
           {
+            "id": "233512-T2.2",
             "name": "Fluid Mechanics / Solid Mechanics / Strength of Materials",
             "variants": [
               "Fluid Mechanics",
@@ -4643,6 +4941,7 @@
             ]
           },
           {
+            "id": "233512-T2.3",
             "name": "Materials Science / Metallurgy / Manufacturing Processes",
             "variants": [
               "Manufacturing Processes",
@@ -4745,6 +5044,7 @@
             ]
           },
           {
+            "id": "233512-T2.4",
             "name": "Mechanics / Theory / Dynamics of Machines / Machine Design",
             "variants": [
               "Kinematics of Machine",
@@ -4807,6 +5107,7 @@
             ]
           },
           {
+            "id": "233512-T2.5",
             "name": "Control Engineering / Instrumentation",
             "variants": [
               "Control Systems Engineering",
@@ -4850,6 +5151,7 @@
             ]
           },
           {
+            "id": "233512-T2.X1",
             "name": "OTHERS",
             "variants": [
               "Operations Research",
@@ -4907,6 +5209,7 @@
         "categoryLabel": "Project, Capstone & Practical-Training",
         "subjects": [
           {
+            "id": "233512-T3.G",
             "name": "Final-Year / Capstone Project / Major Project / Thesis",
             "variants": [
               "Project",
@@ -4930,6 +5233,7 @@
             ]
           },
           {
+            "id": "233512-T3.1",
             "name": "Minor Project",
             "variants": [
               "Mini Project (Practical)",
@@ -4940,6 +5244,7 @@
             ]
           },
           {
+            "id": "233512-T3.2",
             "name": "Industrial Training / OJT / Internship",
             "variants": [
               "Industrial Training",
@@ -4953,6 +5258,7 @@
             ]
           },
           {
+            "id": "233512-T3.3",
             "name": "Technical Seminar / Paper Presentation / Workshop Practice / Engineering Shop",
             "variants": [
               "Technical Report and Seminar (Practical)",
@@ -4985,6 +5291,7 @@
             ]
           },
           {
+            "id": "233512-T3.X1",
             "name": "OTHERS",
             "variants": []
           }
@@ -4995,12 +5302,14 @@
   {
     "anzscoCode": "233311",
     "title": "Electrical Engineer",
+    "occupationId": "electrical-engineer",
     "sourceSheet": "Electrical Engineer subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational subjects",
         "subjects": [
           {
+            "id": "233311-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Applied Mathematics for Electrical Engineering",
@@ -5027,6 +5336,7 @@
             ]
           },
           {
+            "id": "233311-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Engineering Physics I",
@@ -5043,6 +5353,7 @@
             ]
           },
           {
+            "id": "233311-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "Engineering Chemistry I",
@@ -5054,6 +5365,7 @@
             ]
           },
           {
+            "id": "233311-T1.4",
             "name": "Engineering Mechanics (Statics & Dynamics)",
             "variants": [
               "Basic Civil and Mechanical Engineering",
@@ -5061,6 +5373,7 @@
             ]
           },
           {
+            "id": "233311-T1.5",
             "name": "Engineering Drawing / Graphics / CAD",
             "variants": [
               "Engineering Graphics",
@@ -5071,6 +5384,7 @@
             ]
           },
           {
+            "id": "233311-T1.6",
             "name": "Computer Programming Fundamentals (Optional)",
             "variants": [
               "Fundamentals of Computing and Programming",
@@ -5084,6 +5398,7 @@
             ]
           },
           {
+            "id": "233311-T1.7",
             "name": "Engineering Materials (Optional)",
             "variants": [
               "Electrical Materials, Electrical & Electronics Engg. Materials",
@@ -5091,6 +5406,7 @@
             ]
           },
           {
+            "id": "233311-T1.X1",
             "name": "Others",
             "variants": [
               "Effective Technical Communication",
@@ -5115,6 +5431,7 @@
         "categoryLabel": "Core discipline-specific subjects",
         "subjects": [
           {
+            "id": "233311-T2.1",
             "name": "Electrical Machines / Electrical Installation & Design",
             "variants": [
               "Electrical Machine-I",
@@ -5148,6 +5465,7 @@
             ]
           },
           {
+            "id": "233311-T2.2",
             "name": "Power Systems Analysis & Design",
             "variants": [
               "Power System-I",
@@ -5162,6 +5480,7 @@
             ]
           },
           {
+            "id": "233311-T2.3",
             "name": "Power System Protection / Switchgear",
             "variants": [
               "Switchgear And Protection",
@@ -5170,6 +5489,7 @@
             ]
           },
           {
+            "id": "233311-T2.4",
             "name": "Power Transmission & Distribution",
             "variants": [
               "Transmission and Distribution Engineering",
@@ -5180,6 +5500,7 @@
             ]
           },
           {
+            "id": "233311-T2.5",
             "name": "Power Electronics / Power Generation / Power Plant Engineering",
             "variants": [
               "Power Electronics",
@@ -5192,6 +5513,7 @@
             ]
           },
           {
+            "id": "233311-T2.6",
             "name": "High Voltage Engineering",
             "variants": [
               "High Voltage Engineering",
@@ -5199,6 +5521,7 @@
             ]
           },
           {
+            "id": "233311-T2.7",
             "name": "Control Systems",
             "variants": [
               "Control System Theory",
@@ -5218,6 +5541,7 @@
             ]
           },
           {
+            "id": "233311-T2.8",
             "name": "Instrumentation & Measurement",
             "variants": [
               "Electrical Measurement and Measuring Instruments",
@@ -5229,6 +5553,7 @@
             ]
           },
           {
+            "id": "233311-T2.9",
             "name": "Renewable / Sustainable Energy Systems",
             "variants": [
               "Renewable Energy Sources",
@@ -5236,6 +5561,7 @@
             ]
           },
           {
+            "id": "233311-T2.10",
             "name": "Illumination / Electrical Safety & Utilisation",
             "variants": [
               "Electric Safety and Quality",
@@ -5247,6 +5573,7 @@
             ]
           },
           {
+            "id": "233311-T2.X1",
             "name": "OTHERS",
             "variants": [
               "Fundamentals of Electronic Communications; Research and Engineering Design Methods for Electrical Engineering",
@@ -5259,6 +5586,7 @@
         "categoryLabel": "Core (expected on every transcript)",
         "subjects": [
           {
+            "id": "233311-T3.G",
             "name": "Final-Year / Capstone Project / Major Project / Thesis",
             "variants": [
               "Internship/Project",
@@ -5268,6 +5596,7 @@
             ]
           },
           {
+            "id": "233311-T3.1",
             "name": "Minor Project",
             "variants": [
               "Design Engineering - I A",
@@ -5278,6 +5607,7 @@
             ]
           },
           {
+            "id": "233311-T3.2",
             "name": "Industrial Training / OJT / Internship",
             "variants": [
               "Summer Internship",
@@ -5286,6 +5616,7 @@
             ]
           },
           {
+            "id": "233311-T3.X1",
             "name": "OTHERS",
             "variants": []
           }
@@ -5295,12 +5626,14 @@
         "categoryLabel": "Optional / Elective",
         "subjects": [
           {
+            "id": "233311-T3.O1",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Seminars/Colloquia"
             ]
           },
           {
+            "id": "233311-T3.O2",
             "name": "Workshop Practice / Engineering Shop",
             "variants": [
               "General Workshop Practice - I",
@@ -5310,6 +5643,7 @@
             ]
           },
           {
+            "id": "233311-T2.O1",
             "name": "Entrepreneurship / Engineering Management",
             "variants": [
               "Generic Skills & E.Ship Development",
@@ -5318,6 +5652,7 @@
             ]
           },
           {
+            "id": "233311-T3.X2",
             "name": "OTHERS",
             "variants": []
           }
@@ -5328,12 +5663,14 @@
   {
     "anzscoCode": "233411",
     "title": "Electronics Engineer",
+    "occupationId": "electronics-engineer",
     "sourceSheet": "Electronics Engineer subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational subjects",
         "subjects": [
           {
+            "id": "233411-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Engineering Mathematics I",
@@ -5352,6 +5689,7 @@
             ]
           },
           {
+            "id": "233411-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Engineering Physics",
@@ -5362,6 +5700,7 @@
             ]
           },
           {
+            "id": "233411-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "Engineering Chemistry",
@@ -5372,6 +5711,7 @@
             ]
           },
           {
+            "id": "233411-T1.4",
             "name": "Engineering Drawing / Graphics / CAD",
             "variants": [
               "Computer Aided Engineering Drawing",
@@ -5381,6 +5721,7 @@
             ]
           },
           {
+            "id": "233411-T1.5",
             "name": "Computer Programming Fundamentals (Optional)",
             "variants": [
               "Computer Concepts & C Programming",
@@ -5396,6 +5737,7 @@
             ]
           },
           {
+            "id": "233411-T1.6",
             "name": "Basic Electrical Engineering (Optional)",
             "variants": [
               "Basic Electrical Engineering",
@@ -5407,6 +5749,7 @@
             ]
           },
           {
+            "id": "233411-T1.X1",
             "name": "OTHERS",
             "variants": [
               "Environmental Science",
@@ -5425,6 +5768,7 @@
         "categoryLabel": "Core Subjects",
         "subjects": [
           {
+            "id": "233411-T2.1",
             "name": "Electronic Devices & Circuits",
             "variants": [
               "Basic Electronics",
@@ -5442,6 +5786,7 @@
             ]
           },
           {
+            "id": "233411-T2.2",
             "name": "Circuit / Network Theory & Analysis",
             "variants": [
               "Network Analysis",
@@ -5458,6 +5803,7 @@
             ]
           },
           {
+            "id": "233411-T2.3",
             "name": "Digital Electronics & Logic Design / Digital Signal Processing",
             "variants": [
               "Logic Design",
@@ -5473,6 +5819,7 @@
             ]
           },
           {
+            "id": "233411-T2.4",
             "name": "Electromagnetic Theory / Fields & Waves",
             "variants": [
               "Field Theory",
@@ -5488,6 +5835,7 @@
             ]
           },
           {
+            "id": "233411-T2.5",
             "name": "Signals & Systems",
             "variants": [
               "Signals & Systems",
@@ -5495,6 +5843,7 @@
             ]
           },
           {
+            "id": "233411-T2.6",
             "name": "Control Systems",
             "variants": [
               "Modern Control Theory",
@@ -5509,6 +5858,7 @@
             ]
           },
           {
+            "id": "233411-T2.7",
             "name": "Microprocessors, Microcontrollers & Embedded Systems",
             "variants": [
               "Microcontrollers",
@@ -5529,6 +5879,7 @@
             ]
           },
           {
+            "id": "233411-T2.8",
             "name": "Communication Systems (Analog & Digital)",
             "variants": [
               "Optical and Wireless Communication",
@@ -5546,6 +5897,7 @@
             ]
           },
           {
+            "id": "233411-T2.9",
             "name": "Computer Architecture & Networks",
             "variants": [
               "Computer Organization and Architecture",
@@ -5565,6 +5917,7 @@
             ]
           },
           {
+            "id": "233411-T2.10",
             "name": "Power Electronics",
             "variants": [
               "Power Electronics",
@@ -5572,6 +5925,7 @@
             ]
           },
           {
+            "id": "233411-T2.11",
             "name": "Instrumentation & Measurement",
             "variants": [
               "E & E Measurements & Instrumentation",
@@ -5584,6 +5938,7 @@
             ]
           },
           {
+            "id": "233411-T2.X1",
             "name": "OTHERS",
             "variants": [
               "Probability Theory and Stochastic Processes",
@@ -5601,6 +5956,7 @@
         "categoryLabel": "Optional/ Elective subjects",
         "subjects": [
           {
+            "id": "233411-T2.O1",
             "name": "Analog & Linear Integrated Circuits",
             "variants": [
               "Linear IC's & Applications",
@@ -5611,6 +5967,7 @@
             ]
           },
           {
+            "id": "233411-T2.O2",
             "name": "Semiconductor Devices & Materials",
             "variants": [
               "Solid State Electronics",
@@ -5619,6 +5976,7 @@
             ]
           },
           {
+            "id": "233411-T2.O3",
             "name": "VLSI Design",
             "variants": [
               "VLSI Circuits & Design",
@@ -5629,6 +5987,7 @@
             ]
           },
           {
+            "id": "233411-T2.O4",
             "name": "Wireless / Optical / Satellite Communication",
             "variants": [
               "Wireless Communication",
@@ -5645,6 +6004,7 @@
             ]
           },
           {
+            "id": "233411-T2.O5",
             "name": "Microwave, Antenna, Radar & Transmission Lines",
             "variants": [
               "Microwave Engineering",
@@ -5663,6 +6023,7 @@
             ]
           },
           {
+            "id": "233411-T2.X2",
             "name": "OTHERS",
             "variants": []
           }
@@ -5672,6 +6033,7 @@
         "categoryLabel": "Project & Practical Training",
         "subjects": [
           {
+            "id": "233411-T3.G",
             "name": "Final-Year / Major Project / Thesis / Degree Project",
             "variants": [
               "Project Work",
@@ -5687,6 +6049,7 @@
             ]
           },
           {
+            "id": "233411-T3.1",
             "name": "Minor Project",
             "variants": [
               "Mini Project",
@@ -5695,6 +6058,7 @@
             ]
           },
           {
+            "id": "233411-T3.2",
             "name": "Industrial Training / Internship / OJT / Technical Seminar / Independent Study",
             "variants": [
               "Seminar",
@@ -5707,6 +6071,7 @@
             ]
           },
           {
+            "id": "233411-T3.X1",
             "name": "OTHERS",
             "variants": []
           }
@@ -5717,12 +6082,14 @@
   {
     "anzscoCode": "263311",
     "title": "Telecommunications Engineer",
+    "occupationId": "telecommunications-engineer",
     "sourceSheet": "Telecom Engineer subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational subjects",
         "subjects": [
           {
+            "id": "263311-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Mathematics-I/II/III",
@@ -5742,6 +6109,7 @@
             ]
           },
           {
+            "id": "263311-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Engineering Physics",
@@ -5750,6 +6118,7 @@
             ]
           },
           {
+            "id": "263311-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "Engineering Chemistry",
@@ -5758,6 +6127,7 @@
             ]
           },
           {
+            "id": "263311-T1.4",
             "name": "Engineering Mechanics / Elements of Mechanical Engineering",
             "variants": [
               "Elements of Mechanical Engineering",
@@ -5767,6 +6137,7 @@
             ]
           },
           {
+            "id": "263311-T1.5",
             "name": "Engineering Drawing / Graphics / CAD",
             "variants": [
               "Engineering Drawing",
@@ -5776,6 +6147,7 @@
             ]
           },
           {
+            "id": "263311-T1.6",
             "name": "Computer Programming Fundamentals",
             "variants": [
               "Computer Programming",
@@ -5792,6 +6164,7 @@
             ]
           },
           {
+            "id": "263311-T1.X1",
             "name": "Others",
             "variants": [
               "Entrepreneurship",
@@ -5821,6 +6194,7 @@
         "categoryLabel": "Tier 2a - Core discipline-specific subjects",
         "subjects": [
           {
+            "id": "263311-T2.1",
             "name": "Communication Systems (Analog & Digital) / Data & Computer Communications / Networks",
             "variants": [
               "Analog Communications",
@@ -5835,6 +6209,7 @@
             ]
           },
           {
+            "id": "263311-T2.2",
             "name": "Telecommunication Networks, Switching & Traffic Engineering/ Transmission Lines & Media",
             "variants": [
               "Telecommunication Switching Systems and Networks",
@@ -5851,6 +6226,7 @@
             ]
           },
           {
+            "id": "263311-T2.3",
             "name": "Electromagnetic Theory / Fields & Waves",
             "variants": [
               "Electromagnetic Theory and Transmission Lines",
@@ -5862,6 +6238,7 @@
             ]
           },
           {
+            "id": "263311-T2.4",
             "name": "Microwave & RF Engineering, Antenna & Wave Propagation",
             "variants": [
               "Microwave Engineering (and Digital Communication)",
@@ -5873,6 +6250,7 @@
             ]
           },
           {
+            "id": "263311-T2.5",
             "name": "Radar Systems, Satellite & Space Communication, Optical / Fibre-Optic Communication / Wireless & Mobile Communication",
             "variants": [
               "Radar System(s) (Engineering)",
@@ -5884,6 +6262,7 @@
             ]
           },
           {
+            "id": "263311-T2.6",
             "name": "Digital Signal Processing / Information Theory, Coding & Network Security / Signals & Systems / Network Analysis & Internetwork Design",
             "variants": [
               "Digital Signal Processing",
@@ -5896,6 +6275,7 @@
             ]
           },
           {
+            "id": "263311-T2.X1",
             "name": "Others",
             "variants": []
           }
@@ -5905,6 +6285,7 @@
         "categoryLabel": "Tier 2b - Supporting device / circuit-level subjects",
         "subjects": [
           {
+            "id": "263311-T2.7",
             "name": "Electronic Devices & Circuits (supporting) / Digital Electronics & Logic Design (supporting)",
             "variants": [
               "Electronic Devices and Circuits",
@@ -5929,6 +6310,7 @@
             ]
           },
           {
+            "id": "263311-T2.8",
             "name": "Microprocessors, Microcontrollers & Embedded Systems (supporting) / VLSI / Digital System Design (supporting) / Instrumentation & Measurement (supporting)",
             "variants": [
               "Microprocessors and Microcontrollers",
@@ -5945,6 +6327,7 @@
             ]
           },
           {
+            "id": "263311-T2.X2",
             "name": "Others",
             "variants": []
           }
@@ -5954,6 +6337,7 @@
         "categoryLabel": "Project & Practical Training",
         "subjects": [
           {
+            "id": "263311-T3.G",
             "name": "Final-Year / Major Project / Thesis / Degree Project",
             "variants": [
               "Major Project",
@@ -5966,6 +6350,7 @@
             ]
           },
           {
+            "id": "263311-T3.1",
             "name": "Minor Project",
             "variants": [
               "Industry Oriented Mini Project",
@@ -5974,6 +6359,7 @@
             ]
           },
           {
+            "id": "263311-T3.2",
             "name": "Industrial Training / Internship / OJT / Technical Seminar / Independent Study",
             "variants": [
               "Industrial Training",
@@ -5986,6 +6372,7 @@
             ]
           },
           {
+            "id": "263311-T3.X1",
             "name": "Others",
             "variants": []
           }
@@ -5996,12 +6383,14 @@
   {
     "anzscoCode": "233914",
     "title": "Engineering Technologist",
+    "occupationId": "engineering-technologist",
     "sourceSheet": "Eng Technologist subjects",
     "groups": {
       "partA": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233914-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Calculus",
@@ -6013,6 +6402,7 @@
             ]
           },
           {
+            "id": "233914-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Physics I/II",
@@ -6021,12 +6411,14 @@
             ]
           },
           {
+            "id": "233914-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "Chemistry I/II, Engineering Chemistry"
             ]
           },
           {
+            "id": "233914-T1.4",
             "name": "Engineering Mechanics / Elements of Mechanical Engineering",
             "variants": [
               "Engineering Mechanics",
@@ -6036,6 +6428,7 @@
             ]
           },
           {
+            "id": "233914-T1.5",
             "name": "Engineering Drawing / CAD / Graphics",
             "variants": [
               "Engineering Drawing",
@@ -6045,6 +6438,7 @@
             ]
           },
           {
+            "id": "233914-T1.6",
             "name": "Basic Electrical & Electronics Engineering (Optional)",
             "variants": [
               "Basic Electrical Engineering",
@@ -6053,6 +6447,7 @@
             ]
           },
           {
+            "id": "233914-T1.7",
             "name": "Computer Programming / Computing (Optional)",
             "variants": [
               "Programming",
@@ -6061,6 +6456,7 @@
             ]
           },
           {
+            "id": "233914-T1.8",
             "name": "Communication, Ethics & Professional Practice (Optional)",
             "variants": [
               "Communication Skills",
@@ -6070,6 +6466,7 @@
             ]
           },
           {
+            "id": "233914-T1.X1",
             "name": "OTHERS",
             "variants": [
               "Communication Skills",
@@ -6084,6 +6481,7 @@
         "categoryLabel": "Claimed Stream (reference lookup - cross-check vs corresponding PE rubric)",
         "subjects": [
           {
+            "id": "233914-T2.1",
             "name": "Civil / Construction Technology",
             "variants": [
               "Civil / Construction stream subjects as above",
@@ -6095,6 +6493,7 @@
             ]
           },
           {
+            "id": "233914-T2.2",
             "name": "Mechanical / Manufacturing Technology",
             "variants": [
               "Mechanical / Manufacturing stream subjects as above",
@@ -6106,6 +6505,7 @@
             ]
           },
           {
+            "id": "233914-T2.3",
             "name": "Electrical Technology",
             "variants": [
               "Electrical stream subjects as above",
@@ -6116,6 +6516,7 @@
             ]
           },
           {
+            "id": "233914-T2.4",
             "name": "Electronics / Instrumentation Technology",
             "variants": [
               "Electronics / Instrumentation stream subjects as above",
@@ -6126,6 +6527,7 @@
             ]
           },
           {
+            "id": "233914-T2.5",
             "name": "Industrial / Process / Chemical Technology",
             "variants": [
               "Industrial / Process stream subjects as above",
@@ -6136,6 +6538,7 @@
             ]
           },
           {
+            "id": "233914-T2.6",
             "name": "Telecommunications Technology",
             "variants": [
               "Telecommunications stream subjects as above",
@@ -6145,6 +6548,7 @@
             ]
           },
           {
+            "id": "233914-T2.X1",
             "name": "OTHERS",
             "variants": []
           }
@@ -6154,6 +6558,7 @@
         "categoryLabel": "C.1 Canonical project / capstone categories",
         "subjects": [
           {
+            "id": "233914-T3.G",
             "name": "Final-Year / Capstone Project",
             "variants": [
               "Capstone Project",
@@ -6164,6 +6569,7 @@
             ]
           },
           {
+            "id": "233914-T3.O1",
             "name": "Design Project (course-embedded)",
             "variants": [
               "Design Project",
@@ -6172,6 +6578,7 @@
             ]
           },
           {
+            "id": "233914-T3.1",
             "name": "Minor / Mini Project",
             "variants": [
               "Minor Project",
@@ -6180,6 +6587,7 @@
             ]
           },
           {
+            "id": "233914-T3.2",
             "name": "Industrial Training Project / Practicum Report / Technical Report / Seminar",
             "variants": [
               "Industrial Training",
@@ -6191,6 +6599,7 @@
             ]
           },
           {
+            "id": "233914-T3.X1",
             "name": "OTHERS",
             "variants": []
           }
@@ -6200,42 +6609,49 @@
         "categoryLabel": "C.2 Subjects that typically host the project, by stream",
         "subjects": [
           {
+            "id": "233914-T3.O2",
             "name": "Civil / Construction",
             "variants": [
               "Civil / Construction stream subjects as above"
             ]
           },
           {
+            "id": "233914-T3.O3",
             "name": "Mechanical / Manufacturing",
             "variants": [
               "Mechanical / Manufacturing stream subjects as above"
             ]
           },
           {
+            "id": "233914-T3.O4",
             "name": "Electrical",
             "variants": [
               "Electrical stream subjects as above"
             ]
           },
           {
+            "id": "233914-T3.O5",
             "name": "Electronics / Instrumentation",
             "variants": [
               "Electronics / Instrumentation stream subjects as above"
             ]
           },
           {
+            "id": "233914-T3.O6",
             "name": "Industrial / Process",
             "variants": [
               "Industrial / Process stream subjects as above"
             ]
           },
           {
+            "id": "233914-T3.O7",
             "name": "Telecommunications",
             "variants": [
               "Telecommunications stream subjects as above"
             ]
           },
           {
+            "id": "233914-T3.X2",
             "name": "OTHERS",
             "variants": []
           }
@@ -6493,12 +6909,14 @@
   {
     "anzscoCode": "312511",
     "title": "Mechanical Engineering Draftsperson",
+    "occupationId": "mechanical-engineering-draftsperson",
     "sourceSheet": "Mech Draftsperson subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "312511-T1.1",
             "name": "Applied Mathematics / Trade Mathematics",
             "variants": [
               "Technical Mathematics",
@@ -6510,6 +6928,7 @@
             ]
           },
           {
+            "id": "312511-T1.2",
             "name": "Engineering Physics / Applied Science",
             "variants": [
               "Applied Physics",
@@ -6519,6 +6938,7 @@
             ]
           },
           {
+            "id": "312511-T1.3",
             "name": "Engineering Chemistry / Materials Fundamentals",
             "variants": [
               "Applied Chemistry",
@@ -6527,6 +6947,7 @@
             ]
           },
           {
+            "id": "312511-T1.4",
             "name": "Engineering Graphics / Technical Drawing",
             "variants": [
               "Engineering Drawing I / II",
@@ -6537,16 +6958,7 @@
             ]
           },
           {
-            "name": "Workshop Practice / Basic Fabrication",
-            "variants": [
-              "Workshop Technology",
-              "Fitting & Turning Lab",
-              "Mechanical Workshop Practice",
-              "Sheet Metal & Welding Workshop",
-              "Machine Shop Practice"
-            ]
-          },
-          {
+            "id": "312511-T1.5",
             "name": "Basic Electrical & Electronics (Optional)",
             "variants": [
               "Elements of Electrical Engineering",
@@ -6555,6 +6967,7 @@
             ]
           },
           {
+            "id": "312511-T1.6",
             "name": "Computer Fundamentals / IT (Optional)",
             "variants": [
               "Computer Applications",
@@ -6564,6 +6977,7 @@
             ]
           },
           {
+            "id": "312511-T1.7",
             "name": "Communication & Professional Ethics (Optional)",
             "variants": [
               "Communication Skills",
@@ -6573,6 +6987,7 @@
             ]
           },
           {
+            "id": "312511-T1.X1",
             "name": "Others",
             "variants": [
               "General Proficiency",
@@ -6585,15 +7000,29 @@
         "categoryLabel": "Core Subjects",
         "subjects": [
           {
+            "id": "312511-T2.1",
             "name": "Computer-Aided Design (2D CAD)",
             "variants": [
               "AutoCAD I / II",
               "Computer Aided Drafting",
               "2D CAD Techniques",
-              "Computer Aided Engineering Drawing"
+              "Computer Aided Engineering Drawing",
+              "AutoCAD",
+              "3D Modeling",
+              "3D Modelling",
+              "SolidWorks",
+              "Creo",
+              "Pro-E",
+              "Creo / Pro-E",
+              "Inventor",
+              "Advanced CAD",
+              "Computer Aided Machine Drawing",
+              "Computer Aided Machine Drawing (CAMD)",
+              "CAMD"
             ]
           },
           {
+            "id": "312511-T2.2",
             "name": "3D Parametric Modeling / Solid Modeling",
             "variants": [
               "3D Modeling",
@@ -6601,19 +7030,28 @@
               "Creo / Pro-E",
               "Inventor",
               "Advanced CAD",
-              "Computer Aided Machine Drawing (CAMD)"
+              "Computer Aided Machine Drawing (CAMD)",
+              "3D Modelling",
+              "3D Parametric Modelling / Solid Modelling",
+              "Creo",
+              "Pro-E",
+              "Computer Aided Machine Drawing",
+              "CAMD"
             ]
           },
           {
+            "id": "312511-T2.3",
             "name": "Geometric Dimensioning & Tolerancing (GD&T)",
             "variants": [
               "GD&T",
               "Tolerancing and Fits",
               "Metrology & Quality Control",
-              "Precision Measurement & Tolerancing"
+              "Precision Measurement & Tolerancing",
+              "Metrology"
             ]
           },
           {
+            "id": "312511-T2.4",
             "name": "Machine Design & Component Drafting",
             "variants": [
               "Machine Design I / II",
@@ -6623,6 +7061,7 @@
             ]
           },
           {
+            "id": "312511-T2.5",
             "name": "Manufacturing Processes & Production Technology",
             "variants": [
               "Manufacturing Technology I / II",
@@ -6632,6 +7071,7 @@
             ]
           },
           {
+            "id": "312511-T2.6",
             "name": "Engineering Materials & Metallurgy",
             "variants": [
               "Material Science & Metallurgy",
@@ -6640,6 +7080,7 @@
             ]
           },
           {
+            "id": "312511-T2.7",
             "name": "Engineering Mechanics & Strength of Materials",
             "variants": [
               "Applied Mechanics",
@@ -6649,6 +7090,7 @@
             ]
           },
           {
+            "id": "312511-T2.8",
             "name": "Fluid Power / Hydraulics & Pneumatics",
             "variants": [
               "Hydraulics and Pneumatics",
@@ -6657,6 +7099,7 @@
             ]
           },
           {
+            "id": "312511-T2.9",
             "name": "Tool, Die & Jig/Fixture Design (Optional)",
             "variants": [
               "Jigs and Fixtures Design",
@@ -6666,6 +7109,7 @@
             ]
           },
           {
+            "id": "312511-T2.X1",
             "name": "Others",
             "variants": [
               "General Proficiency",
@@ -6678,6 +7122,7 @@
         "categoryLabel": "Optional / Elective Subjects (Curriculum-Dependent)",
         "subjects": [
           {
+            "id": "312511-T2.O1",
             "name": "Piping & Plant Layout Drafting",
             "variants": [
               "Piping Drafting",
@@ -6686,6 +7131,7 @@
             ]
           },
           {
+            "id": "312511-T2.O2",
             "name": "HVAC & Ducting Design",
             "variants": [
               "HVAC Layout & Design",
@@ -6693,6 +7139,7 @@
             ]
           },
           {
+            "id": "312511-T2.O3",
             "name": "CNC Programming & CAM",
             "variants": [
               "Computer Aided Manufacturing (CAM)",
@@ -6701,6 +7148,7 @@
             ]
           },
           {
+            "id": "312511-T2.O4",
             "name": "Finite Element Analysis (FEA) Basics",
             "variants": [
               "Introduction to FEA",
@@ -6709,6 +7157,7 @@
             ]
           },
           {
+            "id": "312511-T2.X2",
             "name": "Others",
             "variants": [
               "General Proficiency",
@@ -6721,6 +7170,7 @@
         "categoryLabel": "Core (expected)",
         "subjects": [
           {
+            "id": "312511-T3.G",
             "name": "Major Drafting Project / Capstone Design",
             "variants": [
               "Drafting Project",
@@ -6730,14 +7180,17 @@
             ]
           },
           {
+            "id": "312511-T3.1",
             "name": "Minor Project / Mini Project",
             "variants": [
               "Mini Project",
               "Drafting Lab Project",
-              "Product Modeling Practice"
+              "Product Modeling Practice",
+              "Product Modelling Practice"
             ]
           },
           {
+            "id": "312511-T3.2",
             "name": "Industrial Training / Internship / Apprenticeship",
             "variants": [
               "Industrial Attachment",
@@ -6747,6 +7200,7 @@
             ]
           },
           {
+            "id": "312511-T3.X1",
             "name": "Others",
             "variants": [
               "General Proficiency",
@@ -6759,6 +7213,18 @@
         "categoryLabel": "Optional / Elective (Institution-Dependent)",
         "subjects": [
           {
+            "id": "312511-T3.O1",
+            "name": "Workshop Practice / Basic Fabrication",
+            "variants": [
+              "Workshop Technology",
+              "Fitting & Turning Lab",
+              "Mechanical Workshop Practice",
+              "Sheet Metal & Welding Workshop",
+              "Machine Shop Practice"
+            ]
+          },
+          {
+            "id": "312511-T3.O2",
             "name": "Technical Seminar / Drafting Portfolio",
             "variants": [
               "Technical Presentation",
@@ -6767,6 +7233,7 @@
             ]
           },
           {
+            "id": "312511-T3.O3",
             "name": "Industrial Management & Cost Estimation",
             "variants": [
               "Cost Estimation & Valuation",
@@ -6775,6 +7242,7 @@
             ]
           },
           {
+            "id": "312511-T3.O4",
             "name": "Safety & Standard Codes Practice",
             "variants": [
               "AS1100 / ISO Drafting Standards",
@@ -6783,6 +7251,7 @@
             ]
           },
           {
+            "id": "312511-T3.X2",
             "name": "Others",
             "variants": [
               "General Proficiency",
@@ -6937,12 +7406,14 @@
   {
     "anzscoCode": "233911",
     "title": "Aeronautical Engineer",
+    "occupationId": "aeronautical-engineer",
     "sourceSheet": "Aeronautical Engineer",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233911-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Mathematics I & II",
@@ -6957,6 +7428,7 @@
             ]
           },
           {
+            "id": "233911-T1.2",
             "name": "Linear Algebra & Vector Calculus",
             "variants": [
               "Vector Calculus & Linear Algebra",
@@ -6964,6 +7436,7 @@
             ]
           },
           {
+            "id": "233911-T1.3",
             "name": "Probability & Statistics",
             "variants": [
               "Probability & Statistics",
@@ -6971,6 +7444,7 @@
             ]
           },
           {
+            "id": "233911-T1.4",
             "name": "Engineering Physics",
             "variants": [
               "Physics",
@@ -6981,6 +7455,7 @@
             ]
           },
           {
+            "id": "233911-T1.5",
             "name": "Engineering Chemistry & Materials",
             "variants": [
               "Chemistry",
@@ -6991,6 +7466,7 @@
             ]
           },
           {
+            "id": "233911-T1.6",
             "name": "Computer Programming (Foundational)",
             "variants": [
               "Problem Solving Through Programming",
@@ -7002,6 +7478,7 @@
             ]
           },
           {
+            "id": "233911-T1.7",
             "name": "Engineering Drawing / CAD / Graphics",
             "variants": [
               "Engineering Graphics",
@@ -7017,6 +7494,7 @@
             ]
           },
           {
+            "id": "233911-T1.8",
             "name": "Engineering Mechanics / Mechanics of Solids",
             "variants": [
               "Engineering Mechanics",
@@ -7029,6 +7507,7 @@
             ]
           },
           {
+            "id": "233911-T1.9",
             "name": "Basic Electrical & Electronics Engineering",
             "variants": [
               "Basics of Electrical Engineering",
@@ -7039,6 +7518,7 @@
             ]
           },
           {
+            "id": "233911-T1.10",
             "name": "Others (General / Support Subjects)",
             "variants": [
               "English",
@@ -7073,6 +7553,7 @@
         "categoryLabel": "Core Discipline-Specific Subjects (Aeronautical Engineering)",
         "subjects": [
           {
+            "id": "233911-T2.1",
             "name": "Aerodynamics",
             "variants": [
               "Aerodynamics I & II",
@@ -7085,6 +7566,7 @@
             ]
           },
           {
+            "id": "233911-T2.2",
             "name": "Flight Mechanics, Performance & Control",
             "variants": [
               "Flight Mechanics I & II (Performance / Stability and Control)",
@@ -7096,6 +7578,7 @@
             ]
           },
           {
+            "id": "233911-T2.3",
             "name": "Aircraft & Aerospace Structures",
             "variants": [
               "Aircraft Structures I & II",
@@ -7111,6 +7594,7 @@
             ]
           },
           {
+            "id": "233911-T2.4",
             "name": "Aircraft Propulsion & Powerplants",
             "variants": [
               "Aircraft Propulsion",
@@ -7124,6 +7608,7 @@
             ]
           },
           {
+            "id": "233911-T2.5",
             "name": "Avionics & Instrumentation",
             "variants": [
               "Avionics",
@@ -7135,6 +7620,7 @@
             ]
           },
           {
+            "id": "233911-T2.6",
             "name": "Aircraft Design",
             "variants": [
               "Aircraft Design I & II",
@@ -7145,6 +7631,7 @@
             ]
           },
           {
+            "id": "233911-T2.7",
             "name": "Aircraft Systems, Manufacturing & Maintenance",
             "variants": [
               "Aircraft Systems, Instruments and Maintenance",
@@ -7158,6 +7645,7 @@
             ]
           },
           {
+            "id": "233911-T2.8",
             "name": "Fluid Mechanics, Thermodynamics & Heat Transfer",
             "variants": [
               "Fluid Mechanics",
@@ -7172,6 +7660,7 @@
             ]
           },
           {
+            "id": "233911-T2.9",
             "name": "Finite Element & Computational Methods",
             "variants": [
               "Introduction to Finite Element Methods",
@@ -7182,6 +7671,7 @@
             ]
           },
           {
+            "id": "233911-T2.10",
             "name": "Space Technology & Rotary-Wing Aircraft",
             "variants": [
               "Introduction to Space Technology",
@@ -7192,6 +7682,7 @@
             ]
           },
           {
+            "id": "233911-T2.11",
             "name": "Air Transportation, Airport & Airways Operations",
             "variants": [
               "Air Traffic Management",
@@ -7209,6 +7700,7 @@
         "categoryLabel": "Capstone, Project & Practical-Training Subjects",
         "subjects": [
           {
+            "id": "233911-T3.G",
             "name": "Final-Year / Capstone Project",
             "variants": [
               "Project Work",
@@ -7220,6 +7712,7 @@
             ]
           },
           {
+            "id": "233911-T3.1",
             "name": "Industrial Training / Internship / Practical Flight-Line Training",
             "variants": [
               "Internship",
@@ -7232,6 +7725,7 @@
         "categoryLabel": "Optional / Elective",
         "subjects": [
           {
+            "id": "233911-T3.O1",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Technical Seminar",
@@ -7245,12 +7739,14 @@
   {
     "anzscoCode": "233912",
     "title": "Agricultural Engineer",
+    "occupationId": "agricultural-engineer",
     "sourceSheet": "Agricultural Engineer Subjects",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233912-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Basic Mathematics",
@@ -7270,6 +7766,7 @@
             ]
           },
           {
+            "id": "233912-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "General Physics I & II",
@@ -7278,6 +7775,7 @@
             ]
           },
           {
+            "id": "233912-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "General and Inorganic Chemistry",
@@ -7287,6 +7785,7 @@
             ]
           },
           {
+            "id": "233912-T1.4",
             "name": "Probability & Statistics",
             "variants": [
               "Elementary Statistics",
@@ -7298,6 +7797,7 @@
             ]
           },
           {
+            "id": "233912-T1.5",
             "name": "Natural & Biological Sciences",
             "variants": [
               "General Biology",
@@ -7312,6 +7812,7 @@
             ]
           },
           {
+            "id": "233912-T1.6",
             "name": "Computer Programming (Foundational)",
             "variants": [
               "Fundamentals of Computer",
@@ -7323,6 +7824,7 @@
             ]
           },
           {
+            "id": "233912-T1.7",
             "name": "Engineering Drawing / CAD / Graphics",
             "variants": [
               "Engineering Graphics",
@@ -7334,6 +7836,7 @@
             ]
           },
           {
+            "id": "233912-T1.8",
             "name": "Engineering Mechanics / Mechanics of Solids",
             "variants": [
               "Engineering Mechanics",
@@ -7348,6 +7851,7 @@
             ]
           },
           {
+            "id": "233912-T1.9",
             "name": "Basic Electrical & Electronics Engineering",
             "variants": [
               "Electrical Circuits",
@@ -7357,6 +7861,7 @@
             ]
           },
           {
+            "id": "233912-T3.O1",
             "name": "Workshop Practice & Manufacturing Processes",
             "variants": [
               "Metallurgy and Workshop Practices",
@@ -7367,6 +7872,7 @@
             ]
           },
           {
+            "id": "233912-T1.10",
             "name": "Others (General / Support Subjects)",
             "variants": [
               "English Plus",
@@ -7428,6 +7934,7 @@
         "categoryLabel": "Core Discipline-Specific Subjects (Agricultural Engineering)",
         "subjects": [
           {
+            "id": "233912-T2.1",
             "name": "Farm Power, Machinery & Tractors",
             "variants": [
               "Agricultural Power and Energy Sources",
@@ -7450,6 +7957,7 @@
             ]
           },
           {
+            "id": "233912-T2.2",
             "name": "Soil & Water Engineering (Irrigation, Drainage & Conservation)",
             "variants": [
               "Irrigation and Drainage Engineering",
@@ -7472,6 +7980,7 @@
             ]
           },
           {
+            "id": "233912-T2.3",
             "name": "Hydrology, Hydraulics & Fluid Mechanics",
             "variants": [
               "Fluid Mechanics I & II",
@@ -7488,6 +7997,7 @@
             ]
           },
           {
+            "id": "233912-T2.4",
             "name": "Agricultural / Farm Structures & Materials",
             "variants": [
               "Agricultural Structures Engineering",
@@ -7503,6 +8013,7 @@
             ]
           },
           {
+            "id": "233912-T2.5",
             "name": "Surveying, Geomatics & GIS",
             "variants": [
               "Surveying",
@@ -7517,6 +8028,7 @@
             ]
           },
           {
+            "id": "233912-T2.6",
             "name": "Farm Processing, Food & Post-Harvest Engineering",
             "variants": [
               "Processing, Handling & Storage of Agricultural Products 1 & 2",
@@ -7533,6 +8045,7 @@
             ]
           },
           {
+            "id": "233912-T2.7",
             "name": "Thermodynamics, Heat Transfer & Farm Energy",
             "variants": [
               "Thermodynamics and Heat Transfer",
@@ -7548,6 +8061,7 @@
             ]
           },
           {
+            "id": "233912-T2.8",
             "name": "Instrumentation, Automation & Computational Engineering",
             "variants": [
               "Instrumentation & Measurements",
@@ -7557,6 +8071,7 @@
             ]
           },
           {
+            "id": "233912-T2.9",
             "name": "Environmental & Industrial Engineering (Agricultural Context)",
             "variants": [
               "Environmental Engineering",
@@ -7576,6 +8091,7 @@
         "categoryLabel": "Capstone, Project & Practical-Training Subjects",
         "subjects": [
           {
+            "id": "233912-T3.G",
             "name": "Final-Year / Capstone Project",
             "variants": [
               "Thesis",
@@ -7587,6 +8103,7 @@
             ]
           },
           {
+            "id": "233912-T3.1",
             "name": "Industrial Training / Internship / On-the-Job Training",
             "variants": [
               "On the Job Training",
@@ -7599,6 +8116,7 @@
             ]
           },
           {
+            "id": "233912-T3.O2",
             "name": "Practical / Hands-on Laboratory Training",
             "variants": [
               "In-house Training I & II",
@@ -7616,6 +8134,7 @@
         "categoryLabel": "Optional / Elective",
         "subjects": [
           {
+            "id": "233912-T3.O3",
             "name": "Technical Seminar / Paper Presentation",
             "variants": [
               "Undergraduate Seminar",
@@ -7623,6 +8142,7 @@
             ]
           },
           {
+            "id": "233912-T2.O1",
             "name": "Educational / Field Exposure Tour",
             "variants": [
               "Educational Tour"
@@ -7635,12 +8155,14 @@
   {
     "anzscoCode": "233913",
     "title": "Biomedical Engineer",
+    "occupationId": "biomedical-engineer",
     "sourceSheet": "Biomedical Engineer Subject",
     "groups": {
       "tier1": {
         "categoryLabel": "Foundational Subjects",
         "subjects": [
           {
+            "id": "233913-T1.1",
             "name": "Engineering Mathematics",
             "variants": [
               "Engineering Mathematics I",
@@ -7682,6 +8204,7 @@
             ]
           },
           {
+            "id": "233913-T1.2",
             "name": "Engineering Physics",
             "variants": [
               "Physics",
@@ -7703,6 +8226,7 @@
             ]
           },
           {
+            "id": "233913-T1.3",
             "name": "Engineering Chemistry",
             "variants": [
               "Chemistry",
@@ -7724,6 +8248,7 @@
             ]
           },
           {
+            "id": "233913-T1.4",
             "name": "Engineering Mechanics / Basic Civil & Mechanical Engineering",
             "variants": [
               "Engineering Mechanics",
@@ -7747,6 +8272,7 @@
             ]
           },
           {
+            "id": "233913-T1.5",
             "name": "Engineering Drawing / Graphics / CAD",
             "variants": [
               "Engineering Graphics",
@@ -7761,6 +8287,7 @@
             ]
           },
           {
+            "id": "233913-T1.6",
             "name": "Computer Programming / Computing",
             "variants": [
               "Computer Programming and Utilization",
@@ -7792,6 +8319,7 @@
             ]
           },
           {
+            "id": "233913-T1.7",
             "name": "Basic Electrical & Electronics Engineering",
             "variants": [
               "Basic Electrical Engineering",
@@ -7817,6 +8345,7 @@
             ]
           },
           {
+            "id": "233913-T1.8",
             "name": "Communication, Ethics & Professional Practice (Optional)",
             "variants": [
               "Communication Skills",
@@ -7858,6 +8387,7 @@
             ]
           },
           {
+            "id": "233913-T1.9",
             "name": "Others (Workshop, Environmental Studies, Life Science, Management, Personality Development)",
             "variants": [
               "Workshop Practice",
@@ -7911,6 +8441,7 @@
         "categoryLabel": "Core Discipline-Specific Subjects",
         "subjects": [
           {
+            "id": "233913-T2.1",
             "name": "Human Anatomy & Physiology / Biochemistry",
             "variants": [
               "Human Anatomy and Physiology",
@@ -7929,6 +8460,7 @@
             ]
           },
           {
+            "id": "233913-T2.2",
             "name": "Biomaterials / Artificial Organs & Implants",
             "variants": [
               "Biomaterials",
@@ -7946,6 +8478,7 @@
             ]
           },
           {
+            "id": "233913-T2.3",
             "name": "Medical Physics",
             "variants": [
               "Medical Physics",
@@ -7954,6 +8487,7 @@
             ]
           },
           {
+            "id": "233913-T2.4",
             "name": "Biomechanics",
             "variants": [
               "Biomechanics",
@@ -7962,6 +8496,7 @@
             ]
           },
           {
+            "id": "233913-T2.5",
             "name": "Signals & Systems / Biosignal Processing",
             "variants": [
               "Signals and Systems",
@@ -7984,6 +8519,7 @@
             ]
           },
           {
+            "id": "233913-T2.6",
             "name": "Biomedical / Medical Instrumentation",
             "variants": [
               "Biomedical Instrumentation",
@@ -8006,6 +8542,7 @@
             ]
           },
           {
+            "id": "233913-T2.7",
             "name": "Biosensors, Transducers & Measurement",
             "variants": [
               "Sensors and Measurements",
@@ -8026,6 +8563,7 @@
             ]
           },
           {
+            "id": "233913-T2.8",
             "name": "Electronic Devices & Circuits / Integrated Circuits",
             "variants": [
               "Electron Devices",
@@ -8060,6 +8598,7 @@
             ]
           },
           {
+            "id": "233913-T2.9",
             "name": "Microprocessors & Microcontrollers (Biomedical)",
             "variants": [
               "Microprocessor and Interfacing",
@@ -8083,6 +8622,7 @@
             ]
           },
           {
+            "id": "233913-T2.10",
             "name": "Control Systems / Bio-Control Systems",
             "variants": [
               "Control Systems",
@@ -8093,6 +8633,7 @@
             ]
           },
           {
+            "id": "233913-T2.11",
             "name": "Pathology & Microbiology",
             "variants": [
               "Pathology and Microbiology",
@@ -8105,6 +8646,7 @@
             ]
           },
           {
+            "id": "233913-T2.12",
             "name": "Medical / Diagnostic Imaging & Image Processing",
             "variants": [
               "Medical Imaging Systems",
@@ -8124,6 +8666,7 @@
             ]
           },
           {
+            "id": "233913-T2.13",
             "name": "Hospital Management / Clinical & Healthcare Systems Engineering",
             "variants": [
               "Hospital Management",
@@ -8142,6 +8685,7 @@
             ]
           },
           {
+            "id": "233913-T2.14",
             "name": "Rehabilitation Engineering / Assistive & Diagnostic-Therapeutic Equipment",
             "variants": [
               "Rehabilitation Engineering",
@@ -8169,6 +8713,7 @@
         "categoryLabel": "Optional / Elective Subjects",
         "subjects": [
           {
+            "id": "233913-T2.O1",
             "name": "Medical Informatics / AI & Bioinformatics in Healthcare",
             "variants": [
               "Medical Informatics",
@@ -8199,6 +8744,7 @@
             ]
           },
           {
+            "id": "233913-T2.O2",
             "name": "Telemedicine / Tele-health",
             "variants": [
               "Telemedicine",
@@ -8206,6 +8752,7 @@
             ]
           },
           {
+            "id": "233913-T2.O3",
             "name": "Biomedical Optics, Photonics & Laser Instrumentation",
             "variants": [
               "Biomedical Optics and Microscopy Imaging",
@@ -8217,6 +8764,7 @@
             ]
           },
           {
+            "id": "233913-T2.O4",
             "name": "BioMEMS / Nanotechnology in Medicine",
             "variants": [
               "Bio-MEMS",
@@ -8228,6 +8776,7 @@
             ]
           },
           {
+            "id": "233913-T2.O5",
             "name": "Radiology, Nuclear Medicine & Radiological Equipment",
             "variants": [
               "Radiological Equipments",
@@ -8238,6 +8787,7 @@
             ]
           },
           {
+            "id": "233913-T2.O6",
             "name": "Virtual Instrumentation",
             "variants": [
               "Virtual Instrumentation",
@@ -8246,6 +8796,7 @@
             ]
           },
           {
+            "id": "233913-T2.O7",
             "name": "Molecular Biology, Genetics, Immunology & Biotechnology",
             "variants": [
               "Molecular Biology and Genetics",
@@ -8263,6 +8814,7 @@
             ]
           },
           {
+            "id": "233913-T2.O8",
             "name": "Ultrasound / Specialised Medical Equipment Applications",
             "variants": [
               "Ultrasound in Medicine",
@@ -8271,6 +8823,7 @@
             ]
           },
           {
+            "id": "233913-T2.O9",
             "name": "Bio-fluidics, Modelling & Simulation",
             "variants": [
               "Biofluidics and Thermodynamics",
@@ -8284,6 +8837,7 @@
             ]
           },
           {
+            "id": "233913-T2.O10",
             "name": "Neuroengineering / Brain-Computer Interfaces",
             "variants": [
               "Principles of Neuroengineering",
@@ -8292,6 +8846,7 @@
             ]
           },
           {
+            "id": "233913-T2.O11",
             "name": "Entrepreneurship & Emerging Design Practices",
             "variants": [
               "Entrepreneurship in Biomedical Engineering",
@@ -8314,6 +8869,7 @@
         "categoryLabel": "Project, Capstone & Practical-Training Reference",
         "subjects": [
           {
+            "id": "233913-T3.G",
             "name": "Final-Year / Capstone Project / Thesis / Major Project",
             "variants": [
               "Project Work",
@@ -8341,6 +8897,7 @@
             ]
           },
           {
+            "id": "233913-T3.1",
             "name": "Industrial Training / Internship / Hospital Training",
             "variants": [
               "Industrial Training-I",
@@ -8359,6 +8916,7 @@
         "categoryLabel": "Optional / Elective",
         "subjects": [
           {
+            "id": "233913-T3.O1",
             "name": "Technical Seminar / Comprehensive Viva",
             "variants": [
               "Seminar",
@@ -8366,6 +8924,1296 @@
               "Comprehensive Viva",
               "Comprehension",
               "Viva Voce"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "233212",
+    "title": "Geotechnical Engineer",
+    "occupationId": "geotechnical-engineer",
+    "sourceSheet": "Generated from anzsco-verification-rubrics.json (no variant sheet yet)",
+    "groups": {
+      "tier1": {
+        "categoryLabel": "Foundational Subjects",
+        "subjects": [
+          {
+            "id": "233212-T1.1",
+            "name": "Engineering Mathematics",
+            "variants": [
+              "Engineering Mathematics"
+            ]
+          },
+          {
+            "id": "233212-T1.2",
+            "name": "Engineering Physics",
+            "variants": [
+              "Engineering Physics"
+            ]
+          },
+          {
+            "id": "233212-T1.3",
+            "name": "Engineering Chemistry",
+            "variants": [
+              "Engineering Chemistry"
+            ]
+          },
+          {
+            "id": "233212-T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "variants": [
+              "Engineering Mechanics (Statics & Dynamics)"
+            ]
+          },
+          {
+            "id": "233212-T1.5",
+            "name": "Engineering Drawing / Graphics / CAD / Surveying",
+            "variants": [
+              "Engineering Drawing / Graphics / CAD / Surveying"
+            ]
+          }
+        ]
+      },
+      "tier2_core": {
+        "categoryLabel": "Core Subjects",
+        "subjects": [
+          {
+            "id": "233212-T2.1",
+            "name": "Soil Mechanics / Geotechnical Engineering Fundamentals",
+            "variants": [
+              "Soil Mechanics / Geotechnical Engineering Fundamentals"
+            ]
+          },
+          {
+            "id": "233212-T2.2",
+            "name": "Foundation Engineering / Shallow & Deep Foundations",
+            "variants": [
+              "Foundation Engineering / Shallow & Deep Foundations"
+            ]
+          },
+          {
+            "id": "233212-T2.3",
+            "name": "Rock Mechanics / Engineering Geology",
+            "variants": [
+              "Rock Mechanics / Engineering Geology"
+            ]
+          },
+          {
+            "id": "233212-T2.4",
+            "name": "Slope Stability / Earth Retaining Structures",
+            "variants": [
+              "Slope Stability / Earth Retaining Structures"
+            ]
+          },
+          {
+            "id": "233212-T2.5",
+            "name": "Ground Improvement / Soil Stabilisation",
+            "variants": [
+              "Ground Improvement / Soil Stabilisation"
+            ]
+          },
+          {
+            "id": "233212-T2.6",
+            "name": "Site Investigation / Geotechnical Exploration",
+            "variants": [
+              "Site Investigation / Geotechnical Exploration"
+            ]
+          },
+          {
+            "id": "233212-T2.7",
+            "name": "Strength of Materials / Structural Mechanics",
+            "variants": [
+              "Strength of Materials / Structural Mechanics"
+            ]
+          },
+          {
+            "id": "233212-T2.8",
+            "name": "Fluid Mechanics / Groundwater Hydrology",
+            "variants": [
+              "Fluid Mechanics / Groundwater Hydrology"
+            ]
+          }
+        ]
+      },
+      "tier2_optional": {
+        "categoryLabel": "Optional Subjects",
+        "subjects": [
+          {
+            "id": "233212-T2.O1",
+            "name": "Earthquake Geotechnical Engineering / Seismic Design",
+            "variants": [
+              "Earthquake Geotechnical Engineering / Seismic Design"
+            ]
+          },
+          {
+            "id": "233212-T2.O2",
+            "name": "Tunnel Engineering / Underground Structures",
+            "variants": [
+              "Tunnel Engineering / Underground Structures"
+            ]
+          },
+          {
+            "id": "233212-T2.O3",
+            "name": "Pavement Engineering / Transportation Geotechnics",
+            "variants": [
+              "Pavement Engineering / Transportation Geotechnics"
+            ]
+          },
+          {
+            "id": "233212-T2.O4",
+            "name": "Environmental Geotechnics / Contaminated Land",
+            "variants": [
+              "Environmental Geotechnics / Contaminated Land"
+            ]
+          },
+          {
+            "id": "233212-T2.O5",
+            "name": "Numerical Methods / Finite Element Analysis for Geotechnics",
+            "variants": [
+              "Numerical Methods / Finite Element Analysis for Geotechnics"
+            ]
+          },
+          {
+            "id": "233212-T2.O6",
+            "name": "Geosynthetics / Reinforced Soil Structures",
+            "variants": [
+              "Geosynthetics / Reinforced Soil Structures"
+            ]
+          },
+          {
+            "id": "233212-T2.O7",
+            "name": "Risk, Hazard & Disaster Management",
+            "variants": [
+              "Risk, Hazard & Disaster Management"
+            ]
+          },
+          {
+            "id": "233212-T2.O8",
+            "name": "Entrepreneurship / Engineering Management",
+            "variants": [
+              "Entrepreneurship / Engineering Management"
+            ]
+          }
+        ]
+      },
+      "tier3_core": {
+        "categoryLabel": "Capstone Project, Practical Training Subjects",
+        "subjects": [
+          {
+            "id": "233212-T3.G",
+            "name": "Final-Year / Capstone Project / Major Project / Thesis",
+            "variants": [
+              "Final-Year / Capstone Project / Major Project / Thesis"
+            ]
+          },
+          {
+            "id": "233212-T3.1",
+            "name": "Minor Project",
+            "variants": [
+              "Minor Project"
+            ]
+          },
+          {
+            "id": "233212-T3.2",
+            "name": "Industrial Training / OJT / Internship",
+            "variants": [
+              "Industrial Training / OJT / Internship"
+            ]
+          }
+        ]
+      },
+      "tier3_optional": {
+        "categoryLabel": "Optional Practical Subjects",
+        "subjects": [
+          {
+            "id": "233212-T3.O1",
+            "name": "Technical Seminar / Paper Presentation",
+            "variants": [
+              "Technical Seminar / Paper Presentation"
+            ]
+          },
+          {
+            "id": "233212-T3.O2",
+            "name": "Workshop Practice / Field Investigation / Lab Work",
+            "variants": [
+              "Workshop Practice / Field Investigation / Lab Work"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "233214",
+    "title": "Structural Engineer",
+    "occupationId": "structural-engineer",
+    "sourceSheet": "Generated from anzsco-verification-rubrics.json (no variant sheet yet)",
+    "groups": {
+      "tier1": {
+        "categoryLabel": "Foundational Subjects",
+        "subjects": [
+          {
+            "id": "233214-T1.1",
+            "name": "Engineering Mathematics",
+            "variants": [
+              "Engineering Mathematics"
+            ]
+          },
+          {
+            "id": "233214-T1.2",
+            "name": "Engineering Physics",
+            "variants": [
+              "Engineering Physics"
+            ]
+          },
+          {
+            "id": "233214-T1.3",
+            "name": "Engineering Chemistry",
+            "variants": [
+              "Engineering Chemistry"
+            ]
+          },
+          {
+            "id": "233214-T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "variants": [
+              "Engineering Mechanics (Statics & Dynamics)"
+            ]
+          },
+          {
+            "id": "233214-T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "variants": [
+              "Engineering Drawing / Graphics / CAD"
+            ]
+          }
+        ]
+      },
+      "tier2_core": {
+        "categoryLabel": "Core Subjects",
+        "subjects": [
+          {
+            "id": "233214-T2.1",
+            "name": "Structural Analysis / Theory of Structures",
+            "variants": [
+              "Structural Analysis / Theory of Structures"
+            ]
+          },
+          {
+            "id": "233214-T2.2",
+            "name": "Reinforced Concrete Design / Concrete Structures",
+            "variants": [
+              "Reinforced Concrete Design / Concrete Structures"
+            ]
+          },
+          {
+            "id": "233214-T2.3",
+            "name": "Steel Design / Steel Structures",
+            "variants": [
+              "Steel Design / Steel Structures"
+            ]
+          },
+          {
+            "id": "233214-T2.4",
+            "name": "Strength of Materials / Solid Mechanics",
+            "variants": [
+              "Strength of Materials / Solid Mechanics"
+            ]
+          },
+          {
+            "id": "233214-T2.5",
+            "name": "Structural Dynamics / Earthquake Engineering",
+            "variants": [
+              "Structural Dynamics / Earthquake Engineering"
+            ]
+          },
+          {
+            "id": "233214-T2.6",
+            "name": "Foundation Engineering / Soil Mechanics",
+            "variants": [
+              "Foundation Engineering / Soil Mechanics"
+            ]
+          },
+          {
+            "id": "233214-T2.7",
+            "name": "Building Codes / Design Standards & Loading",
+            "variants": [
+              "Building Codes / Design Standards & Loading"
+            ]
+          },
+          {
+            "id": "233214-T2.8",
+            "name": "Construction Materials / Construction Technology",
+            "variants": [
+              "Construction Materials / Construction Technology"
+            ]
+          }
+        ]
+      },
+      "tier2_optional": {
+        "categoryLabel": "Optional Subjects",
+        "subjects": [
+          {
+            "id": "233214-T2.O1",
+            "name": "Prestressed Concrete / Advanced Concrete Design",
+            "variants": [
+              "Prestressed Concrete / Advanced Concrete Design"
+            ]
+          },
+          {
+            "id": "233214-T2.O2",
+            "name": "Bridge Engineering / Bridge Design",
+            "variants": [
+              "Bridge Engineering / Bridge Design"
+            ]
+          },
+          {
+            "id": "233214-T2.O3",
+            "name": "Timber / Masonry Structures",
+            "variants": [
+              "Timber / Masonry Structures"
+            ]
+          },
+          {
+            "id": "233214-T2.O4",
+            "name": "Finite Element Analysis / Computational Structural Mechanics",
+            "variants": [
+              "Finite Element Analysis / Computational Structural Mechanics"
+            ]
+          },
+          {
+            "id": "233214-T2.O5",
+            "name": "Tall Buildings / High-Rise Design",
+            "variants": [
+              "Tall Buildings / High-Rise Design"
+            ]
+          },
+          {
+            "id": "233214-T2.O6",
+            "name": "Structural Health Monitoring / Rehabilitation",
+            "variants": [
+              "Structural Health Monitoring / Rehabilitation"
+            ]
+          },
+          {
+            "id": "233214-T2.O7",
+            "name": "Wind Engineering / Aerodynamics of Structures",
+            "variants": [
+              "Wind Engineering / Aerodynamics of Structures"
+            ]
+          },
+          {
+            "id": "233214-T2.O8",
+            "name": "Entrepreneurship / Engineering Management",
+            "variants": [
+              "Entrepreneurship / Engineering Management"
+            ]
+          }
+        ]
+      },
+      "tier3_core": {
+        "categoryLabel": "Capstone Project, Practical Training Subjects",
+        "subjects": [
+          {
+            "id": "233214-T3.G",
+            "name": "Final-Year / Capstone Project / Major Project / Thesis",
+            "variants": [
+              "Final-Year / Capstone Project / Major Project / Thesis"
+            ]
+          },
+          {
+            "id": "233214-T3.1",
+            "name": "Minor Project",
+            "variants": [
+              "Minor Project"
+            ]
+          },
+          {
+            "id": "233214-T3.2",
+            "name": "Industrial Training / OJT / Internship",
+            "variants": [
+              "Industrial Training / OJT / Internship"
+            ]
+          }
+        ]
+      },
+      "tier3_optional": {
+        "categoryLabel": "Optional Practical Subjects",
+        "subjects": [
+          {
+            "id": "233214-T3.O1",
+            "name": "Technical Seminar / Paper Presentation",
+            "variants": [
+              "Technical Seminar / Paper Presentation"
+            ]
+          },
+          {
+            "id": "233214-T3.O2",
+            "name": "Workshop Practice / Engineering Shop / Lab Work",
+            "variants": [
+              "Workshop Practice / Engineering Shop / Lab Work"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "233215",
+    "title": "Transport Engineer",
+    "occupationId": "transport-engineer",
+    "sourceSheet": "Generated from anzsco-verification-rubrics.json (no variant sheet yet)",
+    "groups": {
+      "tier1": {
+        "categoryLabel": "Foundational Subjects",
+        "subjects": [
+          {
+            "id": "233215-T1.1",
+            "name": "Engineering Mathematics",
+            "variants": [
+              "Engineering Mathematics"
+            ]
+          },
+          {
+            "id": "233215-T1.2",
+            "name": "Engineering Physics",
+            "variants": [
+              "Engineering Physics"
+            ]
+          },
+          {
+            "id": "233215-T1.3",
+            "name": "Engineering Chemistry",
+            "variants": [
+              "Engineering Chemistry"
+            ]
+          },
+          {
+            "id": "233215-T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics)",
+            "variants": [
+              "Engineering Mechanics (Statics & Dynamics)"
+            ]
+          },
+          {
+            "id": "233215-T1.5",
+            "name": "Engineering Drawing / Graphics / CAD / Surveying",
+            "variants": [
+              "Engineering Drawing / Graphics / CAD / Surveying"
+            ]
+          }
+        ]
+      },
+      "tier2_core": {
+        "categoryLabel": "Core Subjects",
+        "subjects": [
+          {
+            "id": "233215-T2.1",
+            "name": "Transportation / Highway / Traffic Engineering",
+            "variants": [
+              "Transportation / Highway / Traffic Engineering"
+            ]
+          },
+          {
+            "id": "233215-T2.2",
+            "name": "Traffic Flow Theory / Traffic Operations & Control",
+            "variants": [
+              "Traffic Flow Theory / Traffic Operations & Control"
+            ]
+          },
+          {
+            "id": "233215-T2.3",
+            "name": "Pavement Design / Highway Materials",
+            "variants": [
+              "Pavement Design / Highway Materials"
+            ]
+          },
+          {
+            "id": "233215-T2.4",
+            "name": "Transport Planning / Urban Transport Systems",
+            "variants": [
+              "Transport Planning / Urban Transport Systems"
+            ]
+          },
+          {
+            "id": "233215-T2.5",
+            "name": "Highway Geometric Design / Alignment Design",
+            "variants": [
+              "Highway Geometric Design / Alignment Design"
+            ]
+          },
+          {
+            "id": "233215-T2.6",
+            "name": "Public Transport Systems / Transit Planning",
+            "variants": [
+              "Public Transport Systems / Transit Planning"
+            ]
+          },
+          {
+            "id": "233215-T2.7",
+            "name": "Surveying / Geospatial Methods for Transport",
+            "variants": [
+              "Surveying / Geospatial Methods for Transport"
+            ]
+          },
+          {
+            "id": "233215-T2.8",
+            "name": "Construction Management / Estimation for Transport Projects",
+            "variants": [
+              "Construction Management / Estimation for Transport Projects"
+            ]
+          }
+        ]
+      },
+      "tier2_optional": {
+        "categoryLabel": "Optional Subjects",
+        "subjects": [
+          {
+            "id": "233215-T2.O1",
+            "name": "Airport Engineering / Air Transport",
+            "variants": [
+              "Airport Engineering / Air Transport"
+            ]
+          },
+          {
+            "id": "233215-T2.O2",
+            "name": "Railway Engineering / Rail Systems",
+            "variants": [
+              "Railway Engineering / Rail Systems"
+            ]
+          },
+          {
+            "id": "233215-T2.O3",
+            "name": "Intelligent Transport Systems / Smart Mobility",
+            "variants": [
+              "Intelligent Transport Systems / Smart Mobility"
+            ]
+          },
+          {
+            "id": "233215-T2.O4",
+            "name": "Transport Economics / Project Appraisal",
+            "variants": [
+              "Transport Economics / Project Appraisal"
+            ]
+          },
+          {
+            "id": "233215-T2.O5",
+            "name": "Freight / Logistics / Supply Chain Transport",
+            "variants": [
+              "Freight / Logistics / Supply Chain Transport"
+            ]
+          },
+          {
+            "id": "233215-T2.O6",
+            "name": "Road Safety / Accident Analysis",
+            "variants": [
+              "Road Safety / Accident Analysis"
+            ]
+          },
+          {
+            "id": "233215-T2.O7",
+            "name": "Environmental Impact of Transport",
+            "variants": [
+              "Environmental Impact of Transport"
+            ]
+          },
+          {
+            "id": "233215-T2.O8",
+            "name": "Entrepreneurship / Engineering Management",
+            "variants": [
+              "Entrepreneurship / Engineering Management"
+            ]
+          }
+        ]
+      },
+      "tier3_core": {
+        "categoryLabel": "Capstone Project, Practical Training Subjects",
+        "subjects": [
+          {
+            "id": "233215-T3.G",
+            "name": "Final-Year / Capstone Project / Major Project / Thesis",
+            "variants": [
+              "Final-Year / Capstone Project / Major Project / Thesis"
+            ]
+          },
+          {
+            "id": "233215-T3.1",
+            "name": "Minor Project",
+            "variants": [
+              "Minor Project"
+            ]
+          },
+          {
+            "id": "233215-T3.2",
+            "name": "Industrial Training / OJT / Internship",
+            "variants": [
+              "Industrial Training / OJT / Internship"
+            ]
+          }
+        ]
+      },
+      "tier3_optional": {
+        "categoryLabel": "Optional Practical Subjects",
+        "subjects": [
+          {
+            "id": "233215-T3.O1",
+            "name": "Technical Seminar / Paper Presentation",
+            "variants": [
+              "Technical Seminar / Paper Presentation"
+            ]
+          },
+          {
+            "id": "233215-T3.O2",
+            "name": "Workshop Practice / Field Survey / Lab Work",
+            "variants": [
+              "Workshop Practice / Field Survey / Lab Work"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "233612",
+    "title": "Petroleum Engineer",
+    "occupationId": "petroleum-engineer",
+    "sourceSheet": "Generated from anzsco-verification-rubrics.json (no variant sheet yet)",
+    "groups": {
+      "tier1": {
+        "categoryLabel": "Foundational Subjects",
+        "subjects": [
+          {
+            "id": "233612-T1.1",
+            "name": "Engineering Mathematics",
+            "variants": [
+              "Engineering Mathematics"
+            ]
+          },
+          {
+            "id": "233612-T1.2",
+            "name": "Engineering Physics",
+            "variants": [
+              "Engineering Physics"
+            ]
+          },
+          {
+            "id": "233612-T1.3",
+            "name": "Engineering Chemistry",
+            "variants": [
+              "Engineering Chemistry"
+            ]
+          },
+          {
+            "id": "233612-T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics) / Fluid Mechanics",
+            "variants": [
+              "Engineering Mechanics (Statics & Dynamics) / Fluid Mechanics"
+            ]
+          },
+          {
+            "id": "233612-T1.5",
+            "name": "Engineering Drawing / Graphics / CAD",
+            "variants": [
+              "Engineering Drawing / Graphics / CAD"
+            ]
+          }
+        ]
+      },
+      "tier2_core": {
+        "categoryLabel": "Core Subjects",
+        "subjects": [
+          {
+            "id": "233612-T2.1",
+            "name": "Reservoir Engineering / Reservoir Characterisation",
+            "variants": [
+              "Reservoir Engineering / Reservoir Characterisation"
+            ]
+          },
+          {
+            "id": "233612-T2.2",
+            "name": "Drilling Engineering / Well Design & Operations",
+            "variants": [
+              "Drilling Engineering / Well Design & Operations"
+            ]
+          },
+          {
+            "id": "233612-T2.3",
+            "name": "Production Engineering / Well Completions & Stimulation",
+            "variants": [
+              "Production Engineering / Well Completions & Stimulation"
+            ]
+          },
+          {
+            "id": "233612-T2.4",
+            "name": "Petroleum Geology / Formation Evaluation / Petrophysics",
+            "variants": [
+              "Petroleum Geology / Formation Evaluation / Petrophysics"
+            ]
+          },
+          {
+            "id": "233612-T2.5",
+            "name": "Fluid Mechanics / Multiphase Flow in Porous Media",
+            "variants": [
+              "Fluid Mechanics / Multiphase Flow in Porous Media"
+            ]
+          },
+          {
+            "id": "233612-T2.6",
+            "name": "Thermodynamics / Phase Behaviour of Reservoir Fluids",
+            "variants": [
+              "Thermodynamics / Phase Behaviour of Reservoir Fluids"
+            ]
+          },
+          {
+            "id": "233612-T2.7",
+            "name": "Well Logging / Formation Evaluation Tools",
+            "variants": [
+              "Well Logging / Formation Evaluation Tools"
+            ]
+          },
+          {
+            "id": "233612-T2.8",
+            "name": "Petroleum Economics / Project Evaluation",
+            "variants": [
+              "Petroleum Economics / Project Evaluation"
+            ]
+          }
+        ]
+      },
+      "tier2_optional": {
+        "categoryLabel": "Optional Subjects",
+        "subjects": [
+          {
+            "id": "233612-T2.O1",
+            "name": "Enhanced Oil Recovery / IOR / EOR Methods",
+            "variants": [
+              "Enhanced Oil Recovery / IOR / EOR Methods"
+            ]
+          },
+          {
+            "id": "233612-T2.O2",
+            "name": "Natural Gas Engineering / Gas Reservoirs",
+            "variants": [
+              "Natural Gas Engineering / Gas Reservoirs"
+            ]
+          },
+          {
+            "id": "233612-T2.O3",
+            "name": "Offshore / Subsea Petroleum Engineering",
+            "variants": [
+              "Offshore / Subsea Petroleum Engineering"
+            ]
+          },
+          {
+            "id": "233612-T2.O4",
+            "name": "Well Testing / Pressure Transient Analysis",
+            "variants": [
+              "Well Testing / Pressure Transient Analysis"
+            ]
+          },
+          {
+            "id": "233612-T2.O5",
+            "name": "Health, Safety & Environment in Petroleum Operations",
+            "variants": [
+              "Health, Safety & Environment in Petroleum Operations"
+            ]
+          },
+          {
+            "id": "233612-T2.O6",
+            "name": "Unconventional Resources / Shale / Tight Oil & Gas",
+            "variants": [
+              "Unconventional Resources / Shale / Tight Oil & Gas"
+            ]
+          },
+          {
+            "id": "233612-T2.O7",
+            "name": "Reservoir Simulation / Numerical Modelling",
+            "variants": [
+              "Reservoir Simulation / Numerical Modelling"
+            ]
+          },
+          {
+            "id": "233612-T2.O8",
+            "name": "Entrepreneurship / Engineering Management",
+            "variants": [
+              "Entrepreneurship / Engineering Management"
+            ]
+          }
+        ]
+      },
+      "tier3_core": {
+        "categoryLabel": "Capstone Project, Practical Training Subjects",
+        "subjects": [
+          {
+            "id": "233612-T3.G",
+            "name": "Final-Year / Capstone Project / Major Project / Thesis",
+            "variants": [
+              "Final-Year / Capstone Project / Major Project / Thesis"
+            ]
+          },
+          {
+            "id": "233612-T3.1",
+            "name": "Minor Project",
+            "variants": [
+              "Minor Project"
+            ]
+          },
+          {
+            "id": "233612-T3.2",
+            "name": "Industrial Training / OJT / Internship",
+            "variants": [
+              "Industrial Training / OJT / Internship"
+            ]
+          }
+        ]
+      },
+      "tier3_optional": {
+        "categoryLabel": "Optional Practical Subjects",
+        "subjects": [
+          {
+            "id": "233612-T3.O1",
+            "name": "Technical Seminar / Paper Presentation",
+            "variants": [
+              "Technical Seminar / Paper Presentation"
+            ]
+          },
+          {
+            "id": "233612-T3.O2",
+            "name": "Workshop Practice / Field / Lab Work",
+            "variants": [
+              "Workshop Practice / Field / Lab Work"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "233915",
+    "title": "Environmental Engineer",
+    "occupationId": "environmental-engineer",
+    "sourceSheet": "Generated from anzsco-verification-rubrics.json (no variant sheet yet)",
+    "groups": {
+      "tier1": {
+        "categoryLabel": "Foundational Subjects",
+        "subjects": [
+          {
+            "id": "233915-T1.1",
+            "name": "Engineering Mathematics",
+            "variants": [
+              "Engineering Mathematics"
+            ]
+          },
+          {
+            "id": "233915-T1.2",
+            "name": "Engineering Physics",
+            "variants": [
+              "Engineering Physics"
+            ]
+          },
+          {
+            "id": "233915-T1.3",
+            "name": "Engineering Chemistry / Environmental Chemistry",
+            "variants": [
+              "Engineering Chemistry / Environmental Chemistry"
+            ]
+          },
+          {
+            "id": "233915-T1.4",
+            "name": "Engineering Mechanics / Fluid Mechanics",
+            "variants": [
+              "Engineering Mechanics / Fluid Mechanics"
+            ]
+          },
+          {
+            "id": "233915-T1.5",
+            "name": "Engineering Drawing / Graphics / CAD / GIS",
+            "variants": [
+              "Engineering Drawing / Graphics / CAD / GIS"
+            ]
+          }
+        ]
+      },
+      "tier2_core": {
+        "categoryLabel": "Core Subjects",
+        "subjects": [
+          {
+            "id": "233915-T2.1",
+            "name": "Water & Wastewater Treatment / Sanitary Engineering",
+            "variants": [
+              "Water & Wastewater Treatment / Sanitary Engineering"
+            ]
+          },
+          {
+            "id": "233915-T2.2",
+            "name": "Air Pollution Control / Atmospheric Engineering",
+            "variants": [
+              "Air Pollution Control / Atmospheric Engineering"
+            ]
+          },
+          {
+            "id": "233915-T2.3",
+            "name": "Solid & Hazardous Waste Management",
+            "variants": [
+              "Solid & Hazardous Waste Management"
+            ]
+          },
+          {
+            "id": "233915-T2.4",
+            "name": "Environmental Impact Assessment / EIA",
+            "variants": [
+              "Environmental Impact Assessment / EIA"
+            ]
+          },
+          {
+            "id": "233915-T2.5",
+            "name": "Hydrology / Water Resources / Surface & Groundwater",
+            "variants": [
+              "Hydrology / Water Resources / Surface & Groundwater"
+            ]
+          },
+          {
+            "id": "233915-T2.6",
+            "name": "Environmental Chemistry / Contaminant Transport",
+            "variants": [
+              "Environmental Chemistry / Contaminant Transport"
+            ]
+          },
+          {
+            "id": "233915-T2.7",
+            "name": "Ecology / Environmental Biology / Ecosystem Engineering",
+            "variants": [
+              "Ecology / Environmental Biology / Ecosystem Engineering"
+            ]
+          },
+          {
+            "id": "233915-T2.8",
+            "name": "Environmental Legislation / Standards & Compliance",
+            "variants": [
+              "Environmental Legislation / Standards & Compliance"
+            ]
+          }
+        ]
+      },
+      "tier2_optional": {
+        "categoryLabel": "Optional Subjects",
+        "subjects": [
+          {
+            "id": "233915-T2.O1",
+            "name": "Climate Change / Carbon Management",
+            "variants": [
+              "Climate Change / Carbon Management"
+            ]
+          },
+          {
+            "id": "233915-T2.O2",
+            "name": "Soil & Groundwater Remediation",
+            "variants": [
+              "Soil & Groundwater Remediation"
+            ]
+          },
+          {
+            "id": "233915-T2.O3",
+            "name": "Noise Pollution / Acoustic Engineering",
+            "variants": [
+              "Noise Pollution / Acoustic Engineering"
+            ]
+          },
+          {
+            "id": "233915-T2.O4",
+            "name": "Sustainable Design / Green Engineering / LCA",
+            "variants": [
+              "Sustainable Design / Green Engineering / LCA"
+            ]
+          },
+          {
+            "id": "233915-T2.O5",
+            "name": "Industrial Ecology / Circular Economy",
+            "variants": [
+              "Industrial Ecology / Circular Economy"
+            ]
+          },
+          {
+            "id": "233915-T2.O6",
+            "name": "Remote Sensing / GIS for Environmental Applications",
+            "variants": [
+              "Remote Sensing / GIS for Environmental Applications"
+            ]
+          },
+          {
+            "id": "233915-T2.O7",
+            "name": "Risk Assessment / Environmental Risk Management",
+            "variants": [
+              "Risk Assessment / Environmental Risk Management"
+            ]
+          },
+          {
+            "id": "233915-T2.O8",
+            "name": "Entrepreneurship / Engineering Management",
+            "variants": [
+              "Entrepreneurship / Engineering Management"
+            ]
+          }
+        ]
+      },
+      "tier3_core": {
+        "categoryLabel": "Capstone Project, Practical Training Subjects",
+        "subjects": [
+          {
+            "id": "233915-T3.G",
+            "name": "Final-Year / Capstone Project / Major Project / Thesis",
+            "variants": [
+              "Final-Year / Capstone Project / Major Project / Thesis"
+            ]
+          },
+          {
+            "id": "233915-T3.1",
+            "name": "Minor Project",
+            "variants": [
+              "Minor Project"
+            ]
+          },
+          {
+            "id": "233915-T3.2",
+            "name": "Industrial Training / OJT / Internship",
+            "variants": [
+              "Industrial Training / OJT / Internship"
+            ]
+          }
+        ]
+      },
+      "tier3_optional": {
+        "categoryLabel": "Optional Practical Subjects",
+        "subjects": [
+          {
+            "id": "233915-T3.O1",
+            "name": "Technical Seminar / Paper Presentation",
+            "variants": [
+              "Technical Seminar / Paper Presentation"
+            ]
+          },
+          {
+            "id": "233915-T3.O2",
+            "name": "Workshop Practice / Field / Lab Work",
+            "variants": [
+              "Workshop Practice / Field / Lab Work"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "233916",
+    "title": "Naval Architect",
+    "occupationId": "naval-architect",
+    "sourceSheet": "Generated from anzsco-verification-rubrics.json (no variant sheet yet)",
+    "groups": {
+      "tier1": {
+        "categoryLabel": "Foundational Subjects",
+        "subjects": [
+          {
+            "id": "233916-T1.1",
+            "name": "Engineering Mathematics",
+            "variants": [
+              "Engineering Mathematics"
+            ]
+          },
+          {
+            "id": "233916-T1.2",
+            "name": "Engineering Physics",
+            "variants": [
+              "Engineering Physics"
+            ]
+          },
+          {
+            "id": "233916-T1.3",
+            "name": "Engineering Chemistry",
+            "variants": [
+              "Engineering Chemistry"
+            ]
+          },
+          {
+            "id": "233916-T1.4",
+            "name": "Engineering Mechanics (Statics & Dynamics) / Fluid Mechanics",
+            "variants": [
+              "Engineering Mechanics (Statics & Dynamics) / Fluid Mechanics"
+            ]
+          },
+          {
+            "id": "233916-T1.5",
+            "name": "Engineering Drawing / Graphics / CAD / Ship Drawing",
+            "variants": [
+              "Engineering Drawing / Graphics / CAD / Ship Drawing"
+            ]
+          }
+        ]
+      },
+      "tier2_core": {
+        "categoryLabel": "Core Subjects",
+        "subjects": [
+          {
+            "id": "233916-T2.1",
+            "name": "Ship Hydrostatics / Stability of Ships",
+            "variants": [
+              "Ship Hydrostatics / Stability of Ships"
+            ]
+          },
+          {
+            "id": "233916-T2.2",
+            "name": "Ship Resistance & Propulsion / Hydrodynamics",
+            "variants": [
+              "Ship Resistance & Propulsion / Hydrodynamics"
+            ]
+          },
+          {
+            "id": "233916-T2.3",
+            "name": "Ship Structures / Strength of Ship Structures",
+            "variants": [
+              "Ship Structures / Strength of Ship Structures"
+            ]
+          },
+          {
+            "id": "233916-T2.4",
+            "name": "Ship Design / Preliminary Design & Lines Plan",
+            "variants": [
+              "Ship Design / Preliminary Design & Lines Plan"
+            ]
+          },
+          {
+            "id": "233916-T2.5",
+            "name": "Marine Engineering Systems / Ship Machinery",
+            "variants": [
+              "Marine Engineering Systems / Ship Machinery"
+            ]
+          },
+          {
+            "id": "233916-T2.6",
+            "name": "Seakeeping / Manoeuvring of Ships",
+            "variants": [
+              "Seakeeping / Manoeuvring of Ships"
+            ]
+          },
+          {
+            "id": "233916-T2.7",
+            "name": "Materials for Marine Construction / Welding & Fabrication",
+            "variants": [
+              "Materials for Marine Construction / Welding & Fabrication"
+            ]
+          },
+          {
+            "id": "233916-T2.8",
+            "name": "Naval Architecture Calculations / Rules & Regulations",
+            "variants": [
+              "Naval Architecture Calculations / Rules & Regulations"
+            ]
+          }
+        ]
+      },
+      "tier2_optional": {
+        "categoryLabel": "Optional Subjects",
+        "subjects": [
+          {
+            "id": "233916-T2.O1",
+            "name": "Offshore Structures / Ocean Engineering",
+            "variants": [
+              "Offshore Structures / Ocean Engineering"
+            ]
+          },
+          {
+            "id": "233916-T2.O2",
+            "name": "Yacht / Small Craft Design",
+            "variants": [
+              "Yacht / Small Craft Design"
+            ]
+          },
+          {
+            "id": "233916-T2.O3",
+            "name": "Computational Fluid Dynamics for Ships",
+            "variants": [
+              "Computational Fluid Dynamics for Ships"
+            ]
+          },
+          {
+            "id": "233916-T2.O4",
+            "name": "Ship Production / Shipyard Technology",
+            "variants": [
+              "Ship Production / Shipyard Technology"
+            ]
+          },
+          {
+            "id": "233916-T2.O5",
+            "name": "Marine Safety / Damage Stability / Subdivision",
+            "variants": [
+              "Marine Safety / Damage Stability / Subdivision"
+            ]
+          },
+          {
+            "id": "233916-T2.O6",
+            "name": "Underwater Vehicles / Submersibles",
+            "variants": [
+              "Underwater Vehicles / Submersibles"
+            ]
+          },
+          {
+            "id": "233916-T2.O7",
+            "name": "Maritime Economics / Ship Costing",
+            "variants": [
+              "Maritime Economics / Ship Costing"
+            ]
+          },
+          {
+            "id": "233916-T2.O8",
+            "name": "Entrepreneurship / Engineering Management",
+            "variants": [
+              "Entrepreneurship / Engineering Management"
+            ]
+          }
+        ]
+      },
+      "tier3_core": {
+        "categoryLabel": "Capstone Project, Practical Training Subjects",
+        "subjects": [
+          {
+            "id": "233916-T3.G",
+            "name": "Final-Year / Capstone Project / Major Project / Thesis",
+            "variants": [
+              "Final-Year / Capstone Project / Major Project / Thesis"
+            ]
+          },
+          {
+            "id": "233916-T3.1",
+            "name": "Minor Project",
+            "variants": [
+              "Minor Project"
+            ]
+          },
+          {
+            "id": "233916-T3.2",
+            "name": "Industrial Training / OJT / Internship / Shipyard Training",
+            "variants": [
+              "Industrial Training / OJT / Internship / Shipyard Training"
+            ]
+          }
+        ]
+      },
+      "tier3_optional": {
+        "categoryLabel": "Optional Practical Subjects",
+        "subjects": [
+          {
+            "id": "233916-T3.O1",
+            "name": "Technical Seminar / Paper Presentation",
+            "variants": [
+              "Technical Seminar / Paper Presentation"
+            ]
+          },
+          {
+            "id": "233916-T3.O2",
+            "name": "Workshop Practice / Model Testing / Lab Work",
+            "variants": [
+              "Workshop Practice / Model Testing / Lab Work"
             ]
           }
         ]

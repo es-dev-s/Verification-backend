@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import {
   applyBoostAndCut,
   assessExtractedSubjects,
-  extractionWarnings,
+  chooseSubjectsAfterExtraction,
   scoreAllOccupations,
 } from "./assessCase.js";
 import {
@@ -242,27 +242,31 @@ describe("#11 dedupe per qualification", () => {
   });
 });
 
-describe("#5 incomplete extraction warnings", () => {
-  const base = {
-    subjectHash: "x",
-    source: "llm" as const,
-    totalParts: 3,
-    failedParts: 0,
-    skippedParts: 0,
-    missingKeys: false,
-  };
-  it("is silent when complete", () => {
-    assert.deepEqual(extractionWarnings({ ...base, complete: true }), []);
+describe("empty-extraction guard", () => {
+  const row = (name: string) => ({
+    name,
+    code: null,
+    credits: null,
+    grade: null,
+    yearOrSemester: null,
+    qualification: "bachelor" as const,
+    sourceSnippet: null,
+    isRepeat: false,
   });
-  it("warns on failed / skipped parts and missing keys", () => {
-    const w = extractionWarnings({ ...base, complete: false, failedParts: 1, skippedParts: 1 });
-    assert.equal(w.length, 1);
-    assert.match(w[0]!, /1 of 3 transcript part\(s\) failed/);
-    assert.match(w[0]!, /skipped/);
-    assert.match(
-      extractionWarnings({ ...base, complete: false, missingKeys: true })[0]!,
-      /no Groq API key/,
-    );
+  it("keeps saved subjects when extraction returns none", () => {
+    const saved = [row("Thermodynamics")];
+    const r = chooseSubjectsAfterExtraction([], saved);
+    assert.equal(r.keptSaved, true);
+    assert.deepEqual(r.rows, saved);
+  });
+  it("uses fresh subjects (even a partial list) when there are any", () => {
+    const fresh = [row("Fluid Mechanics")];
+    const r = chooseSubjectsAfterExtraction(fresh, [row("Thermodynamics"), row("Statics")]);
+    assert.equal(r.keptSaved, false);
+    assert.deepEqual(r.rows, fresh);
+  });
+  it("returns the empty list when nothing was saved", () => {
+    assert.deepEqual(chooseSubjectsAfterExtraction([], []), { rows: [], keptSaved: false });
   });
 });
 

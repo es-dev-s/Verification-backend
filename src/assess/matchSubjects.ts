@@ -1,6 +1,6 @@
 import { generateJson } from "../lib/gemini.js";
 import { assessConfig } from "./config.js";
-import type { RubricSubject } from "./loadRubric.js";
+import type { Rubric, RubricSubject } from "./loadRubric.js";
 import {
   bestSimilarity,
   canonicalTokens,
@@ -36,7 +36,52 @@ export type MatchOptions = {
    * final-year project / thesis / capstone / dissertation is matched to it.
    */
   gateSubject?: string;
+  /**
+   * Topic words the keyword rule also needs before it credits the gate
+   * ("draft*" = prefix). Unset → any project / thesis title counts (engineers).
+   * Rubric variants / aliases of the gate still match on their own.
+   */
+  gateKeywordRequires?: string[];
+  /**
+   * Principle 2 (combined courses): each half of "A and B" is also matched on
+   * its own, even when the whole title already matched something, so one
+   * course can satisfy two rubric rows. Off unless the rubric turns it on.
+   */
+  combinedCourses?: boolean;
 };
+
+/** Matching options a rubric asks for (gate subject, gate topic words, combined courses). */
+export function matchOptionsForRubric(rubric: Rubric): MatchOptions {
+  const gate = rubric.tiers.tier3.gate;
+  return {
+    gateSubject: gate?.gateSubject,
+    ...(gate?.keywordRuleRequires?.length
+      ? { gateKeywordRequires: gate.keywordRuleRequires }
+      : {}),
+    ...(rubric.matching?.combinedCourses ? { combinedCourses: true } : {}),
+  };
+}
+
+/** True when the name has one of the words ("draft*" matches drafting, draftsman …). */
+export function hasTopicWord(name: string, words: readonly string[]): boolean {
+  const toks = normalizeSubjectName(name).split(" ").filter(Boolean);
+  return words.some((w) => {
+    const word = w.toLowerCase().trim();
+    if (!word) return false;
+    if (word.endsWith("*")) {
+      const stem = word.slice(0, -1);
+      return toks.some((t) => t.startsWith(stem));
+    }
+    return toks.includes(word);
+  });
+}
+
+/** Keyword rule for the gate: project/thesis title (+ topic words when the rubric asks). */
+function keywordRuleCreditsGate(name: string, opts?: MatchOptions): boolean {
+  if (!opts?.gateSubject || !looksLikeGateSubject(name)) return false;
+  const required = opts.gateKeywordRequires;
+  return !required?.length || hasTopicWord(name, required);
+}
 
 /** Confidence assigned to rule-based (non-exact) matches. */
 const RULE_CONFIDENCE = {
@@ -149,7 +194,25 @@ function matchRowSync(
       if (fuzzy) out.push(toMatch(row, fuzzy.subject, "fuzzy", fuzzy.score));
     }
   }
-  if (opts?.gateSubject && looksLikeGateSubject(row.name)) {
+  if (opts?.combinedCourses) {
+    // Principle 2: "Computer Aided Design and Solid Modelling" → 2D CAD + 3D.
+    const have = new Set(out.map((m) => `${m.tier}|${m.rubricSubject}`));
+    for (const part of compoundParts(row.name)) {
+      const exact = findAllExact(part, index);
+      const hits = exact.length
+        ? exact.map((subject) => ({ subject, score: RULE_CONFIDENCE.canonical }))
+        : tryRules(part, index);
+      for (const h of hits) {
+        const k = subjectKey(h.subject);
+        if (have.has(k)) continue;
+        have.add(k);
+        out.push(
+          toMatch(row, h.subject, "fuzzy", h.score, `Combined course: "${part}"`),
+        );
+      }
+    }
+  }
+  if (opts?.gateSubject && keywordRuleCreditsGate(row.name, opts)) {
     const gate = index.find(
       (e) => e.subject.tier === "tier3" && e.subject.name === opts.gateSubject,
     )?.subject;
@@ -218,14 +281,16 @@ export async function matchSubjects(
   // we allow multiple matches from one name only when exact hits differ.
   // For scoring uniqueness: each rubric expected/core subject counts once.
 
+  const perRow: SubjectMatch[][] = [];
   for (const row of extracted) {
     const hits = matchRowSync(row, index, opts);
     if (hits.length) {
-      matches.push(...hits);
+      perRow.push(hits);
       continue;
     }
     unclear.push(row);
   }
+  for (const hits of creditSharedOnce(perRow, rubricSubjects)) matches.push(...hits);
 
   if (opts?.useLlm !== false && unclear.length && Date.now() < (opts?.deadlineMs ?? Infinity)) {
     const llmMatches = await matchUnclearWithLlm(
@@ -244,7 +309,14 @@ export async function matchSubjects(
         d.matchedSubject
       ) {
         const subject = rubricSubjects.find((s) => s.name === d.matchedSubject);
-        if (subject) {
+        // A gate with topic words (312511) is not credited by the LLM for a
+        // generic "Final Year Project" either.
+        const gateBlocked =
+          subject?.tier === "tier3" &&
+          subject.name === opts?.gateSubject &&
+          Boolean(opts?.gateKeywordRequires?.length) &&
+          !hasTopicWord(row.name, opts!.gateKeywordRequires!);
+        if (subject && !gateBlocked) {
           matches.push(
             toMatch(
               row,
@@ -290,6 +362,85 @@ export async function matchSubjects(
   }
 
   return { matches, unmatched: unclear };
+}
+
+const CATEGORY_RANK: Record<string, number> = { expected: 0, core: 0, optional: 1 };
+
+/**
+ * Shared sheet rows: one anzsco_subjects.json heading can be linked to several rubric
+ * headings (its "id" plus "alsoIds"), so they all carry the same variants and one
+ * transcript subject would otherwise hit each of them. Scoring counts unique rubric
+ * headings, so that would count one subject several times.
+ *
+ * Rule: per transcript subject, at most one heading per shared row is credited.
+ * Rows with no such clash go first; for a clash the kept heading is, in order:
+ * one whose own rubric name the transcript subject equals (e.g. "Physical Metallurgy"
+ * → "Physical Metallurgy / Phase Transformations"), one not yet credited by another
+ * transcript subject, a counted (expected/core)
+ * heading over an optional one, the higher confidence, then rubric order.
+ * Hits on headings that do not share a row are untouched.
+ */
+export function creditSharedOnce(
+  perRow: SubjectMatch[][],
+  rubricSubjects: RubricSubject[],
+): SubjectMatch[][] {
+  const info = new Map<string, { shared?: string; order: number; own: Set<string> }>();
+  rubricSubjects.forEach((s, order) =>
+    info.set(`${s.tier}|${s.name}`, {
+      shared: s.sharedVariantsFrom,
+      order,
+      // The heading name and each "/"-separated part of it.
+      own: new Set(
+        [s.name, ...s.name.split("/")]
+          .flatMap((v) => expandVariantPatterns(v))
+          .map((v) => normalizeSubjectName(v))
+          .filter(Boolean),
+      ),
+    }),
+  );
+  const ownName = (m: SubjectMatch) =>
+    info.get(`${m.tier}|${m.rubricSubject}`)?.own.has(normalizeSubjectName(m.transcriptName)) ?? false;
+  const keyOf = (m: SubjectMatch) => `${m.tier}|${m.rubricSubject}`;
+  const sharedOf = (m: SubjectMatch) => info.get(keyOf(m))?.shared;
+  const clashes = (hits: SubjectMatch[]) => {
+    const seen = new Set<string>();
+    for (const m of hits) {
+      const g = sharedOf(m);
+      if (!g) continue;
+      if (seen.has(g)) return true;
+      seen.add(g);
+    }
+    return false;
+  };
+
+  const credited = new Set<string>();
+  const out: SubjectMatch[][] = perRow.map((hits) => hits);
+  perRow.forEach((hits) => {
+    if (!clashes(hits)) for (const m of hits) credited.add(keyOf(m));
+  });
+  perRow.forEach((hits, i) => {
+    if (!clashes(hits)) return;
+    const byGroup = new Map<string, SubjectMatch[]>();
+    for (const m of hits) {
+      const g = sharedOf(m);
+      if (g) byGroup.set(g, [...(byGroup.get(g) ?? []), m]);
+    }
+    const keep = new Set<SubjectMatch>(hits.filter((m) => !sharedOf(m)));
+    for (const group of byGroup.values()) {
+      const best = [...group].sort(
+        (x, y) =>
+          Number(ownName(y)) - Number(ownName(x)) ||
+          Number(credited.has(keyOf(x))) - Number(credited.has(keyOf(y))) ||
+          (CATEGORY_RANK[x.category ?? ""] ?? 2) - (CATEGORY_RANK[y.category ?? ""] ?? 2) ||
+          y.confidence - x.confidence ||
+          (info.get(keyOf(x))?.order ?? 0) - (info.get(keyOf(y))?.order ?? 0),
+      )[0]!;
+      keep.add(best);
+      credited.add(keyOf(best));
+    }
+    out[i] = hits.filter((m) => keep.has(m));
+  });
+  return out;
 }
 
 function findAllExact(

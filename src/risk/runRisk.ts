@@ -3,8 +3,13 @@ import { assessConfig } from "../assess/config.js";
 import type { AssessmentResult } from "../assess/schemas.js";
 import { historicalStatsForAnzsco } from "./historical.js";
 import { buildPrecedentCheck, emptyPrecedentCheck } from "./precedent.js";
-import { judgeRiskWithLlm } from "./analyzeRisk.js";
+import {
+  COMPETENCE_CONFLICT_PREFIX,
+  judgeRiskWithLlm,
+  withCompetence,
+} from "./analyzeRisk.js";
 import { computeRiskScores } from "./scoreRisk.js";
+import { bandInputForCandidate } from "./bandInput.js";
 import type { Competence, RiskAssessmentResult } from "./schemas.js";
 
 const QUAL_PRIORITY = [
@@ -34,6 +39,14 @@ function findCandidate(assessment: AssessmentResult, anzscoCode: string) {
       title: assessment.title ?? "Occupation",
       foundationalPct: assessment.foundationalPct,
       corePct: assessment.corePct,
+      foundationalMatched: assessment.foundationalMatched,
+      coreMatched: assessment.coreMatched,
+      determination: assessment.determination,
+      tier1Outcome: assessment.tier1Outcome,
+      tier2Outcome: assessment.tier2Outcome,
+      tier3GateMet: assessment.tier3GateMet,
+      bandDetermination: assessment.bandDetermination,
+      assessmentFlow: assessment.assessmentFlow,
       missingSubjects: assessment.missingSubjects ?? { tier1: [], tier2: [] },
       workExperienceBoost: assessment.workExperienceBoost,
       workExperienceAnalysis: null,
@@ -55,8 +68,8 @@ async function persistRisk(
 }
 
 /**
- * Compute Step-4 risk for a chosen ANZSCO using assessment coverage,
- * historical datasheet outcomes, and related work experience.
+ * Compute Step-4 risk for a chosen ANZSCO from the Step 3 determination and
+ * bands; historical outcomes are a modifier only, work experience a note.
  */
 export async function runRiskAssessment(
   caseId: string,
@@ -117,15 +130,12 @@ export async function runRiskAssessment(
     precedent,
     workExperienceBoost,
     missingCore,
+    bands: bandInputForCandidate(candidate, assessment),
+    assessmentFlow: candidate.assessmentFlow,
   });
 
   const llm = await judgeRiskWithLlm(scored, { deadlineMs });
-  const result: RiskAssessmentResult = {
-    ...scored,
-    competence: llm.competent ? "competent" : "not_competent",
-    competenceSource: "ai",
-    insight: llm.insight,
-  };
+  const result: RiskAssessmentResult = withCompetence(scored, llm);
 
   await persistRisk(caseId, assessment, result);
 
@@ -169,6 +179,11 @@ export async function patchRiskCompetence(
     precedent: assessment.risk.precedent ?? emptyPrecedentCheck(),
     competence,
     competenceSource: "manual",
+    // The assessor has reviewed: drop the AI conflict note.
+    competenceConflict: false,
+    riskNotes: (assessment.risk.riskNotes ?? []).filter(
+      (n) => !n.startsWith(COMPETENCE_CONFLICT_PREFIX),
+    ),
   };
   await persistRisk(caseId, assessment, next);
   return next;

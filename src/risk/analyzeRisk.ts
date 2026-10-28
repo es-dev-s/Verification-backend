@@ -11,62 +11,89 @@ import {
 } from "./schemas.js";
 import { riskLevelLabel } from "./scoreRisk.js";
 
+type ScoredRisk = Omit<
+  RiskAssessmentResult,
+  "competence" | "competenceSource" | "insight"
+>;
+
 export function riskInsightSystemPrompt(): string {
   return `You are an assessor assistant for ANZSCO academic risk review.
-Given computed scores only, return JSON:
+The risk level is already decided from the Step 3 determination and bands; do not change it.
+Return JSON:
 {
   "competent": boolean,
   "insight": string
 }
 
 Rules:
-- competent=true when overall alignment and subject coverage support the occupation; false when gaps are material.
-- insight: 1–2 short sentences max. Cite the numbers. No bullet lists. No fluff.
+- competent=true when the Step 3 result and subject coverage support the occupation (normally No risk or Low risk); false when gaps are material.
+- insight: 1–2 short sentences max. Cite the Step 3 basis and the key numbers. No bullet lists. No fluff.
+- Historical outcomes and work experience are context only unless the notes say the level was moved.
 - Do not invent subjects or change the scores.`;
 }
 
-export function riskInsightUserPrompt(
-  scored: Omit<
-    RiskAssessmentResult,
-    "competence" | "competenceSource" | "insight"
-  >,
-): string {
+export function riskInsightUserPrompt(scored: ScoredRisk): string {
+  const vocational = scored.assessmentFlow === "vocational_units";
+  const coverage = vocational
+    ? `Core units: ${scored.corePct}%`
+    : `Fundamental: ${scored.fundamentalPct}%\nCore: ${scored.corePct}%`;
   return `ANZSCO ${scored.anzscoCode} — ${scored.title}
-Fundamental: ${scored.fundamentalPct}%
-Core: ${scored.corePct}%
+Risk level: ${riskLevelLabel(scored.riskLevel)}
+Basis: ${scored.riskBasis ?? "n/a"}
+${coverage}
 Historical positive: ${scored.historicalPct}% (${scored.historical.totalCases} cases)
-Overall alignment: ${scored.overallPct}% → ${riskLevelLabel(scored.riskLevel)}
-Work experience boost: ${scored.workExperienceBoost ? `yes (+${scored.workExperienceDelta})` : "no"}
+Notes: ${(scored.riskNotes ?? []).join(" ") || "none"}
+Work experience: ${scored.workExperienceBoost ? "related (context only)" : "none noted"}
 Missing major domains: ${scored.missingMajorDomains}
 Reducing risk: ${scored.reducingRisk.join(" ")}
 Increasing risk: ${scored.increasingRisk.join(" ")}`;
 }
 
-/** Deterministic fallback when Groq is unavailable. */
-export function buildRiskInsightFallback(
-  scored: Omit<
-    RiskAssessmentResult,
-    "competence" | "competenceSource" | "insight"
-  >,
-): RiskLlmJudgement {
-  const competent =
-    scored.overallPct >= 75 &&
-    scored.corePct >= 60 &&
-    scored.fundamentalPct >= 50;
-  const work = scored.workExperienceBoost
-    ? ` Related work experience improved alignment by ${scored.workExperienceDelta} points.`
-    : "";
+/** Deterministic fallback when Groq is unavailable: competent when the band is No risk / Low. */
+export function buildRiskInsightFallback(scored: ScoredRisk): RiskLlmJudgement {
+  const competent = scored.riskLevel === "no_risk" || scored.riskLevel === "low";
+  const basis = scored.riskBasis ? ` ${scored.riskBasis}.` : "";
+  const coverage =
+    scored.assessmentFlow === "vocational_units"
+      ? `core units ${scored.corePct}%`
+      : `core ${scored.corePct}% and fundamentals ${scored.fundamentalPct}%`;
   return {
     competent,
-    insight: `Overall alignment is ${scored.overallPct}% (${riskLevelLabel(scored.riskLevel)}), driven by core ${scored.corePct}% and fundamentals ${scored.fundamentalPct}%.${work}`,
+    insight: `${riskLevelLabel(scored.riskLevel)}.${basis} Coverage: ${coverage}.`,
+  };
+}
+
+export const COMPETENCE_CONFLICT_PREFIX = "Competence check";
+
+/**
+ * Attach the competence judgement. The band-based risk level always stands;
+ * when the competence check disagrees with it (competent but Medium/High, or
+ * not competent but No risk/Low), a note asks the assessor to review.
+ */
+export function withCompetence(
+  scored: ScoredRisk,
+  judgement: RiskLlmJudgement,
+): RiskAssessmentResult {
+  const bandSupports = scored.riskLevel === "no_risk" || scored.riskLevel === "low";
+  const conflict = judgement.competent !== bandSupports;
+  const notes = [...(scored.riskNotes ?? [])];
+  if (conflict) {
+    notes.push(
+      `${COMPETENCE_CONFLICT_PREFIX} (${judgement.competent ? "competent" : "not competent"}) differs from the ${riskLevelLabel(scored.riskLevel)} level; the level stands — assessor to review.`,
+    );
+  }
+  return {
+    ...scored,
+    riskNotes: notes,
+    competenceConflict: conflict,
+    competence: judgement.competent ? "competent" : "not_competent",
+    competenceSource: "ai",
+    insight: judgement.insight,
   };
 }
 
 export async function judgeRiskWithLlm(
-  scored: Omit<
-    RiskAssessmentResult,
-    "competence" | "competenceSource" | "insight"
-  >,
+  scored: ScoredRisk,
   opts?: { deadlineMs?: number },
 ): Promise<RiskLlmJudgement> {
   const fallback = buildRiskInsightFallback(scored);

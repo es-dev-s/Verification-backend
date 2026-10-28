@@ -15,15 +15,35 @@ import {
 } from "./extractSubjects.js";
 import {
   flattenRubricSubjects,
+  listVocationalOccupations,
   loadAllAcademicRubrics,
   loadRubric,
   rubricFingerprint,
   scoringSubjects,
   type Rubric,
+  type VocationalOccupation,
 } from "./loadRubric.js";
-import { matchSubjects, matchSubjectsSync } from "./matchSubjects.js";
+import {
+  matchOptionsForRubric,
+  matchSubjects,
+  matchSubjectsSync,
+} from "./matchSubjects.js";
+import {
+  checkQualification,
+  type QualificationInfo,
+} from "./qualificationCheck.js";
+import {
+  occupationKind,
+  routeOccupation,
+  routeQualifications,
+  type OccupationRouteDecision,
+  type RoutingDecision,
+} from "./route.js";
+import { isDiplomaLevel } from "./schemas.js";
 import type {
   AnzscoCandidate,
+  RoutingInfo,
+  VocationalAssessmentDetail,
   AssessmentResult,
   ExtractedSubjectRow,
   ExtractionReport,
@@ -35,8 +55,10 @@ import type {
 } from "./schemas.js";
 import {
   scoreAssessment,
+  type QualificationCheckResult,
   type ScoreResult,
 } from "./score.js";
+import { hasUnitCodes, scoreVocational, type VocationalScore } from "./vocational.js";
 
 export type AssessCaseOpts = {
   /** Force re-extract even if hash matches. */
@@ -53,7 +75,7 @@ export type AssessCaseOpts = {
 };
 
 /** Which transcript rows were scored for an occupation. */
-type PoolKind = "bachelor" | "master" | "combined";
+type PoolKind = "bachelor" | "master" | "combined" | "diploma";
 
 export type ScoredOccupation = {
   rubric: Rubric;
@@ -63,12 +85,31 @@ export type ScoredOccupation = {
   qualificationsUsed: QualificationType[];
   mastersFallbackUsed: boolean;
   poolKind: PoolKind;
+  /** Step 1 qualification check for the winning pool (reused when re-scoring). */
+  qualificationCheck: QualificationCheckResult;
   /** Rows of the winning pool (reused by the optional LLM refine). */
   poolRows: ExtractedSubjectRow[];
   workExperienceBoost: boolean;
   /** Academic-only score before work boost (for UI before→after %). */
   confidenceScoreBefore: number;
   workExperienceAnalysis: WorkExperienceCandidateAnalysis | null;
+  /** Step 1 routing decision for this occupation (include / cap). */
+  routeDecision?: OccupationRouteDecision;
+  /** Unit-code detail (vocational occupations only). */
+  vocational?: VocationalAssessmentDetail | null;
+  /** Re-score a vocational occupation (work-experience boost on / off). */
+  rescoreVocational?: (workExperienceBoost: boolean) => VocationalScore;
+};
+
+/** Inputs shared by every occupation scored for one case. */
+export type ScoringContext = {
+  workExperienceBoost: boolean;
+  /** Case qualifications (level + title [+ transcript texts]) for routing and Step 1. */
+  qualifications?: QualificationInfo[];
+  /** Raw transcript texts (unit-code scan for vocational occupations). */
+  transcriptTexts?: string[];
+  /** Score only this occupation id or ANZSCO; routing never excludes it. */
+  occupationId?: string;
 };
 
 /**
@@ -106,6 +147,30 @@ export async function assessCase(
     .find((d) => d.type === "CV" && d.status === "DONE");
   const cvText = cvDoc?.text ?? null;
   const persistedRows = caseRow.extractedSubjects.map(rowFromDb);
+  // Qualification titles by DB level: refine a document's level (associate
+  // degree has no DB enum value) and feed the Step 1 qualification check.
+  const titleByLevel = new Map(
+    caseRow.qualifications.map((q) => [String(q.degreeLevel), q.degreeTitle ?? null]),
+  );
+  const docLevel = (t: { degreeLevel: string | null }) =>
+    degreeLevelToQualification(
+      t.degreeLevel,
+      t.degreeLevel ? titleByLevel.get(t.degreeLevel) : null,
+    );
+  const qualificationInfos: QualificationInfo[] = caseRow.qualifications.map((q) => ({
+    level: degreeLevelToQualification(q.degreeLevel, q.degreeTitle),
+    title: q.degreeTitle ?? null,
+    rawLevel: String(q.degreeLevel),
+    // Transcript text at this level, so routing can spot a qualification code.
+    texts: transcripts
+      .filter(
+        (t) =>
+          t.degreeLevel === String(q.degreeLevel) ||
+          (!t.degreeLevel && caseRow.qualifications.length === 1),
+      )
+      .map((t) => t.text ?? ""),
+  }));
+  const transcriptTexts = transcripts.map((t) => t.text ?? "");
 
   if (
     !transcripts.length &&
@@ -148,15 +213,14 @@ export async function assessCase(
     | null;
   const previousExtraction = previous?.extraction;
 
-  // Cache hit — never for a run whose extraction was incomplete.
+  // Cache hit
   if (
     !opts?.force &&
     !opts?.injectedSubjects &&
     !opts?.occupationId &&
     caseRow.assessment &&
     caseRow.assessment.inputHash === inputHash &&
-    previous &&
-    previousExtraction?.complete !== false
+    previous
   ) {
     const cached = previous;
     if (!cached.extractedSubjects?.length && persistedRows.length) {
@@ -166,66 +230,72 @@ export async function assessCase(
   }
 
   // Persisted subjects are reusable only if they came from the same transcripts
-  // and that extraction was complete (legacy rows: old v1 hash must match).
+  // (legacy rows without an extraction record: old v1 hash must match).
   const canReusePersisted =
     !opts?.force &&
     persistedRows.length > 0 &&
     (previousExtraction
-      ? previousExtraction.subjectHash === subjectHash &&
-        previousExtraction.complete !== false
+      ? previousExtraction.subjectHash === subjectHash
       : caseRow.assessment?.inputHash === legacyHash);
 
   // Step 1 — extract (or reuse persisted / injected)
   let extracted: ExtractedSubjectRow[];
   let extraction: ExtractionReport;
-  const warnings: string[] = [];
+  // False when this run produced no usable fresh subjects; the result is then
+  // stored without a valid cache key so the next run extracts again.
+  let cacheable = true;
   if (opts?.injectedSubjects) {
     extracted = opts.injectedSubjects;
-    extraction = completeReport(subjectHash, "injected");
+    extraction = { subjectHash, source: "injected" };
   } else if (canReusePersisted) {
     extracted = persistedRows;
-    extraction = completeReport(subjectHash, "persisted");
+    extraction = { subjectHash, source: "persisted" };
   } else if (useLlm && transcripts.length) {
     const sources: TranscriptSource[] = transcripts.map((t) => ({
       documentId: t.id,
       text: t.text!,
-      degreeLevelHint: degreeLevelToQualification(t.degreeLevel),
+      degreeLevelHint: docLevel(t),
     }));
-    const outcome = await extractSubjectsFromTranscripts(sources, { deadlineMs });
-    extraction = {
-      subjectHash,
-      complete: outcome.complete,
-      source: "llm",
-      totalParts: outcome.totalParts,
-      failedParts: outcome.failedParts,
-      skippedParts: outcome.skippedParts,
-      missingKeys: outcome.missingKeys,
-    };
-    if (!outcome.subjects.length && !outcome.complete && persistedRows.length) {
-      // Extraction failed outright — keep the previously saved subjects rather
-      // than wiping them; the incomplete flag forces a retry next run.
-      extracted = persistedRows;
-      extraction.source = "persisted";
+    const fresh = await extractSubjectsFromTranscripts(sources, { deadlineMs });
+    const choice = chooseSubjectsAfterExtraction(fresh, persistedRows);
+    extracted = choice.rows;
+    if (choice.keptSaved) {
+      // Extraction returned nothing — keep the saved subjects (not overwritten)
+      // and keep their original transcript hash.
+      extraction = {
+        subjectHash: previousExtraction?.subjectHash ?? "",
+        source: "persisted",
+      };
+      cacheable = false;
     } else {
-      extracted = outcome.subjects;
+      extraction = { subjectHash, source: "llm" };
       await persistExtractedSubjects(caseId, extracted, transcripts);
+      if (!extracted.length) cacheable = false;
     }
   } else if (persistedRows.length) {
     extracted = persistedRows;
-    extraction = completeReport(subjectHash, "persisted");
+    extraction = { subjectHash, source: "persisted" };
   } else {
     return emptyNoMatch(
       "Could not extract subjects from the transcript (LLM unavailable and no cached subjects).",
     );
   }
-  warnings.push(...extractionWarnings(extraction));
 
-  const rubrics = opts?.occupationId
-    ? [loadRubric(opts.occupationId)]
-    : loadAllAcademicRubrics();
+  // Saved rows from diploma-level transcripts were stored as "unknown" before
+  // diploma levels existed: tag them from their document now.
+  extracted = applyDocumentLevels(
+    extracted,
+    transcripts.map((t) => ({ id: t.id, level: docLevel(t) })),
+  );
 
-  // Academic sync-match every occupation first (no work experience in ranking).
-  const scoredAll = scoreAllOccupations(extracted, rubrics);
+  // Step 1 routing picks which occupations are ranked; each one is then
+  // sync-matched (no work experience in ranking).
+  const { scored: scoredAll, routing } = scoreRoutedOccupations(extracted, {
+    workExperienceBoost: false,
+    qualifications: qualificationInfos,
+    transcriptTexts,
+    occupationId: opts?.occupationId,
+  });
   // Wider shortlist first; the final cut to maxCandidates happens only after
   // the work-experience boost so a related job can lift a lower candidate.
   const shortlistSize = Math.max(
@@ -236,11 +306,14 @@ export async function assessCase(
 
   // Optional: refine the best occupation with LLM unclear subject matching
   const best = shortlist[0];
-  if (best && useLlm && assessConfig.llmUnclearMatches) {
+  // Unit-code occupations match on codes only: no LLM refine.
+  if (best && !best.vocational && useLlm && assessConfig.llmUnclearMatches) {
     const refined = await scoreOccupationWithLlm(extracted, best.rubric, {
       workExperienceBoost: false,
       deadlineMs,
       pool: best.poolRows,
+      qualifications: qualificationInfos,
+      routeDecision: best.routeDecision,
     });
     shortlist = [refined, ...shortlist.slice(1)];
     shortlist.sort(compareScoredOccupations);
@@ -272,11 +345,9 @@ export async function assessCase(
   }));
   const matches = dedupeMatchRows(winner.matches);
   const missingSubjects = computeMissingSubjects(matches, winner.rubric);
-  const transcriptSource = buildTranscriptSource(
-    winner.qualificationsUsed,
-    winner.poolKind,
-    extracted,
-  );
+  const transcriptSource = winner.vocational
+    ? VOCATIONAL_SOURCE
+    : buildTranscriptSource(winner.qualificationsUsed, winner.poolKind, extracted);
   const candidates = top.map((s) => {
     const m = dedupeMatchRows(s.matches);
     return buildCandidate(
@@ -293,6 +364,7 @@ export async function assessCase(
         workExperienceBoost: s.workExperienceBoost,
         workExperienceAnalysis: s.workExperienceAnalysis,
       },
+      s,
     );
   });
 
@@ -309,7 +381,7 @@ export async function assessCase(
     coreMatched: winner.scored.coreMatched,
     coreExpected: winner.scored.coreExpected,
     corePct: winner.scored.corePct,
-    tier1Outcome: winner.scored.tier1Outcome,
+    tier1Outcome: winner.vocational ? null : winner.scored.tier1Outcome,
     tier2Outcome: winner.scored.tier2Outcome,
     tier3GateMet: winner.scored.tier3GateMet,
     workExperienceBoost: winner.workExperienceBoost,
@@ -321,8 +393,11 @@ export async function assessCase(
     mastersFallbackUsed: winner.mastersFallbackUsed,
     candidates,
     extractedSubjects: extracted,
+    qualificationNotes: winner.scored.qualificationNotes,
+    routing: routingInfo(routing),
+    assessmentFlow: winner.vocational ? "vocational_units" : "academic",
+    bandDetermination: winner.scored.bandDetermination,
     explanation: "",
-    warnings,
     extraction,
   };
 
@@ -343,7 +418,7 @@ export async function assessCase(
     where: { caseId },
     create: {
       caseId,
-      inputHash,
+      inputHash: cacheable ? inputHash : "",
       anzscoCode: result.anzscoCode,
       confidence: result.confidence,
       determination: result.determination,
@@ -363,7 +438,7 @@ export async function assessCase(
       resultJson: result as object,
     },
     update: {
-      inputHash,
+      inputHash: cacheable ? inputHash : "",
       anzscoCode: result.anzscoCode,
       confidence: result.confidence,
       determination: result.determination,
@@ -396,23 +471,49 @@ export async function assessCase(
 
 /**
  * Candidate transcript pools for one occupation: Bachelor (+ rows with unknown
- * level), Master's alone, and both combined. The best-scoring pool is kept, so
- * a strong Master's is never ignored just because the Bachelor's looked "ok".
- * Ties prefer Bachelor, then Master's, then combined.
+ * level), Master's alone, both combined, and diploma-level rows (Diploma /
+ * Advanced Diploma / Associate Degree) as their own group. The best-scoring
+ * pool is kept, so a strong Master's is never ignored just because the
+ * Bachelor's looked "ok". Ties prefer Bachelor, then Master's, then combined,
+ * then diploma.
  */
 function candidatePools(
   extracted: ExtractedSubjectRow[],
 ): Array<{ kind: PoolKind; rows: ExtractedSubjectRow[] }> {
-  const bachelorish = extracted.filter((s) => s.qualification !== "master");
+  const bachelorish = extracted.filter(
+    (s) => s.qualification !== "master" && !isDiplomaLevel(s.qualification),
+  );
   const masterRows = extracted.filter((s) => s.qualification === "master");
+  const diplomaRows = extracted.filter((s) => isDiplomaLevel(s.qualification));
   const pools: Array<{ kind: PoolKind; rows: ExtractedSubjectRow[] }> = [];
   if (bachelorish.length) pools.push({ kind: "bachelor", rows: bachelorish });
   if (masterRows.length) pools.push({ kind: "master", rows: masterRows });
   if (bachelorish.length && masterRows.length) {
     pools.push({ kind: "combined", rows: [...bachelorish, ...masterRows] });
   }
+  if (diplomaRows.length) pools.push({ kind: "diploma", rows: diplomaRows });
   if (!pools.length) pools.push({ kind: "bachelor", rows: extracted });
   return pools;
+}
+
+/**
+ * Tag rows with their transcript's level when the row has none yet (or only a
+ * diploma-family level the document refines, e.g. diploma → associate degree).
+ * Bachelor / Master's rows are never changed.
+ */
+export function applyDocumentLevels(
+  rows: ExtractedSubjectRow[],
+  documents: Array<{ id: string; level: QualificationType | "unknown" }>,
+): ExtractedSubjectRow[] {
+  const byId = new Map(documents.map((d) => [d.id, d.level]));
+  const only = documents.length === 1 ? documents[0]!.level : null;
+  return rows.map((r) => {
+    const level = (r.documentId ? byId.get(r.documentId) : null) ?? only;
+    if (!level || level === "unknown" || level === r.qualification) return r;
+    if (r.qualification !== "unknown" && !isDiplomaLevel(r.qualification)) return r;
+    if (r.qualification !== "unknown" && !isDiplomaLevel(level)) return r;
+    return { ...r, qualification: level };
+  });
 }
 
 function qualificationsOf(rows: ExtractedSubjectRow[]): QualificationType[] {
@@ -435,31 +536,34 @@ function compareScores(a: ScoreResult, b: ScoreResult): number {
   return 0;
 }
 
-function gateSubjectOf(rubric: Rubric): string | undefined {
-  return rubric.tiers.tier3.gate?.gateSubject;
-}
-
 function scoreOccupation(
   extracted: ExtractedSubjectRow[],
   rubric: Rubric,
   opts: {
     workExperienceBoost: boolean;
+    /** Case qualifications (level + title) for the Step 1 check. */
+    qualifications?: QualificationInfo[];
+    /** Step 1 routing cap for this occupation. */
+    routeDecision?: OccupationRouteDecision;
   },
 ): ScoredOccupation {
   const rubricSubjects = flattenRubricSubjects(rubric);
-  const gateSubject = gateSubjectOf(rubric);
+  const matchOptions = matchOptionsForRubric(rubric);
 
   let best: ScoredOccupation | null = null;
   for (const pool of candidatePools(extracted)) {
-    const matchResult = matchSubjectsSync(pool.rows, rubricSubjects, {
-      gateSubject,
-    });
+    const matchResult = matchSubjectsSync(pool.rows, rubricSubjects, matchOptions);
     const qualificationsUsed = qualificationsOf(pool.rows);
+    const qualificationCheck = withRouteCap(
+      checkQualification(rubric, qualificationsUsed, opts.qualifications ?? []),
+      opts.routeDecision,
+    );
     const scored = scoreAssessment({
       matches: matchResult.matches,
       qualificationsUsed,
       workExperienceBoost: opts.workExperienceBoost,
       rubric,
+      qualificationCheck,
     });
     // Strictly better only, so earlier pools (Bachelor) win ties.
     if (!best || compareScores(best.scored, scored) > 0) {
@@ -469,24 +573,170 @@ function scoreOccupation(
         matches: matchResult.matches,
         unmatched: matchResult.unmatched,
         qualificationsUsed,
-        mastersFallbackUsed: pool.kind !== "bachelor",
+        mastersFallbackUsed: pool.kind === "master" || pool.kind === "combined",
         poolKind: pool.kind,
+        qualificationCheck,
         poolRows: pool.rows,
         workExperienceBoost: opts.workExperienceBoost,
         confidenceScoreBefore: scored.confidenceScore,
         workExperienceAnalysis: null,
+        routeDecision: opts.routeDecision,
+        vocational: null,
       };
     }
   }
   return best!;
 }
 
-/** Score every rubric (academic only) and return them best-first. */
+/** Add the Step 1 route cap to a qualification-check result (no duplicate notes). */
+function withRouteCap(
+  check: QualificationCheckResult,
+  decision?: OccupationRouteDecision,
+): QualificationCheckResult {
+  if (!decision?.capAtConditional) return check;
+  const notes = [...check.notes];
+  if (decision.capNote && !notes.includes(decision.capNote)) notes.push(decision.capNote);
+  return { capAtConditional: true, notes, routeCapped: true };
+}
+
+const VOCATIONAL_SOURCE: TranscriptSourceInfo = {
+  kind: "diploma",
+  label: "Matched using: unit codes on the transcript",
+};
+
+/** Score one vocational (unit-code) occupation as a ScoredOccupation. */
+function scoreVocationalOccupation(
+  extracted: ExtractedSubjectRow[],
+  occupation: VocationalOccupation,
+  routing: RoutingDecision,
+  ctx: ScoringContext,
+  routeDecision: OccupationRouteDecision,
+): ScoredOccupation {
+  const accepted = routing.qualifications.filter(
+    (q) => q.route === "vocational" && q.vocationalOccupationIds.includes(occupation.id),
+  );
+  const codes = occupation.qualificationCodes.join(" / ");
+  const qualificationNote = accepted.length
+    ? `Qualification accepted for ${occupation.anzsco}: ${accepted
+        .map((q) => q.title ?? q.qualificationCodes.join(", "))
+        .join("; ")} (${accepted[0]!.reason}).`
+    : `Qualification not confirmed as ${codes || "the required qualification"} or an equivalent ${occupation.title} qualification: assessor to confirm (Step 1).`;
+  const rows = extracted;
+  const rescore = (boost: boolean) =>
+    scoreVocational({
+      occupation,
+      rows,
+      transcriptTexts: ctx.transcriptTexts,
+      workExperienceBoost: boost,
+      qualificationMet: accepted.length > 0,
+      qualificationNote,
+      qualificationCheck: withRouteCap({ capAtConditional: false, notes: [] }, routeDecision),
+    });
+  const v = rescore(ctx.workExperienceBoost);
+  const used = v.matches.map((m) => m.qualification);
+  const qualificationsUsed = (used.length ? [...new Set(used)] : ["unknown"]) as QualificationType[];
+  return {
+    rubric: v.rubric,
+    scored: v.scored,
+    matches: v.matches,
+    unmatched: v.unmatched,
+    qualificationsUsed,
+    mastersFallbackUsed: false,
+    poolKind: "diploma",
+    qualificationCheck: { capAtConditional: false, notes: v.scored.qualificationNotes },
+    poolRows: rows,
+    workExperienceBoost: ctx.workExperienceBoost,
+    confidenceScoreBefore: v.scored.confidenceScore,
+    workExperienceAnalysis: null,
+    routeDecision,
+    vocational: v.detail,
+    rescoreVocational: rescore,
+  };
+}
+
+/**
+ * Step 1 routing + scoring: classify the qualifications, rank only the
+ * occupations the route allows (academic and vocational), best-first.
+ */
+export function scoreRoutedOccupations(
+  extracted: ExtractedSubjectRow[],
+  ctx: ScoringContext,
+): { scored: ScoredOccupation[]; routing: RoutingDecision } {
+  const vocational = listVocationalOccupations();
+  const routing = routeQualifications(ctx.qualifications ?? [], vocational);
+  const transcriptHasUnitCodes = hasUnitCodes(extracted, ctx.transcriptTexts);
+  const target = ctx.occupationId?.trim();
+  const vocTarget = target
+    ? vocational.find((o) => o.id === target || o.anzsco === target)
+    : undefined;
+  const academic = target ? (vocTarget ? [] : [loadRubric(target)]) : loadAllAcademicRubrics();
+  const vocList = target ? (vocTarget ? [vocTarget] : []) : vocational;
+
+  const out: ScoredOccupation[] = [];
+  for (const rubric of academic) {
+    const decision = routeOccupation(
+      routing,
+      {
+        id: rubric.occupationId ?? rubric.anzscoCode,
+        anzsco: rubric.anzscoCode,
+        kind: occupationKind(rubric.anzscoCode, "academic"),
+      },
+      { transcriptHasUnitCodes },
+    );
+    // A targeted run always scores its occupation (caps still apply).
+    if (!decision.include && !target) continue;
+    out.push(
+      scoreOccupation(extracted, rubric, {
+        workExperienceBoost: ctx.workExperienceBoost,
+        qualifications: ctx.qualifications,
+        routeDecision: decision,
+      }),
+    );
+  }
+  for (const occ of vocList) {
+    const decision = routeOccupation(
+      routing,
+      { id: occ.id, anzsco: occ.anzsco, kind: "vocational", scoringEnabled: occ.scoringEnabled },
+      { transcriptHasUnitCodes },
+    );
+    const targetedWithCodes = Boolean(target) && occ.coreUnits.units.some((u) => u.code);
+    if (!decision.include && !targetedWithCodes) continue;
+    out.push(scoreVocationalOccupation(extracted, occ, routing, ctx, decision));
+  }
+  out.sort(compareScoredOccupations);
+  return { scored: out, routing };
+}
+
+/** Saved form of the routing decision (AssessmentResult.routing). */
+function routingInfo(routing: RoutingDecision): RoutingInfo {
+  return {
+    routes: routing.routes,
+    label: routing.label,
+    basedOn: routing.basedOn,
+    note: routing.note,
+    notes: routing.notes,
+    qualifications: routing.qualifications.map((q) => ({
+      title: q.title,
+      level: q.level,
+      route: q.route,
+      reason: q.reason,
+    })),
+  };
+}
+
+/**
+ * Score rubrics best-first. Without an explicit rubric list this is the
+ * routed run (Step 1 routing, academic + vocational occupations); with a list
+ * only those academic rubrics are scored (no routing), as before.
+ */
 export function scoreAllOccupations(
   extracted: ExtractedSubjectRow[],
-  rubrics: Rubric[] = loadAllAcademicRubrics(),
-  opts: { workExperienceBoost: boolean } = { workExperienceBoost: false },
+  rubrics?: Rubric[],
+  opts: { workExperienceBoost: boolean; qualifications?: QualificationInfo[] } = {
+    workExperienceBoost: false,
+  },
 ): ScoredOccupation[] {
+  if (!rubrics) return scoreRoutedOccupations(extracted, opts).scored;
   const all = rubrics.map((rubric) => scoreOccupation(extracted, rubric, opts));
   all.sort(compareScoredOccupations);
   return all;
@@ -523,13 +773,19 @@ function applyWorkExperienceJudgements(
     );
     const related = Boolean(judgement?.related);
 
-    if (related) {
+    if (occ.rescoreVocational) {
+      occ.workExperienceBoost = related;
+      const v = occ.rescoreVocational(related);
+      occ.scored = v.scored;
+      occ.vocational = v.detail;
+    } else if (related) {
       occ.workExperienceBoost = true;
       occ.scored = scoreAssessment({
         matches: occ.matches,
         qualificationsUsed: occ.qualificationsUsed,
         workExperienceBoost: true,
         rubric: occ.rubric,
+        qualificationCheck: occ.qualificationCheck,
       });
     } else {
       occ.workExperienceBoost = false;
@@ -575,6 +831,18 @@ function compareScoredOccupations(a: ScoredOccupation, b: ScoredOccupation): num
     return a.scored.tier3GateMet ? -1 : 1;
   }
   return a.rubric.title.localeCompare(b.rubric.title);
+}
+
+/**
+ * Empty-extraction guard: when a fresh extraction returns no subjects but
+ * subjects were saved earlier, keep the saved ones instead of wiping them.
+ */
+export function chooseSubjectsAfterExtraction(
+  fresh: ExtractedSubjectRow[],
+  saved: ExtractedSubjectRow[],
+): { rows: ExtractedSubjectRow[]; keptSaved: boolean } {
+  if (!fresh.length && saved.length) return { rows: saved, keptSaved: true };
+  return { rows: fresh, keptSaved: false };
 }
 
 function emptyNoMatch(explanation: string): AssessmentResult {
@@ -698,6 +966,12 @@ function buildTranscriptSource(
   poolKind: PoolKind,
   extracted: ExtractedSubjectRow[],
 ): TranscriptSourceInfo {
+  if (poolKind === "diploma") {
+    return {
+      kind: "diploma",
+      label: `Matched using: ${diplomaLabel(qualificationsUsed)} transcript`,
+    };
+  }
   const hadBachelor = extracted.some((r) => r.qualification === "bachelor");
   if (poolKind === "master" && hadBachelor) {
     return {
@@ -739,6 +1013,16 @@ function buildTranscriptSource(
   };
 }
 
+function diplomaLabel(levels: QualificationType[]): string {
+  const names: Record<string, string> = {
+    diploma: "Diploma",
+    advanced_diploma: "Advanced Diploma",
+    associate_degree: "Associate Degree",
+  };
+  const found = levels.filter((l) => names[l]).map((l) => names[l]!);
+  return found.length ? found.join(" / ") : "Diploma-level";
+}
+
 function buildSubjectCatalog(rubric: Rubric): AnzscoCandidate["subjectCatalog"] {
   const out: AnzscoCandidate["subjectCatalog"] = [];
   for (const tier of ["tier1", "tier2"] as const) {
@@ -775,6 +1059,13 @@ function buildCandidate(
     confidenceScore: number;
     determination: ScoreResult["determination"];
     recommended: boolean;
+    qualificationNotes?: string[];
+    qualificationCapped?: boolean;
+    tier1Outcome?: ScoreResult["tier1Outcome"];
+    tier2Outcome?: ScoreResult["tier2Outcome"];
+    bandDetermination?: ScoreResult["bandDetermination"];
+    gateDowngraded?: boolean;
+    routeCapped?: boolean;
   },
   matches: SubjectMatch[],
   missingSubjects: MissingSubjectsByTier,
@@ -783,7 +1074,9 @@ function buildCandidate(
     workExperienceBoost?: boolean;
     workExperienceAnalysis?: WorkExperienceCandidateAnalysis | null;
   },
+  occ?: { vocational?: VocationalAssessmentDetail | null },
 ): AnzscoCandidate {
+  const vocational = occ?.vocational ?? null;
   return {
     anzscoCode: rubric.anzscoCode,
     title: rubric.title,
@@ -804,25 +1097,37 @@ function buildCandidate(
     missingSubjects,
     unmatched,
     subjectCatalog: buildSubjectCatalog(rubric),
+    qualificationNotes: scored.qualificationNotes ?? [],
+    qualificationCapped: scored.qualificationCapped ?? false,
+    assessmentFlow: vocational ? "vocational_units" : "academic",
+    tier1Outcome: vocational ? null : scored.tier1Outcome ?? null,
+    tier2Outcome: scored.tier2Outcome ?? null,
+    bandDetermination: scored.bandDetermination,
+    gateDowngraded: scored.gateDowngraded ?? false,
+    routeCapped: scored.routeCapped ?? false,
+    vocational,
   };
 }
 
 /** Pure scoring path for unit tests (no DB / LLM). Scores all academic occupations by default. */
 export function assessExtractedSubjects(
   extracted: ExtractedSubjectRow[],
-  opts?: { workExperienceBoost?: boolean; occupationId?: string },
+  opts?: {
+    workExperienceBoost?: boolean;
+    occupationId?: string;
+    /** Case qualifications (level + title) for routing and the Step 1 check. */
+    qualifications?: QualificationInfo[];
+    /** Raw transcript texts (unit-code scan for vocational occupations). */
+    transcriptTexts?: string[];
+  },
 ): AssessmentResult {
-  const rubrics = opts?.occupationId
-    ? [loadRubric(opts.occupationId)]
-    : loadAllAcademicRubrics();
-
-  const scoredAll = rubrics.map((rubric) =>
-    scoreOccupation(extracted, rubric, {
-      workExperienceBoost: opts?.workExperienceBoost ?? false,
-    }),
-  );
   // Boost (test path) is already applied to every occupation before the cut.
-  scoredAll.sort(compareScoredOccupations);
+  const { scored: scoredAll, routing } = scoreRoutedOccupations(extracted, {
+    workExperienceBoost: opts?.workExperienceBoost ?? false,
+    qualifications: opts?.qualifications,
+    transcriptTexts: opts?.transcriptTexts,
+    occupationId: opts?.occupationId,
+  });
   const top = scoredAll.slice(0, assessConfig.maxCandidates);
   const winner = top[0];
   if (!winner) {
@@ -836,11 +1141,9 @@ export function assessExtractedSubjects(
     qualification: u.qualification as QualificationType,
   }));
   const missingSubjects = computeMissingSubjects(deduped, winner.rubric);
-  const transcriptSource = buildTranscriptSource(
-    winner.qualificationsUsed,
-    winner.poolKind,
-    extracted,
-  );
+  const transcriptSource = winner.vocational
+    ? VOCATIONAL_SOURCE
+    : buildTranscriptSource(winner.qualificationsUsed, winner.poolKind, extracted);
   const candidates = top.map((s) => {
     const m = dedupeMatchRows(s.matches);
     const boosted = opts?.workExperienceBoost ?? false;
@@ -876,6 +1179,7 @@ export function assessExtractedSubjects(
         workExperienceBoost: boosted,
         workExperienceAnalysis: analysis,
       },
+      s,
     );
   });
 
@@ -892,7 +1196,7 @@ export function assessExtractedSubjects(
     coreMatched: winner.scored.coreMatched,
     coreExpected: winner.scored.coreExpected,
     corePct: winner.scored.corePct,
-    tier1Outcome: winner.scored.tier1Outcome,
+    tier1Outcome: winner.vocational ? null : winner.scored.tier1Outcome,
     tier2Outcome: winner.scored.tier2Outcome,
     tier3GateMet: winner.scored.tier3GateMet,
     workExperienceBoost: opts?.workExperienceBoost ?? false,
@@ -904,6 +1208,10 @@ export function assessExtractedSubjects(
     mastersFallbackUsed: winner.mastersFallbackUsed,
     candidates,
     extractedSubjects: extracted,
+    qualificationNotes: winner.scored.qualificationNotes,
+    routing: routingInfo(routing),
+    assessmentFlow: winner.vocational ? "vocational_units" : "academic",
+    bandDetermination: winner.scored.bandDetermination,
     explanation: "",
   };
 
@@ -927,10 +1235,14 @@ export async function scoreOccupationWithLlm(
     deadlineMs?: number;
     /** Rows to score (default: the best pool chosen by the sync scorer). */
     pool?: ExtractedSubjectRow[];
+    qualifications?: QualificationInfo[];
+    routeDecision?: OccupationRouteDecision;
   },
 ): Promise<ScoredOccupation> {
   const sync = scoreOccupation(extracted, rubric, {
     workExperienceBoost: opts.workExperienceBoost,
+    qualifications: opts.qualifications,
+    routeDecision: opts.routeDecision,
   });
   const pool = opts.pool ?? sync.poolRows;
   const qualificationsUsed = qualificationsOf(pool);
@@ -939,13 +1251,18 @@ export async function scoreOccupationWithLlm(
     deadlineMs: opts.deadlineMs,
     occupationTitle: rubric.title,
     anzscoCode: rubric.anzscoCode,
-    gateSubject: gateSubjectOf(rubric),
+    ...matchOptionsForRubric(rubric),
   });
+  const qualificationCheck = withRouteCap(
+    checkQualification(rubric, qualificationsUsed, opts.qualifications ?? []),
+    opts.routeDecision,
+  );
   const scored = scoreAssessment({
     matches: matchResult.matches,
     qualificationsUsed,
     workExperienceBoost: opts.workExperienceBoost,
     rubric,
+    qualificationCheck,
   });
   return {
     ...sync,
@@ -953,13 +1270,14 @@ export async function scoreOccupationWithLlm(
     matches: matchResult.matches,
     unmatched: matchResult.unmatched,
     qualificationsUsed,
+    qualificationCheck,
     poolRows: pool,
     confidenceScoreBefore: scored.confidenceScore,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Helpers: deterministic ordering, cache keys, extraction warnings
+// Helpers: deterministic ordering, cache keys
 // ---------------------------------------------------------------------------
 
 const LEVEL_RANK: Record<string, number> = { bachelor: 0, master: 1 };
@@ -1021,47 +1339,7 @@ export function scoringConfigFingerprint() {
     maxCandidates: assessConfig.maxCandidates,
     boostShortlist: assessConfig.boostShortlist,
     coverage: assessConfig.coverage,
-    engine: "assess-v2",
+    engine: "assess-v3-routing",
   };
 }
 
-function completeReport(
-  subjectHash: string,
-  source: ExtractionReport["source"],
-): ExtractionReport {
-  return {
-    subjectHash,
-    complete: true,
-    source,
-    totalParts: 0,
-    failedParts: 0,
-    skippedParts: 0,
-    missingKeys: false,
-  };
-}
-
-/** Human-readable warnings for an incomplete extraction (empty when complete). */
-export function extractionWarnings(report: ExtractionReport): string[] {
-  if (report.complete) return [];
-  if (report.missingKeys) {
-    return [
-      report.source === "persisted"
-        ? "Subject extraction is not configured (no Groq API key). Showing previously saved subjects."
-        : "Subject extraction is not configured (no Groq API key). No subjects could be read from the transcript.",
-    ];
-  }
-  const bits: string[] = [];
-  if (report.failedParts) {
-    bits.push(`${report.failedParts} of ${report.totalParts} transcript part(s) failed`);
-  }
-  if (report.skippedParts) {
-    bits.push(`${report.skippedParts} part(s) were skipped (time limit)`);
-  }
-  const tail =
-    report.source === "persisted"
-      ? " Showing previously saved subjects."
-      : " Some subjects may be missing, so the score may be too low.";
-  return [
-    `Subject extraction was incomplete: ${bits.join("; ")}.${tail} Re-run the assessment to retry.`,
-  ];
-}

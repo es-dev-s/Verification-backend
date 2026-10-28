@@ -70,14 +70,27 @@ export type RiskAssessmentResult = {
    * Separate from subject-weighted scoring.
    */
   precedent: PrecedentCheck;
-  /** Weighted overall before work-experience adjustment. */
+  /** Display-only: old weighted alignment (no longer decides the level). */
   overallPctBeforeWork: number;
   workExperienceBoost: boolean;
-  /** Points added when related work experience is present. */
+  /** Always 0 now: work experience is a note only (kept for old saved results). */
   workExperienceDelta: number;
-  /** Final alignment score used for risk banding (0–100). */
+  /** Display-only: old weighted alignment (0–100). */
   overallPct: number;
+  /** Final level: Step 3 base level, after the historical modifier. */
   riskLevel: RiskLevel;
+  /** Level from the Step 3 determination + bands, before the historical modifier. */
+  baseRiskLevel?: RiskLevel;
+  /** Plain-language basis, e.g. "Step 3: Verified – Low Risk (No Risk, Low Risk)". */
+  riskBasis?: string;
+  stepThreeDetermination?: "verified_no_risk" | "conditional" | "not_verified" | "no_match";
+  /** True when ≥ 20 cases and < 40 % positive moved the level one step worse. */
+  historicalModifierApplied?: boolean;
+  /** Notes: historical modifier / context, work experience, competence conflict. */
+  riskNotes?: string[];
+  assessmentFlow?: "academic" | "vocational_units";
+  /** True when the competence check disagrees with the band (band stands). */
+  competenceConflict?: boolean;
   reducingRisk: string[];
   increasingRisk: string[];
   /** Single sentence on missing major core domains. */

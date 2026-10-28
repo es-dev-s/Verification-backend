@@ -81,6 +81,8 @@ export function dedupeSubjects(rows: ExtractedSubjectRow[]): ExtractedSubjectRow
     const existing = seen.get(key);
     if (existing) {
       existing.isRepeat = true;
+      // Keep a unit code found by another chunk for the same subject.
+      if (!existing.code && row.code) existing.code = row.code;
       continue;
     }
     seen.set(key, { ...row, isRepeat: row.isRepeat ?? false });
@@ -93,31 +95,19 @@ function applyDegreeHint(
   hint?: QualificationType | "unknown",
 ): ExtractedSubjectRow {
   if (row.qualification !== "unknown") return row;
-  if (hint === "bachelor" || hint === "master") {
+  if (hint && hint !== "unknown") {
     return { ...row, qualification: hint };
   }
   return row;
 }
 
-type ChunkStatus = "ok" | "failed" | "skipped" | "empty";
-
-/** Rows plus completeness counters from one extraction run. */
-export type SubjectExtractionOutcome = {
-  subjects: ExtractedSubjectRow[];
-  totalParts: number;
-  failedParts: number;
-  skippedParts: number;
-  missingKeys: boolean;
-  complete: boolean;
-};
-
 async function extractChunkOnKey(
   chunk: string,
   apiKey: GroqKey,
   pipelineDeadlineMs: number,
-): Promise<{ rows: ExtractedSubjectRow[]; status: ChunkStatus }> {
-  if (!chunk.trim()) return { rows: [], status: "empty" };
-  if (Date.now() >= pipelineDeadlineMs - 1500) return { rows: [], status: "skipped" };
+): Promise<ExtractedSubjectRow[]> {
+  if (!chunk.trim()) return [];
+  if (Date.now() >= pipelineDeadlineMs - 1500) return [];
 
   const requestMs = Math.min(
     assessConfig.extractRequestTimeoutMs,
@@ -140,18 +130,15 @@ async function extractChunkOnKey(
         (data as { subjects?: unknown[] }).subjects?.length ?? "?"
       }`,
     );
-    return {
-      rows: subjectExtractLlmSchema
-        .parse(data)
-        .subjects.map((s) => subjectNameToExtractedRow(s.name)),
-      status: "ok",
-    };
+    return subjectExtractLlmSchema.parse(data).subjects.map((s) =>
+      subjectNameToExtractedRow(s.name, s.code ?? null),
+    );
   } catch (err) {
     console.error(
       `[assess] subject extract failed key=${apiKey.name}:`,
       err instanceof Error ? err.message : err,
     );
-    return { rows: [], status: "failed" };
+    return [];
   }
 }
 
@@ -163,36 +150,21 @@ async function extractChunkOnKey(
 export async function extractSubjectsFromTranscripts(
   sources: TranscriptSource[],
   opts?: { deadlineMs?: number },
-): Promise<SubjectExtractionOutcome> {
+): Promise<ExtractedSubjectRow[]> {
   const deadlineMs = opts?.deadlineMs ?? Date.now() + assessConfig.timeoutMs;
   const all: ExtractedSubjectRow[] = [];
-  let totalParts = 0;
-  let failedParts = 0;
-  let skippedParts = 0;
 
   const keys = loadGroqKeys();
   if (!keys.length || !groqIsConfigured()) {
     console.error(
       "[assess] subject extract: no GROQ_API_KEY / GROQ_API_KEY_1..N configured",
     );
-    return {
-      subjects: [],
-      totalParts: 0,
-      failedParts: 0,
-      skippedParts: 0,
-      missingKeys: true,
-      complete: false,
-    };
+    return [];
   }
 
   for (const source of sources) {
     if (!source.text?.trim()) continue;
-    if (Date.now() >= deadlineMs) {
-      // Whole transcript never attempted — count it as one skipped part.
-      totalParts += 1;
-      skippedParts += 1;
-      continue;
-    }
+    if (Date.now() >= deadlineMs) break;
 
     // One chunk per Groq key so all keys work together at once.
     const chunks = splitForParallelKeys(source.text, keys.length);
@@ -213,10 +185,7 @@ export async function extractSubjectsFromTranscripts(
       ),
     );
 
-    for (const { rows, status } of chunkResults) {
-      totalParts += 1;
-      if (status === "failed") failedParts += 1;
-      if (status === "skipped") skippedParts += 1;
+    for (const rows of chunkResults) {
       for (const row of rows) {
         all.push({
           ...applyDegreeHint(row, source.degreeLevelHint),
@@ -226,14 +195,7 @@ export async function extractSubjectsFromTranscripts(
     }
   }
 
-  return {
-    subjects: dedupeSubjects(all),
-    totalParts,
-    failedParts,
-    skippedParts,
-    missingKeys: false,
-    complete: failedParts === 0 && skippedParts === 0,
-  };
+  return dedupeSubjects(all);
 }
 
 /**
@@ -260,7 +222,9 @@ export function hashSubjectInput(
   transcripts: Array<{ id: string; text: string; degreeLevel?: string | null }>,
 ): string {
   const h = createHash("sha256");
-  h.update("subjects-v2\0");
+  // v3: rows carry unit codes (vocational transcripts), so older saved rows
+  // without codes are re-extracted once.
+  h.update("subjects-v3-codes\0");
   for (const t of transcripts) {
     h.update(t.id);
     h.update("\0");
@@ -297,11 +261,49 @@ export function stableStringify(value: unknown): string {
     .join(",")}}`;
 }
 
-/** Map Document.degreeLevel to bachelor/master/unknown for subject qualification. */
+/**
+ * Degree level named by a qualification / transcript title, or null when the
+ * title does not say. Checked most-specific first ("Advanced Diploma" before
+ * "Diploma", "Associate Degree" before "Degree").
+ */
+export function degreeLevelFromTitle(
+  title: string | null | undefined,
+): QualificationType | null {
+  const t = (title ?? "").toLowerCase();
+  if (!t.trim()) return null;
+  if (/\bassociate\s+(?:degree|of\b)|\bassoc\.?\s+deg/.test(t)) return "associate_degree";
+  if (/\badv(?:anced|\.)?\s+dip(?:loma|\.)?\b/.test(t)) return "advanced_diploma";
+  if (/\b(?:master|masters|master's|m\.?\s?sc|m\.?\s?eng|m\.?\s?tech|m\.?e\.)\b/.test(t)) {
+    return "master";
+  }
+  if (
+    /\b(?:bachelor|bachelors|bachelor's|b\.?\s?sc|b\.?\s?eng|b\.?\s?tech|b\.?e\.|b\.?s\.)(?=\W|$)/.test(t)
+  ) {
+    return "bachelor";
+  }
+  // Graduate / postgraduate diplomas sit above a bachelor: not a diploma-level group.
+  if (/\b(?:post\s*-?\s*graduate|graduate)\s+diploma\b/.test(t)) return null;
+  if (/\bdiploma\b/.test(t)) return "diploma";
+  return null;
+}
+
+/**
+ * Map Document.degreeLevel (+ the qualification title at that level, when
+ * known) to the subject qualification used for scoring. The DB enum has no
+ * associate degree, so an "Associate Degree …" title refines a diploma /
+ * advanced-diploma / unlabelled document; a document without a level falls
+ * back to whatever level its title names.
+ */
 export function degreeLevelToQualification(
   level: string | null | undefined,
+  degreeTitle?: string | null,
 ): QualificationType | "unknown" {
+  const fromTitle = degreeLevelFromTitle(degreeTitle);
   if (level === "bachelor") return "bachelor";
   if (level === "master") return "master";
+  if (level === "diploma" || level === "advanced_diploma") {
+    return fromTitle === "associate_degree" ? "associate_degree" : level;
+  }
+  if (!level) return fromTitle ?? "unknown";
   return "unknown";
 }
