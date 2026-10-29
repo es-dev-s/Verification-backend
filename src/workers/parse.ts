@@ -33,6 +33,11 @@ import {
 } from "../parse/schemas.js";
 import { correctOcrEducationText } from "../parse/ocrCorrect.js";
 import {
+  clientNameFromCvText,
+  saveClientName,
+  sanitizeClientName,
+} from "../lib/clientName.js";
+import {
   sanitizeEducationExtract,
   sanitizeExtractedLabel,
 } from "../parse/sanitizeExtracted.js";
@@ -445,6 +450,11 @@ export async function parseExperience(caseId: string) {
   }
 
   let parsed = experienceExtractSchema.safeParse(data);
+  // Applicant name for the Clients page (kept even if rows fall back to heuristics).
+  const llmName =
+    !fallback && parsed.success
+      ? sanitizeClientName(parsed.data.applicantName ?? null)
+      : null;
   if (!parsed.success || !parsed.data.rows.length) {
     if (!fallback) {
       console.warn(
@@ -475,6 +485,12 @@ export async function parseExperience(caseId: string) {
       compareExperienceDates(b.start, b.end) -
       compareExperienceDates(a.start, a.end),
   );
+
+  if (llmName) {
+    await saveClientName(caseId, cv.id, llmName, "cv_llm");
+  } else {
+    await saveClientName(caseId, cv.id, clientNameFromCvText(cv.text), "cv_text");
+  }
 
   await prisma.experienceRow.deleteMany({ where: { caseId } });
 
@@ -514,7 +530,8 @@ export async function parseExperience(caseId: string) {
   return {
     rows: saved,
     sourceDocumentId: cv.id,
-    geminiRaw: data,
+    // The name is stored for the Clients page only — keep it out of the Step 2 read result.
+    geminiRaw: withoutApplicantName(data),
     fallback,
     geminiMeta,
   };
@@ -530,4 +547,10 @@ function compareExperienceDates(
     if (m) return Number(m[0]);
   }
   return 0;
+}
+
+function withoutApplicantName(data: Record<string, unknown>): Record<string, unknown> {
+  if (!data || typeof data !== "object" || !("applicantName" in data)) return data;
+  const { applicantName: _name, ...rest } = data;
+  return rest;
 }

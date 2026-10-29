@@ -7,7 +7,7 @@ import { applyDocumentLevels, assessExtractedSubjects } from "./assessCase.js";
 import { degreeLevelFromTitle, degreeLevelToQualification } from "./extractSubjects.js";
 import { flattenRubricSubjects, loadRubric } from "./loadRubric.js";
 import { matchOptionsForRubric, matchSubjectsSync } from "./matchSubjects.js";
-import { checkQualification, DIPLOMA_ONLY_NOTE } from "./qualificationCheck.js";
+import { checkQualification } from "./qualificationCheck.js";
 import type { ExtractedSubjectRow, QualificationType } from "./schemas.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -176,29 +176,12 @@ describe("312511 Step 1 qualification check", () => {
   });
 });
 
-describe("professional engineers: diploma-level only is never verified", () => {
+describe("professional engineers: no diploma cap in the scorer (Gate 1 decides)", () => {
   const eng = loadRubric("mechanical-engineer");
 
-  it("caps a diploma-only pool", () => {
-    const c = checkQualification(eng, ["diploma"]);
-    assert.equal(c.capAtConditional, true);
-    assert.deepEqual(c.notes, [DIPLOMA_ONLY_NOTE]);
-    assert.equal(checkQualification(eng, ["advanced_diploma", "associate_degree"]).capAtConditional, true);
-  });
-
-  it("uses case qualifications when the rows have no level", () => {
-    assert.equal(
-      checkQualification(eng, ["unknown"], [{ level: "advanced_diploma", title: null }]).capAtConditional,
-      true,
-    );
-    assert.equal(
-      checkQualification(eng, ["unknown"], [
-        { level: "advanced_diploma", title: null },
-        { level: "bachelor", title: null },
-      ]).capAtConditional,
-      false,
-    );
-    assert.equal(checkQualification(eng, ["unknown"]).capAtConditional, false);
+  it("the qualification check no longer caps a diploma-only pool", () => {
+    assert.deepEqual(checkQualification(eng, ["diploma"]), { capAtConditional: false, notes: [] });
+    assert.equal(checkQualification(eng, ["unknown"], [{ level: "advanced_diploma", title: null }]).capAtConditional, false);
   });
 
   it("leaves bachelor pools alone", () => {

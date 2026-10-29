@@ -99,7 +99,10 @@ describe("matchSubjectsSync", () => {
 
 describe("scoreAssessment / assessExtractedSubjects", () => {
   it("recommends 233111 for a Chemical Engineering transcript", () => {
-    const result = assessExtractedSubjects(CHEM_ENG_TRANSCRIPT);
+    const result = assessExtractedSubjects(CHEM_ENG_TRANSCRIPT, {
+      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering (Chemical)", durationYears: 4 }],
+    });
+    assert.equal(result.gate1?.result, "open");
     assert.equal(result.recommended, true);
     assert.equal(result.anzscoCode, "233111");
     assert.ok(result.confidence === "high" || result.confidence === "medium");

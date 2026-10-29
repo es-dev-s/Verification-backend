@@ -57,6 +57,27 @@ export function nameFromFileName(fileName: string | null | undefined): string | 
   return name || null;
 }
 
+export type ClientNameSource = "cv_text" | "cv_file" | "document_file" | "case_id";
+
+/**
+ * Clients page name: the name read from the CV text first, then the old
+ * file-name guess (CV file, then the first document), then the case id.
+ */
+export function resolveClientName(input: {
+  caseId: string;
+  cvTextName?: string | null;
+  cvFileName?: string | null;
+  firstFileName?: string | null;
+}): { name: string; source: ClientNameSource } {
+  const fromText = (input.cvTextName ?? "").trim();
+  if (fromText) return { name: fromText, source: "cv_text" };
+  const fromCv = nameFromFileName(input.cvFileName);
+  if (fromCv) return { name: fromCv, source: "cv_file" };
+  const fromOther = nameFromFileName(input.firstFileName);
+  if (fromOther) return { name: fromOther, source: "document_file" };
+  return { name: `Client ${input.caseId.slice(-6)}`, source: "case_id" };
+}
+
 export type OccupationInfo = { anzscoCode: string | null; title: string | null };
 
 /** "Chemical Engineer (233111)" → { title, anzscoCode }. */

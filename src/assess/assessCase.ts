@@ -1,18 +1,12 @@
 import { prisma } from "../lib/prisma.js";
+import { ensureClientNameFromCv } from "../lib/clientName.js";
 import { assessConfig } from "./config.js";
 import {
   analyzeWorkExperienceForCandidates,
   type OccupationWorkJudgement,
 } from "./experienceBoost.js";
 import { buildExplanationFallback, writeExplanation } from "./explain.js";
-import {
-  degreeLevelToQualification,
-  extractSubjectsFromTranscripts,
-  hashAssessmentInput,
-  hashScoringInput,
-  hashSubjectInput,
-  type TranscriptSource,
-} from "./extractSubjects.js";
+import { hashAssessmentInput, hashScoringInput } from "./extractSubjects.js";
 import {
   flattenRubricSubjects,
   listVocationalOccupations,
@@ -32,21 +26,35 @@ import {
   checkQualification,
   type QualificationInfo,
 } from "./qualificationCheck.js";
-import {
-  occupationKind,
-  routeOccupation,
-  routeQualifications,
-  type OccupationRouteDecision,
-  type RoutingDecision,
-} from "./route.js";
+import { routeQualifications, type RoutingDecision } from "./route.js";
+import { evidenceConfigFingerprint } from "./evidenceConfig.js";
+import { evaluateGate1, gateIsOpen, openTracks, trackForAnzsco } from "./gate1.js";
 import { isDiplomaLevel } from "./schemas.js";
+import { preferFinalYearGate, withTermIndex } from "./qualificationEvidence.js";
+import {
+  applyDocumentLevels,
+  documentLevelResolver,
+  gateOverridesOf,
+  qualificationInfosFor,
+  readSavedSubjectHash,
+  resolveSubjects,
+  rowFromDb,
+  subjectHashOf,
+  usableTranscripts,
+} from "./transcriptData.js";
+
+// Moved to transcriptData.ts (Transcript data step); re-exported for callers and tests.
+export { applyDocumentLevels, chooseSubjectsAfterExtraction } from "./transcriptData.js";
 import type {
   AnzscoCandidate,
-  RoutingInfo,
   VocationalAssessmentDetail,
   AssessmentResult,
   ExtractedSubjectRow,
   ExtractionReport,
+  FinalProjectEvidence,
+  Gate1Decision,
+  Gate1TrackId,
+  QualificationEvidence,
   MissingSubjectsByTier,
   QualificationType,
   SubjectMatch,
@@ -93,12 +101,18 @@ export type ScoredOccupation = {
   /** Academic-only score before work boost (for UI before→after %). */
   confidenceScoreBefore: number;
   workExperienceAnalysis: WorkExperienceCandidateAnalysis | null;
-  /** Step 1 routing decision for this occupation (include / cap). */
-  routeDecision?: OccupationRouteDecision;
+  /** Gate 1 track this occupation was scored under. */
+  track?: Gate1TrackId;
+  /** Priority of that track (1 = assess first); undefined for targeted runs. */
+  trackPriority?: number;
   /** Unit-code detail (vocational occupations only). */
   vocational?: VocationalAssessmentDetail | null;
   /** Re-score a vocational occupation (work-experience boost on / off). */
   rescoreVocational?: (workExperienceBoost: boolean) => VocationalScore;
+  /** Gate project picked for this occupation (final year preferred). */
+  finalProject?: FinalProjectEvidence | null;
+  /** Professional Engineer / Technologist tracks never score diploma-level rows. */
+  excludeDiplomaRows?: boolean;
 };
 
 /** Inputs shared by every occupation scored for one case. */
@@ -108,8 +122,10 @@ export type ScoringContext = {
   qualifications?: QualificationInfo[];
   /** Raw transcript texts (unit-code scan for vocational occupations). */
   transcriptTexts?: string[];
-  /** Score only this occupation id or ANZSCO; routing never excludes it. */
+  /** Score only this occupation id or ANZSCO (tests / dev; bypasses the Gate 1 track filter). */
   occupationId?: string;
+  /** Step 2 checkbox: assessor confirmed an engineering-titled degree. */
+  engineeringTitledDegree?: boolean | null;
 };
 
 /**
@@ -132,44 +148,39 @@ export async function assessCase(
       qualifications: { orderBy: [{ degreeLevel: "asc" }, { id: "asc" }] },
       assessment: true,
       extractedSubjects: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      // Award level, field of study and Transcript data overrides (gate inputs).
+      fieldSources: true,
     },
   });
   if (!caseRow) throw new Error("Case not found");
 
-  const transcripts = sortTranscripts(
-    caseRow.documents.filter(
-      (d) => d.type === "TRANSCRIPT" && d.status === "DONE" && d.text?.trim(),
-    ),
-  );
+  const transcripts = usableTranscripts(caseRow.documents);
   // Latest finished CV wins (a re-upload replaces the older one).
   const cvDoc = [...caseRow.documents]
     .reverse()
     .find((d) => d.type === "CV" && d.status === "DONE");
   const cvText = cvDoc?.text ?? null;
+  // Clients page name only (no LLM, not part of any hash or the result).
+  if (!opts?.injectedSubjects?.length) await ensureClientNameFromCv(caseId);
   const persistedRows = caseRow.extractedSubjects.map(rowFromDb);
   // Qualification titles by DB level: refine a document's level (associate
   // degree has no DB enum value) and feed the Step 1 qualification check.
-  const titleByLevel = new Map(
-    caseRow.qualifications.map((q) => [String(q.degreeLevel), q.degreeTitle ?? null]),
-  );
-  const docLevel = (t: { degreeLevel: string | null }) =>
-    degreeLevelToQualification(
-      t.degreeLevel,
-      t.degreeLevel ? titleByLevel.get(t.degreeLevel) : null,
-    );
-  const qualificationInfos: QualificationInfo[] = caseRow.qualifications.map((q) => ({
-    level: degreeLevelToQualification(q.degreeLevel, q.degreeTitle),
-    title: q.degreeTitle ?? null,
-    rawLevel: String(q.degreeLevel),
-    // Transcript text at this level, so routing can spot a qualification code.
-    texts: transcripts
-      .filter(
-        (t) =>
-          t.degreeLevel === String(q.degreeLevel) ||
-          (!t.degreeLevel && caseRow.qualifications.length === 1),
-      )
-      .map((t) => t.text ?? ""),
+  const qualificationRows = caseRow.qualifications.map((q) => ({
+    degreeLevel: String(q.degreeLevel),
+    degreeTitle: q.degreeTitle ?? null,
+    durationYears: q.durationYears ?? null,
+    country: q.country ?? null,
+    institution: q.institution ?? null,
   }));
+  const docLevel = documentLevelResolver(qualificationRows);
+  // Includes the assessor values from Upload & details / Transcript data /
+  // Verify details (award level, field of study, counted duration, share).
+  const qualificationInfos: QualificationInfo[] = qualificationInfosFor(
+    qualificationRows,
+    transcripts,
+    caseRow.fieldSources,
+  );
+  const gateOverrides = gateOverridesOf(qualificationInfos);
   const transcriptTexts = transcripts.map((t) => t.text ?? "");
 
   if (
@@ -186,13 +197,7 @@ export async function assessCase(
   //  - subjectHash: what subject extraction depends on (transcripts only), so
   //    editing experience / qualifications re-scores without re-extracting.
   //  - inputHash: everything the final score depends on.
-  const subjectHash = hashSubjectInput(
-    transcripts.map((t) => ({
-      id: t.id,
-      text: t.text ?? "",
-      degreeLevel: t.degreeLevel,
-    })),
-  );
+  const subjectHash = subjectHashOf(transcripts);
   const legacyHash = hashAssessmentInput(
     transcripts.map((t) => ({ id: t.id, text: t.text ?? "" })),
     cvText,
@@ -204,6 +209,8 @@ export async function assessCase(
     qualifications: caseRow.qualifications.map(withoutTimestamps),
     selectedDegreeLevels: caseRow.selectedDegreeLevels,
     engineeringTitledDegree: caseRow.engineeringTitledDegree,
+    // Only when set, so cases without assessor values keep their cache key.
+    ...(gateOverrides ? { gateOverrides } : {}),
     rubric: rubricFingerprint(),
     config: scoringConfigFingerprint(),
   });
@@ -229,80 +236,66 @@ export async function assessCase(
     return cached;
   }
 
-  // Persisted subjects are reusable only if they came from the same transcripts
-  // (legacy rows without an extraction record: old v1 hash must match).
-  const canReusePersisted =
-    !opts?.force &&
-    persistedRows.length > 0 &&
-    (previousExtraction
-      ? previousExtraction.subjectHash === subjectHash
-      : caseRow.assessment?.inputHash === legacyHash);
-
-  // Step 1 — extract (or reuse persisted / injected)
+  // Step 1 — subjects: injected (tests), else the Transcript data step's saved
+  // subjects when they came from these transcripts, else extract and save
+  // (shared with the Transcript data step, see transcriptData.ts).
   let extracted: ExtractedSubjectRow[];
   let extraction: ExtractionReport;
   // False when this run produced no usable fresh subjects; the result is then
   // stored without a valid cache key so the next run extracts again.
   let cacheable = true;
   if (opts?.injectedSubjects) {
-    extracted = opts.injectedSubjects;
+    extracted = applyDocumentLevels(
+      opts.injectedSubjects,
+      transcripts.map((t) => ({ id: t.id, level: docLevel(t) })),
+    ).map(withTermIndex);
     extraction = { subjectHash, source: "injected" };
-  } else if (canReusePersisted) {
-    extracted = persistedRows;
-    extraction = { subjectHash, source: "persisted" };
-  } else if (useLlm && transcripts.length) {
-    const sources: TranscriptSource[] = transcripts.map((t) => ({
-      documentId: t.id,
-      text: t.text!,
-      degreeLevelHint: docLevel(t),
-    }));
-    const fresh = await extractSubjectsFromTranscripts(sources, { deadlineMs });
-    const choice = chooseSubjectsAfterExtraction(fresh, persistedRows);
-    extracted = choice.rows;
-    if (choice.keptSaved) {
-      // Extraction returned nothing — keep the saved subjects (not overwritten)
-      // and keep their original transcript hash.
-      extraction = {
-        subjectHash: previousExtraction?.subjectHash ?? "",
-        source: "persisted",
-      };
-      cacheable = false;
-    } else {
-      extraction = { subjectHash, source: "llm" };
-      await persistExtractedSubjects(caseId, extracted, transcripts);
-      if (!extracted.length) cacheable = false;
-    }
-  } else if (persistedRows.length) {
-    extracted = persistedRows;
-    extraction = { subjectHash, source: "persisted" };
   } else {
-    return emptyNoMatch(
-      "Could not extract subjects from the transcript (LLM unavailable and no cached subjects).",
-    );
+    const resolved = await resolveSubjects({
+      caseId,
+      transcripts,
+      persistedRows,
+      subjectHash,
+      savedHash: await readSavedSubjectHash(caseId),
+      previousExtraction,
+      legacyHashMatches: caseRow.assessment?.inputHash === legacyHash,
+      docLevel,
+      force: opts?.force,
+      useLlm,
+      deadlineMs,
+    });
+    if (!resolved) {
+      return emptyNoMatch(
+        "Could not extract subjects from the transcript (LLM unavailable and no cached subjects).",
+      );
+    }
+    extracted = resolved.rows;
+    extraction = resolved.extraction;
+    cacheable = resolved.cacheable;
   }
 
-  // Saved rows from diploma-level transcripts were stored as "unknown" before
-  // diploma levels existed: tag them from their document now.
-  extracted = applyDocumentLevels(
-    extracted,
-    transcripts.map((t) => ({ id: t.id, level: docLevel(t) })),
-  );
-
-  // Step 1 routing picks which occupations are ranked; each one is then
-  // sync-matched (no work experience in ranking).
-  const { scored: scoredAll, routing } = scoreRoutedOccupations(extracted, {
+  // Gate 1 decides which tracks are scored (before any scoring); each
+  // occupation in an open track is then sync-matched (no work experience in ranking).
+  const { scored: scoredAll, gate } = scoreRoutedOccupations(extracted, {
     workExperienceBoost: false,
     qualifications: qualificationInfos,
     transcriptTexts,
     occupationId: opts?.occupationId,
+    engineeringTitledDegree: caseRow.engineeringTitledDegree,
   });
+  if (!gateIsOpen(gate) && !opts?.occupationId) {
+    // Not eligible / manual review: nothing is scored, the reason is the explanation.
+    const blocked = gateBlockedResult(gate, extracted, extraction);
+    await saveAssessment(caseId, blocked, cacheable ? inputHash : "");
+    return blocked;
+  }
   // Wider shortlist first; the final cut to maxCandidates happens only after
   // the work-experience boost so a related job can lift a lower candidate.
   const shortlistSize = Math.max(
     assessConfig.maxCandidates,
     assessConfig.boostShortlist,
   );
-  let shortlist = scoredAll.slice(0, shortlistSize);
+  let shortlist = cutWithTracks(scoredAll, shortlistSize);
 
   // Optional: refine the best occupation with LLM unclear subject matching
   const best = shortlist[0];
@@ -313,9 +306,12 @@ export async function assessCase(
       deadlineMs,
       pool: best.poolRows,
       qualifications: qualificationInfos,
-      routeDecision: best.routeDecision,
+      excludeDiplomaRows: best.excludeDiplomaRows,
     });
-    shortlist = [refined, ...shortlist.slice(1)];
+    shortlist = [
+      { ...refined, track: best.track, trackPriority: best.trackPriority },
+      ...shortlist.slice(1),
+    ];
     shortlist.sort(compareScoredOccupations);
   }
 
@@ -331,7 +327,7 @@ export async function assessCase(
     );
     shortlist = applyBoostAndCut(shortlist, judgements, shortlist.length);
   }
-  const top = shortlist.slice(0, assessConfig.maxCandidates);
+  const top = cutWithTracks(shortlist, assessConfig.maxCandidates);
 
   const winner = top[0];
   if (!winner) {
@@ -394,11 +390,13 @@ export async function assessCase(
     candidates,
     extractedSubjects: extracted,
     qualificationNotes: winner.scored.qualificationNotes,
-    routing: routingInfo(routing),
+    gate1: gate,
     assessmentFlow: winner.vocational ? "vocational_units" : "academic",
     bandDetermination: winner.scored.bandDetermination,
     explanation: "",
     extraction,
+    qualificationEvidence: buildQualificationEvidence(winner, gate),
+    finalProjectTitle: winner.finalProject?.title ?? null,
   };
 
   // When nothing is recommended, still surface best coverage numbers from the top card
@@ -414,50 +412,7 @@ export async function assessCase(
     deadlineMs,
   });
 
-  await prisma.assessment.upsert({
-    where: { caseId },
-    create: {
-      caseId,
-      inputHash: cacheable ? inputHash : "",
-      anzscoCode: result.anzscoCode,
-      confidence: result.confidence,
-      determination: result.determination,
-      recommended: result.recommended,
-      foundationalMatched: result.foundationalMatched,
-      foundationalExpected: result.foundationalExpected,
-      foundationalPct: result.foundationalPct,
-      coreMatched: result.coreMatched,
-      coreExpected: result.coreExpected,
-      corePct: result.corePct,
-      tier1Outcome: result.tier1Outcome,
-      tier2Outcome: result.tier2Outcome,
-      tier3GateMet: result.tier3GateMet,
-      workExperienceBoost: result.workExperienceBoost,
-      qualificationsUsed: result.qualificationsUsed,
-      explanation: result.explanation,
-      resultJson: result as object,
-    },
-    update: {
-      inputHash: cacheable ? inputHash : "",
-      anzscoCode: result.anzscoCode,
-      confidence: result.confidence,
-      determination: result.determination,
-      recommended: result.recommended,
-      foundationalMatched: result.foundationalMatched,
-      foundationalExpected: result.foundationalExpected,
-      foundationalPct: result.foundationalPct,
-      coreMatched: result.coreMatched,
-      coreExpected: result.coreExpected,
-      corePct: result.corePct,
-      tier1Outcome: result.tier1Outcome,
-      tier2Outcome: result.tier2Outcome,
-      tier3GateMet: result.tier3GateMet,
-      workExperienceBoost: result.workExperienceBoost,
-      qualificationsUsed: result.qualificationsUsed,
-      explanation: result.explanation,
-      resultJson: result as object,
-    },
-  });
+  await saveAssessment(caseId, result, cacheable ? inputHash : "");
 
   if (result.recommended && result.title) {
     await prisma.case.update({
@@ -467,6 +422,35 @@ export async function assessCase(
   }
 
   return result;
+}
+
+/** Upsert the assessment row (same columns as before; Gate 1 lives in resultJson). */
+async function saveAssessment(caseId: string, result: AssessmentResult, inputHash: string) {
+  const columns = {
+    inputHash,
+    anzscoCode: result.anzscoCode,
+    confidence: result.confidence,
+    determination: result.determination,
+    recommended: result.recommended,
+    foundationalMatched: result.foundationalMatched,
+    foundationalExpected: result.foundationalExpected,
+    foundationalPct: result.foundationalPct,
+    coreMatched: result.coreMatched,
+    coreExpected: result.coreExpected,
+    corePct: result.corePct,
+    tier1Outcome: result.tier1Outcome,
+    tier2Outcome: result.tier2Outcome,
+    tier3GateMet: result.tier3GateMet,
+    workExperienceBoost: result.workExperienceBoost,
+    qualificationsUsed: result.qualificationsUsed,
+    explanation: result.explanation,
+    resultJson: result as object,
+  };
+  await prisma.assessment.upsert({
+    where: { caseId },
+    create: { caseId, ...columns },
+    update: columns,
+  });
 }
 
 /**
@@ -479,6 +463,7 @@ export async function assessCase(
  */
 function candidatePools(
   extracted: ExtractedSubjectRow[],
+  excludeDiplomaRows = false,
 ): Array<{ kind: PoolKind; rows: ExtractedSubjectRow[] }> {
   const bachelorish = extracted.filter(
     (s) => s.qualification !== "master" && !isDiplomaLevel(s.qualification),
@@ -491,29 +476,9 @@ function candidatePools(
   if (bachelorish.length && masterRows.length) {
     pools.push({ kind: "combined", rows: [...bachelorish, ...masterRows] });
   }
-  if (diplomaRows.length) pools.push({ kind: "diploma", rows: diplomaRows });
+  if (diplomaRows.length && !excludeDiplomaRows) pools.push({ kind: "diploma", rows: diplomaRows });
   if (!pools.length) pools.push({ kind: "bachelor", rows: extracted });
   return pools;
-}
-
-/**
- * Tag rows with their transcript's level when the row has none yet (or only a
- * diploma-family level the document refines, e.g. diploma → associate degree).
- * Bachelor / Master's rows are never changed.
- */
-export function applyDocumentLevels(
-  rows: ExtractedSubjectRow[],
-  documents: Array<{ id: string; level: QualificationType | "unknown" }>,
-): ExtractedSubjectRow[] {
-  const byId = new Map(documents.map((d) => [d.id, d.level]));
-  const only = documents.length === 1 ? documents[0]!.level : null;
-  return rows.map((r) => {
-    const level = (r.documentId ? byId.get(r.documentId) : null) ?? only;
-    if (!level || level === "unknown" || level === r.qualification) return r;
-    if (r.qualification !== "unknown" && !isDiplomaLevel(r.qualification)) return r;
-    if (r.qualification !== "unknown" && !isDiplomaLevel(level)) return r;
-    return { ...r, qualification: level };
-  });
 }
 
 function qualificationsOf(rows: ExtractedSubjectRow[]): QualificationType[] {
@@ -543,21 +508,20 @@ function scoreOccupation(
     workExperienceBoost: boolean;
     /** Case qualifications (level + title) for the Step 1 check. */
     qualifications?: QualificationInfo[];
-    /** Step 1 routing cap for this occupation. */
-    routeDecision?: OccupationRouteDecision;
+    /** Professional Engineer / Technologist tracks: skip the diploma-level pool. */
+    excludeDiplomaRows?: boolean;
   },
 ): ScoredOccupation {
   const rubricSubjects = flattenRubricSubjects(rubric);
   const matchOptions = matchOptionsForRubric(rubric);
 
   let best: ScoredOccupation | null = null;
-  for (const pool of candidatePools(extracted)) {
+  for (const pool of candidatePools(extracted, opts.excludeDiplomaRows)) {
     const matchResult = matchSubjectsSync(pool.rows, rubricSubjects, matchOptions);
+    const gate = preferFinalYearGate(matchResult.matches, pool.rows, gateNameOf(rubric));
+    matchResult.matches = gate.matches;
     const qualificationsUsed = qualificationsOf(pool.rows);
-    const qualificationCheck = withRouteCap(
-      checkQualification(rubric, qualificationsUsed, opts.qualifications ?? []),
-      opts.routeDecision,
-    );
+    const qualificationCheck = checkQualification(rubric, qualificationsUsed, opts.qualifications ?? []);
     const scored = scoreAssessment({
       matches: matchResult.matches,
       qualificationsUsed,
@@ -580,23 +544,42 @@ function scoreOccupation(
         workExperienceBoost: opts.workExperienceBoost,
         confidenceScoreBefore: scored.confidenceScore,
         workExperienceAnalysis: null,
-        routeDecision: opts.routeDecision,
         vocational: null,
+        finalProject: gate.finalProject,
+        excludeDiplomaRows: opts.excludeDiplomaRows,
       };
     }
   }
   return best!;
 }
 
-/** Add the Step 1 route cap to a qualification-check result (no duplicate notes). */
-function withRouteCap(
-  check: QualificationCheckResult,
-  decision?: OccupationRouteDecision,
-): QualificationCheckResult {
-  if (!decision?.capAtConditional) return check;
-  const notes = [...check.notes];
-  if (decision.capNote && !notes.includes(decision.capNote)) notes.push(decision.capNote);
-  return { capAtConditional: true, notes, routeCapped: true };
+/** Rubric Tier 3 gate subject name (same default as score.ts). */
+function gateNameOf(rubric: Rubric): string {
+  return (
+    rubric.tiers.tier3.gate?.gateSubject ??
+    "Major Project / Thesis / Final-Year Project/ Capstone Project"
+  );
+}
+
+/** Step 3 evidence for the top occupation (engineering decision, final project). Duration is shown by Gate 1. */
+export function buildQualificationEvidence(
+  winner: ScoredOccupation,
+  gate: Gate1Decision,
+): QualificationEvidence {
+  const engineering = gate.engineering ?? {
+    decision: "unclear" as const,
+    reason: "no qualification decided Gate 1",
+    titleSignal: "none" as const,
+    subjectShare: null,
+    subjectsConsidered: 0,
+    capped: false,
+    note: null,
+  };
+  return {
+    duration: [],
+    engineering: { ...engineering, capped: false },
+    finalProject: winner.finalProject ?? null,
+  };
 }
 
 const VOCATIONAL_SOURCE: TranscriptSourceInfo = {
@@ -610,7 +593,6 @@ function scoreVocationalOccupation(
   occupation: VocationalOccupation,
   routing: RoutingDecision,
   ctx: ScoringContext,
-  routeDecision: OccupationRouteDecision,
 ): ScoredOccupation {
   const accepted = routing.qualifications.filter(
     (q) => q.route === "vocational" && q.vocationalOccupationIds.includes(occupation.id),
@@ -630,7 +612,7 @@ function scoreVocationalOccupation(
       workExperienceBoost: boost,
       qualificationMet: accepted.length > 0,
       qualificationNote,
-      qualificationCheck: withRouteCap({ capAtConditional: false, notes: [] }, routeDecision),
+      qualificationCheck: { capAtConditional: false, notes: [] },
     });
   const v = rescore(ctx.workExperienceBoost);
   const used = v.matches.map((m) => m.qualification);
@@ -648,80 +630,108 @@ function scoreVocationalOccupation(
     workExperienceBoost: ctx.workExperienceBoost,
     confidenceScoreBefore: v.scored.confidenceScore,
     workExperienceAnalysis: null,
-    routeDecision,
     vocational: v.detail,
     rescoreVocational: rescore,
   };
 }
 
 /**
- * Step 1 routing + scoring: classify the qualifications, rank only the
- * occupations the route allows (academic and vocational), best-first.
+ * Gate 1 + scoring: decide eligibility first, then rank only the occupations
+ * in the open tracks (academic and vocational), best-first. A blocked gate
+ * (not eligible / manual review) scores nothing. A targeted run (occupationId,
+ * tests / dev only) still computes the gate but always scores its occupation.
  */
 export function scoreRoutedOccupations(
   extracted: ExtractedSubjectRow[],
   ctx: ScoringContext,
-): { scored: ScoredOccupation[]; routing: RoutingDecision } {
+): { scored: ScoredOccupation[]; gate: Gate1Decision } {
   const vocational = listVocationalOccupations();
+  const academicAll = loadAllAcademicRubrics();
+  const gate = evaluateGate1({
+    qualifications: ctx.qualifications ?? [],
+    rows: extracted,
+    engineeringTitledDegree: ctx.engineeringTitledDegree,
+    vocational,
+    rubricCodes: academicAll.map((r) => r.anzscoCode),
+  });
   const routing = routeQualifications(ctx.qualifications ?? [], vocational);
-  const transcriptHasUnitCodes = hasUnitCodes(extracted, ctx.transcriptTexts);
-  const target = ctx.occupationId?.trim();
-  const vocTarget = target
-    ? vocational.find((o) => o.id === target || o.anzsco === target)
-    : undefined;
-  const academic = target ? (vocTarget ? [] : [loadRubric(target)]) : loadAllAcademicRubrics();
-  const vocList = target ? (vocTarget ? [vocTarget] : []) : vocational;
-
   const out: ScoredOccupation[] = [];
-  for (const rubric of academic) {
-    const decision = routeOccupation(
-      routing,
-      {
-        id: rubric.occupationId ?? rubric.anzscoCode,
-        anzsco: rubric.anzscoCode,
-        kind: occupationKind(rubric.anzscoCode, "academic"),
-      },
-      { transcriptHasUnitCodes },
-    );
-    // A targeted run always scores its occupation (caps still apply).
-    if (!decision.include && !target) continue;
-    out.push(
-      scoreOccupation(extracted, rubric, {
+
+  const target = ctx.occupationId?.trim();
+  if (target) {
+    const vocTarget = vocational.find((o) => o.id === target || o.anzsco === target);
+    if (vocTarget) {
+      if (vocTarget.coreUnits.units.some((u) => u.code)) {
+        out.push({ ...scoreVocationalOccupation(extracted, vocTarget, routing, ctx), track: "engineering_associate" });
+      }
+    } else {
+      const rubric = loadRubric(target);
+      out.push({
+        ...scoreOccupation(extracted, rubric, {
+          workExperienceBoost: ctx.workExperienceBoost,
+          qualifications: ctx.qualifications,
+        }),
+        track: trackForAnzsco(rubric.anzscoCode) ?? undefined,
+      });
+    }
+    return { scored: out, gate };
+  }
+
+  if (!gateIsOpen(gate)) return { scored: [], gate };
+
+  const priority = new Map(openTracks(gate).map((t) => [t.track, t.priority]));
+  for (const rubric of academicAll) {
+    const track = trackForAnzsco(rubric.anzscoCode);
+    if (!track || !priority.has(track)) continue;
+    const excludeDiplomaRows = track !== "engineering_associate";
+    out.push({
+      ...scoreOccupation(extracted, rubric, {
         workExperienceBoost: ctx.workExperienceBoost,
         qualifications: ctx.qualifications,
-        routeDecision: decision,
+        excludeDiplomaRows,
       }),
-    );
+      track,
+      trackPriority: priority.get(track),
+    });
   }
-  for (const occ of vocList) {
-    const decision = routeOccupation(
-      routing,
-      { id: occ.id, anzsco: occ.anzsco, kind: "vocational", scoringEnabled: occ.scoringEnabled },
-      { transcriptHasUnitCodes },
-    );
-    const targetedWithCodes = Boolean(target) && occ.coreUnits.units.some((u) => u.code);
-    if (!decision.include && !targetedWithCodes) continue;
-    out.push(scoreVocationalOccupation(extracted, occ, routing, ctx, decision));
+  if (priority.has("engineering_associate")) {
+    const transcriptHasUnitCodes = hasUnitCodes(extracted, ctx.transcriptTexts);
+    for (const occ of vocational) {
+      if (!occ.scoringEnabled) continue;
+      const pointed = routing.vocationalOccupationIds.includes(occ.id);
+      if (!pointed && !transcriptHasUnitCodes) continue;
+      out.push({
+        ...scoreVocationalOccupation(extracted, occ, routing, ctx),
+        track: "engineering_associate",
+        trackPriority: priority.get("engineering_associate"),
+      });
+    }
   }
   out.sort(compareScoredOccupations);
-  return { scored: out, routing };
+  return { scored: out, gate };
 }
 
-/** Saved form of the routing decision (AssessmentResult.routing). */
-function routingInfo(routing: RoutingDecision): RoutingInfo {
-  return {
-    routes: routing.routes,
-    label: routing.label,
-    basedOn: routing.basedOn,
-    note: routing.note,
-    notes: routing.notes,
-    qualifications: routing.qualifications.map((q) => ({
-      title: q.title,
-      level: q.level,
-      route: q.route,
-      reason: q.reason,
-    })),
-  };
+/**
+ * Cut a ranked list to n, keeping at least one occupation from every track
+ * that was scored (the best of a missing track replaces the lowest entry of a
+ * track that has more than one), then re-rank.
+ */
+export function cutWithTracks(list: ScoredOccupation[], n: number): ScoredOccupation[] {
+  const top = list.slice(0, n);
+  const tracks = [...new Set(list.map((s) => s.track).filter((t): t is Gate1TrackId => !!t))];
+  for (const t of tracks) {
+    if (top.some((s) => s.track === t)) continue;
+    const best = list.find((s) => s.track === t);
+    if (!best) continue;
+    for (let i = top.length - 1; i >= 0; i--) {
+      const tr = top[i]!.track;
+      if (top.filter((s) => s.track === tr).length > 1) {
+        top[i] = best;
+        break;
+      }
+    }
+  }
+  return top.sort(compareScoredOccupations);
 }
 
 /**
@@ -737,6 +747,7 @@ export function scoreAllOccupations(
   },
 ): ScoredOccupation[] {
   if (!rubrics) return scoreRoutedOccupations(extracted, opts).scored;
+  // Explicit rubric list: scored as given (no Gate 1 filter).
   const all = rubrics.map((rubric) => scoreOccupation(extracted, rubric, opts));
   all.sort(compareScoredOccupations);
   return all;
@@ -754,7 +765,7 @@ export function applyBoostAndCut(
   const list = [...shortlist];
   applyWorkExperienceJudgements(list, judgements);
   list.sort(compareScoredOccupations);
-  return list.slice(0, maxCandidates);
+  return cutWithTracks(list, maxCandidates);
 }
 
 /** Apply Groq judgements: re-score with boost and attach UI analysis. */
@@ -803,11 +814,14 @@ function applyWorkExperienceJudgements(
   }
 }
 
-/** Prefer recommended occupations, then higher numeric confidence, then coverage. */
+/** Prefer recommended occupations, then Gate 1 track priority, then higher numeric confidence, then coverage. */
 function compareScoredOccupations(a: ScoredOccupation, b: ScoredOccupation): number {
   if (a.scored.recommended !== b.scored.recommended) {
     return a.scored.recommended ? -1 : 1;
   }
+  const pa = a.trackPriority ?? 99;
+  const pb = b.trackPriority ?? 99;
+  if (pa !== pb) return pa - pb;
   if (a.scored.confidenceScore !== b.scored.confidenceScore) {
     return b.scored.confidenceScore - a.scored.confidenceScore;
   }
@@ -834,15 +848,50 @@ function compareScoredOccupations(a: ScoredOccupation, b: ScoredOccupation): num
 }
 
 /**
- * Empty-extraction guard: when a fresh extraction returns no subjects but
- * subjects were saved earlier, keep the saved ones instead of wiping them.
+ * Gate 1 not eligible / manual review: no candidates, no scores, the gate
+ * reason is the explanation (no LLM).
  */
-export function chooseSubjectsAfterExtraction(
-  fresh: ExtractedSubjectRow[],
-  saved: ExtractedSubjectRow[],
-): { rows: ExtractedSubjectRow[]; keptSaved: boolean } {
-  if (!fresh.length && saved.length) return { rows: saved, keptSaved: true };
-  return { rows: fresh, keptSaved: false };
+export function gateBlockedResult(
+  gate: Gate1Decision,
+  extracted: ExtractedSubjectRow[],
+  extraction?: ExtractionReport,
+): AssessmentResult {
+  return {
+    anzscoCode: null,
+    title: null,
+    recommended: false,
+    confidence: null,
+    confidenceScore: 0,
+    determination: "no_match",
+    foundationalMatched: 0,
+    foundationalExpected: 0,
+    foundationalPct: 0,
+    coreMatched: 0,
+    coreExpected: 0,
+    corePct: 0,
+    tier1Outcome: null,
+    tier2Outcome: null,
+    tier3GateMet: false,
+    workExperienceBoost: false,
+    qualificationsUsed: [],
+    matches: [],
+    unmatched: [],
+    missingSubjects: { tier1: [], tier2: [] },
+    transcriptSource: {
+      kind: "unknown",
+      label:
+        gate.result === "not_eligible"
+          ? "Not scored: Gate 1 result is not eligible"
+          : "Not scored: Gate 1 needs manual review",
+    },
+    mastersFallbackUsed: false,
+    candidates: [],
+    extractedSubjects: extracted,
+    qualificationNotes: [],
+    gate1: gate,
+    explanation: gate.reason,
+    ...(extraction ? { extraction } : {}),
+  };
 }
 
 function emptyNoMatch(explanation: string): AssessmentResult {
@@ -901,33 +950,6 @@ function emptyNoMatch(explanation: string): AssessmentResult {
     extractedSubjects: [],
     explanation,
   };
-}
-
-async function persistExtractedSubjects(
-  caseId: string,
-  rows: ExtractedSubjectRow[],
-  transcripts: Array<{ id: string }>,
-) {
-  await prisma.extractedSubject.deleteMany({ where: { caseId } });
-  if (!rows.length) return;
-  // Each row keeps the transcript it came from; fall back to the only
-  // transcript when there is exactly one (older rows had no documentId).
-  const fallbackDocId = transcripts.length === 1 ? transcripts[0]!.id : null;
-  await prisma.extractedSubject.createMany({
-    data: rows.map((r, i) => ({
-      caseId,
-      documentId: r.documentId ?? fallbackDocId,
-      name: r.name,
-      code: r.code ?? null,
-      credits: r.credits ?? null,
-      grade: r.grade ?? null,
-      yearOrSemester: r.yearOrSemester ?? null,
-      qualification: r.qualification,
-      sourceSnippet: r.sourceSnippet ?? null,
-      isRepeat: r.isRepeat ?? false,
-      sortOrder: i,
-    })),
-  });
 }
 
 function dedupeMatchRows(matches: SubjectMatch[]): SubjectMatch[] {
@@ -1074,7 +1096,11 @@ function buildCandidate(
     workExperienceBoost?: boolean;
     workExperienceAnalysis?: WorkExperienceCandidateAnalysis | null;
   },
-  occ?: { vocational?: VocationalAssessmentDetail | null },
+  occ?: {
+    vocational?: VocationalAssessmentDetail | null;
+    finalProject?: FinalProjectEvidence | null;
+    track?: Gate1TrackId;
+  },
 ): AnzscoCandidate {
   const vocational = occ?.vocational ?? null;
   return {
@@ -1106,6 +1132,8 @@ function buildCandidate(
     gateDowngraded: scored.gateDowngraded ?? false,
     routeCapped: scored.routeCapped ?? false,
     vocational,
+    finalProjectTitle: occ?.finalProject?.title ?? null,
+    ...(occ?.track ? { track: occ.track } : {}),
   };
 }
 
@@ -1119,16 +1147,25 @@ export function assessExtractedSubjects(
     qualifications?: QualificationInfo[];
     /** Raw transcript texts (unit-code scan for vocational occupations). */
     transcriptTexts?: string[];
+    /** Step 2 checkbox: assessor confirmed an engineering-titled degree. */
+    engineeringTitledDegree?: boolean | null;
   },
 ): AssessmentResult {
   // Boost (test path) is already applied to every occupation before the cut.
-  const { scored: scoredAll, routing } = scoreRoutedOccupations(extracted, {
-    workExperienceBoost: opts?.workExperienceBoost ?? false,
-    qualifications: opts?.qualifications,
-    transcriptTexts: opts?.transcriptTexts,
-    occupationId: opts?.occupationId,
-  });
-  const top = scoredAll.slice(0, assessConfig.maxCandidates);
+  const { scored: scoredAll, gate } = scoreRoutedOccupations(
+    extracted.map(withTermIndex),
+    {
+      workExperienceBoost: opts?.workExperienceBoost ?? false,
+      qualifications: opts?.qualifications,
+      transcriptTexts: opts?.transcriptTexts,
+      occupationId: opts?.occupationId,
+      engineeringTitledDegree: opts?.engineeringTitledDegree,
+    },
+  );
+  if (!gateIsOpen(gate) && !opts?.occupationId) {
+    return gateBlockedResult(gate, extracted);
+  }
+  const top = cutWithTracks(scoredAll, assessConfig.maxCandidates);
   const winner = top[0];
   if (!winner) {
     return emptyNoMatch("No academic ANZSCO rubrics available to assess.");
@@ -1209,10 +1246,12 @@ export function assessExtractedSubjects(
     candidates,
     extractedSubjects: extracted,
     qualificationNotes: winner.scored.qualificationNotes,
-    routing: routingInfo(routing),
+    gate1: gate,
     assessmentFlow: winner.vocational ? "vocational_units" : "academic",
     bandDetermination: winner.scored.bandDetermination,
     explanation: "",
+    qualificationEvidence: buildQualificationEvidence(winner, gate),
+    finalProjectTitle: winner.finalProject?.title ?? null,
   };
 
   if (!result.recommended) {
@@ -1236,13 +1275,13 @@ export async function scoreOccupationWithLlm(
     /** Rows to score (default: the best pool chosen by the sync scorer). */
     pool?: ExtractedSubjectRow[];
     qualifications?: QualificationInfo[];
-    routeDecision?: OccupationRouteDecision;
+    excludeDiplomaRows?: boolean;
   },
 ): Promise<ScoredOccupation> {
   const sync = scoreOccupation(extracted, rubric, {
     workExperienceBoost: opts.workExperienceBoost,
     qualifications: opts.qualifications,
-    routeDecision: opts.routeDecision,
+    excludeDiplomaRows: opts.excludeDiplomaRows,
   });
   const pool = opts.pool ?? sync.poolRows;
   const qualificationsUsed = qualificationsOf(pool);
@@ -1253,12 +1292,10 @@ export async function scoreOccupationWithLlm(
     anzscoCode: rubric.anzscoCode,
     ...matchOptionsForRubric(rubric),
   });
-  const qualificationCheck = withRouteCap(
-    checkQualification(rubric, qualificationsUsed, opts.qualifications ?? []),
-    opts.routeDecision,
-  );
+  const gate = preferFinalYearGate(matchResult.matches, pool, gateNameOf(rubric));
+  const qualificationCheck = checkQualification(rubric, qualificationsUsed, opts.qualifications ?? []);
   const scored = scoreAssessment({
-    matches: matchResult.matches,
+    matches: gate.matches,
     qualificationsUsed,
     workExperienceBoost: opts.workExperienceBoost,
     rubric,
@@ -1267,7 +1304,8 @@ export async function scoreOccupationWithLlm(
   return {
     ...sync,
     scored,
-    matches: matchResult.matches,
+    finalProject: gate.finalProject,
+    matches: gate.matches,
     unmatched: matchResult.unmatched,
     qualificationsUsed,
     qualificationCheck,
@@ -1279,47 +1317,6 @@ export async function scoreOccupationWithLlm(
 // ---------------------------------------------------------------------------
 // Helpers: deterministic ordering, cache keys
 // ---------------------------------------------------------------------------
-
-const LEVEL_RANK: Record<string, number> = { bachelor: 0, master: 1 };
-
-/** Bachelor transcripts first, then Master's, then others; stable by upload time / id. */
-function sortTranscripts<
-  T extends { id: string; degreeLevel: string | null; createdAt: Date },
->(docs: T[]): T[] {
-  return [...docs].sort((a, b) => {
-    const ra = LEVEL_RANK[a.degreeLevel ?? ""] ?? 2;
-    const rb = LEVEL_RANK[b.degreeLevel ?? ""] ?? 2;
-    if (ra !== rb) return ra - rb;
-    const ta = a.createdAt.getTime();
-    const tb = b.createdAt.getTime();
-    if (ta !== tb) return ta - tb;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-  });
-}
-
-function rowFromDb(s: {
-  name: string;
-  code: string | null;
-  credits: string | null;
-  grade: string | null;
-  yearOrSemester: string | null;
-  qualification: string;
-  sourceSnippet: string | null;
-  isRepeat: boolean;
-  documentId: string | null;
-}): ExtractedSubjectRow {
-  return {
-    name: s.name,
-    code: s.code,
-    credits: s.credits,
-    grade: s.grade,
-    yearOrSemester: s.yearOrSemester,
-    qualification: s.qualification as QualificationType,
-    sourceSnippet: s.sourceSnippet,
-    isRepeat: s.isRepeat,
-    documentId: s.documentId,
-  };
-}
 
 function withoutTimestamps<T extends Record<string, unknown>>(row: T) {
   const { createdAt: _c, updatedAt: _u, ...rest } = row as Record<string, unknown>;
@@ -1339,7 +1336,8 @@ export function scoringConfigFingerprint() {
     maxCandidates: assessConfig.maxCandidates,
     boostShortlist: assessConfig.boostShortlist,
     coverage: assessConfig.coverage,
-    engine: "assess-v3-routing",
+    evidence: evidenceConfigFingerprint(),
+    engine: "assess-v5-gate1",
   };
 }
 

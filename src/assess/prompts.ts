@@ -4,13 +4,15 @@ export function subjectExtractSystemPrompt(): string {
 The response MUST be a single JSON object matching this exact schema (no markdown, no extra keys):
 {
   "subjects": [
-    { "name": string, "code": string | null }
+    { "name": string, "code": string | null, "credits": number | null, "yearOrSemester": string | null }
   ]
 }
 
 Rules:
-- "name" is ONLY the subject / unit / course title. Do NOT put credit hours, grades, marks, semesters, years, or degree level (bachelor/master) in it.
+- "name" is ONLY the subject / unit / course title. Do NOT put credit hours, grades, marks, semesters, years, or degree level (bachelor/master) in it (credits and year / semester have their own fields).
 - "code" is the unit / course code printed next to that subject exactly as written (e.g. "UEECD0007", "BSBSMB402", "MATH1001"), or null when none is printed. Never invent a code and never put the code inside "name".
+- "credits" is the credit points / credit hours / units printed for that subject as a number (e.g. 3, 7.5), or null when no credit value is printed for it. Never compute, convert or guess credits.
+- "yearOrSemester" is the year / semester / term heading the subject is listed under, copied as printed (e.g. "Year 3 Semester 2", "Semester V", "Second Year", "Fall 2019"), or null when this text chunk shows no such heading for it. Never guess a year or semester from the subject name, its code or its position.
 - Extract EVERY distinct subject name that appears in this text chunk. Do not invent or rename subjects.
 - Keep each name exactly as written on the transcript (minor whitespace cleanup only).
 - Include projects, theses, capstones, internships / industrial training when they appear as named entries.
@@ -21,7 +23,7 @@ Rules:
 }
 
 export function subjectExtractUserPrompt(chunk: string): string {
-  return `Extract subject names (and their unit codes when printed) from this transcript text.
+  return `Extract subject names (and their unit codes, credits and year / semester when printed) from this transcript text.
 ---
 ${chunk}
 ---`;

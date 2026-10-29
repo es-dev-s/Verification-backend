@@ -3,13 +3,14 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import {
   highestDegree,
-  nameFromFileName,
+  resolveClientName,
   resolveOccupation,
   snippet,
   verificationOf,
   type ClientFilter,
 } from "../lib/clientSummary.js";
 import { deleteBlob } from "../lib/blob.js";
+import { CLIENT_NAME_FIELD } from "../lib/clientName.js";
 import { prisma } from "../lib/prisma.js";
 import { getExtractQueue } from "../lib/queues.js";
 
@@ -102,6 +103,13 @@ export const clientRoutes: FastifyPluginAsync = async (app) => {
           select: { type: true, originalName: true },
         },
         assessment: { select: { anzscoCode: true, resultJson: true } },
+        // Name read from the CV text (stored on FieldSource; see lib/clientName.ts).
+        fieldSources: {
+          where: { field: CLIENT_NAME_FIELD, degreeLevel: null },
+          orderBy: { id: "asc" },
+          take: 1,
+          select: { finalValue: true },
+        },
       },
     });
 
@@ -118,16 +126,17 @@ export const clientRoutes: FastifyPluginAsync = async (app) => {
         assessmentTitle: json?.title,
       });
       const degree = highestDegree(c.qualifications, c.selectedDegreeLevels);
-      const cv = c.documents.find((d) => d.type === "CV");
-      const fromCv = nameFromFileName(cv?.originalName);
-      const fromOther = fromCv
-        ? null
-        : nameFromFileName(c.documents[0]?.originalName);
+      const clientName = resolveClientName({
+        caseId: c.id,
+        cvTextName: c.fieldSources[0]?.finalValue,
+        cvFileName: c.documents.find((d) => d.type === "CV")?.originalName,
+        firstFileName: c.documents[0]?.originalName,
+      });
       const review = reviews.byCase.get(c.id) ?? null;
       return {
         caseId: c.id,
-        name: fromCv ?? fromOther ?? `Client ${c.id.slice(-6)}`,
-        nameSource: fromCv ? "cv_file" : fromOther ? "document_file" : "case_id",
+        name: clientName.name,
+        nameSource: clientName.source,
         anzscoCode: occupation.anzscoCode,
         occupation: occupation.title,
         degreeLevel: degree.degreeLevel,

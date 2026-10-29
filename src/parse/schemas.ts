@@ -76,6 +76,8 @@ export const experienceRowSchema = z.object({
 
 export const experienceExtractSchema = z.object({
   rows: z.array(experienceRowSchema),
+  /** Applicant's full name from the top of the CV (Clients page only). */
+  applicantName: z.string().nullable().optional(),
 });
 
 export type ExperienceExtract = z.infer<typeof experienceExtractSchema>;

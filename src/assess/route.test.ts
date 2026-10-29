@@ -2,13 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { assessExtractedSubjects } from "./assessCase.js";
 import { listVocationalOccupations } from "./loadRubric.js";
-import { DIPLOMA_ONLY_NOTE } from "./qualificationCheck.js";
 import {
   classifyQualification,
-  DRAFTSPERSON_CAP_NOTE,
   findQualificationCodes,
   occupationKind,
-  routeOccupation,
   routeQualifications,
 } from "./route.js";
 import type { ExtractedSubjectRow, QualificationType } from "./schemas.js";
@@ -82,69 +79,39 @@ describe("classifyQualification", () => {
   });
 });
 
-describe("routeQualifications / routeOccupation", () => {
-  it("unknown → score everything, with the 'not identified' note", () => {
+describe("routeQualifications", () => {
+  it("unknown → 'qualification not identified' label, no vocational ids", () => {
     const d = routeQualifications([{ level: "unknown", title: null }], voc);
-    assert.equal(d.scoreAll, true);
-    assert.equal(d.note, "Scored as: all occupations — qualification not identified");
-    assert.equal(routeOccupation(d, { id: "x", anzsco: "233512", kind: "professional" }).include, true);
-    // Vocational only when the transcript lists unit codes.
-    const v = { id: ELEC.id, anzsco: "312311", kind: "vocational" as const, scoringEnabled: true };
-    assert.equal(routeOccupation(d, v).include, false);
-    assert.equal(routeOccupation(d, v, { transcriptHasUnitCodes: true }).include, true);
+    assert.deepEqual(d.routes, ["unknown"]);
+    assert.deepEqual(d.vocationalOccupationIds, []);
   });
 
-  it("professional: 312511 excluded without a drafting word, vocational excluded", () => {
-    const d = routeQualifications([{ level: "bachelor", title: "Bachelor of Civil Engineering" }], voc);
-    assert.equal(d.note, "Scored as: professional engineer — based on Bachelor of Civil Engineering");
-    assert.equal(routeOccupation(d, { id: "p", anzsco: "233211", kind: "professional" }).include, true);
-    assert.equal(routeOccupation(d, { id: "m", anzsco: "312511", kind: occupationKind("312511", "academic") }).include, false);
-    assert.equal(
-      routeOccupation(d, { id: ELEC.id, anzsco: "312311", kind: "vocational", scoringEnabled: true }, { transcriptHasUnitCodes: true }).include,
-      false,
-    );
-  });
-
-  it("draftsperson_academic: 312511 included, professional capped at conditional", () => {
-    const d = routeQualifications([{ level: "diploma", title: "Diploma of Mechanical Drafting" }], voc);
-    assert.equal(routeOccupation(d, { id: "m", anzsco: "312511", kind: "mech_draftsperson" }).include, true);
-    const p = routeOccupation(d, { id: "p", anzsco: "233512", kind: "professional" });
-    assert.deepEqual(p, { include: true, capAtConditional: true, capNote: DRAFTSPERSON_CAP_NOTE });
-  });
-
-  it("vocational: matching occupation in, professional capped as diploma, 312511 out", () => {
+  it("vocational: a UEE62122 title points to 312311", () => {
     const d = routeQualifications([{ level: "advanced_diploma", title: "UEE62122 Advanced Diploma of Engineering Technology - Electrical" }], voc);
     assert.deepEqual(d.routes, ["vocational"]);
-    assert.equal(
-      routeOccupation(d, { id: ELEC.id, anzsco: "312311", kind: "vocational", scoringEnabled: true }).include,
-      true,
-    );
-    assert.equal(routeOccupation(d, { id: "m", anzsco: "312511", kind: "mech_draftsperson" }).include, false);
-    const p = routeOccupation(d, { id: "p", anzsco: "233311", kind: "professional" });
-    assert.equal(p.capAtConditional, true);
-    assert.equal(p.capNote, DIPLOMA_ONLY_NOTE);
+    assert.ok(d.vocationalOccupationIds.includes(ELEC.id));
+    assert.equal(occupationKind("312511", "academic"), "mech_draftsperson");
   });
 
-  it("a disabled vocational occupation is never ranked and gets a note", () => {
+  it("a disabled vocational occupation gets a note", () => {
     const civil = voc.find((o) => !o.scoringEnabled && o.titleMatch.length)!;
     assert.ok(civil);
     const d = routeQualifications([{ level: "advanced_diploma", title: "Advanced Diploma of Civil Construction Design" }], voc);
-    assert.equal(
-      routeOccupation(d, { id: civil.id, anzsco: civil.anzsco, kind: "vocational", scoringEnabled: false }).include,
-      false,
-    );
     assert.ok(d.notes.some((n) => n.includes("not switched on")));
   });
 });
 
-describe("assessExtractedSubjects routing", () => {
-  it("professional route: 312511 is not ranked and the Scored as note is saved", () => {
+describe("assessExtractedSubjects tracks (Gate 1)", () => {
+  it("4-year engineering bachelor: PE + Technologist scored, Associate (312511 / 312311) closed", () => {
     const rows = [row("Engineering Drawing"), row("Thermodynamics"), row("Fluid Mechanics"), row("Machine Design")];
     const res = assessExtractedSubjects(rows, {
-      qualifications: [{ level: "bachelor", title: "Bachelor of Mechanical Engineering" }],
+      qualifications: [{ level: "bachelor", title: "Bachelor of Mechanical Engineering", durationYears: 4 }],
     });
+    assert.equal(res.gate1?.rule, 3);
     assert.ok(!res.candidates!.some((c) => c.anzscoCode === "312511"));
     assert.ok(!res.candidates!.some((c) => c.anzscoCode === "312311"));
-    assert.equal(res.routing?.note, "Scored as: professional engineer — based on Bachelor of Mechanical Engineering");
+    assert.ok(res.candidates!.every((c) => c.track === "professional_engineer" || c.track === "engineering_technologist"));
+    assert.ok(res.candidates!.some((c) => c.track === "engineering_technologist"), "technologist kept in the top list");
+    assert.equal(res.routing, undefined);
   });
 });

@@ -179,9 +179,15 @@ describe("assessExtractedSubjects (vocational route)", () => {
   it("UEE62122 with 22 core units → 312311 verified, unit detail on the candidate", () => {
     const res = assessExtractedSubjects(unitRows(22), {
       qualifications: [
-        { level: "advanced_diploma", title: "Advanced Diploma of Engineering Technology - Electrical", texts: ["UEE62122"] },
+        {
+          level: "advanced_diploma",
+          title: "Advanced Diploma of Engineering Technology - Electrical",
+          texts: ["UEE62122"],
+          durationYears: 2,
+        },
       ],
     });
+    assert.equal(res.gate1?.rule, 5);
     assert.equal(res.anzscoCode, "312311");
     assert.equal(res.determination, "verified_no_risk");
     assert.equal(res.tier1Outcome, null);
@@ -189,7 +195,9 @@ describe("assessExtractedSubjects (vocational route)", () => {
     const c = res.candidates!.find((x) => x.anzscoCode === "312311")!;
     assert.equal(c.vocational?.coreMatched, 22);
     assert.equal(c.vocational?.coreBand, "no_risk");
-    assert.ok(!res.candidates!.some((x) => x.anzscoCode === "312511"));
-    assert.match(res.routing?.note ?? "", /^Scored as: vocational \(unit codes\) — based on /);
+    // 312511 is in the same (Associate) track; its title check caps it without a drafting title.
+    const drafts = res.candidates!.find((x) => x.anzscoCode === "312511");
+    if (drafts) assert.notEqual(drafts.determination, "verified_no_risk");
+    assert.ok(res.candidates!.every((x) => x.track === "engineering_associate"));
   });
 });

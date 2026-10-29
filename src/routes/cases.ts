@@ -2,6 +2,8 @@ import type { FastifyPluginAsync } from "fastify";
 import { DegreeLevel } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { CLIENT_NAME_FIELD } from "../lib/clientName.js";
+import { TRANSCRIPT_FIELD_PREFIX } from "../assess/transcriptData.js";
 
 const degreeLevelSchema = z.nativeEnum(DegreeLevel);
 
@@ -68,6 +70,8 @@ async function upsertFieldFinals(
 ) {
   if (body.fieldFinalEntries?.length) {
     for (const entry of body.fieldFinalEntries) {
+      // Transcript data values are saved by their own endpoint only.
+      if (entry.field.startsWith(TRANSCRIPT_FIELD_PREFIX)) continue;
       await prisma.fieldSource.upsert({
         where: {
           caseId_field_degreeLevel: {
@@ -150,7 +154,14 @@ function caseInclude() {
     documents: { orderBy: { createdAt: "asc" as const } },
     qualifications: { orderBy: { degreeLevel: "asc" as const } },
     experienceRows: { orderBy: { sortOrder: "asc" as const } },
-    fieldSources: true,
+    // The CV client name is for the Clients page only, not the engine.
+    // Transcript data rows ("transcript.*") have their own endpoint.
+    fieldSources: {
+      where: {
+        field: { not: CLIENT_NAME_FIELD },
+        NOT: { field: { startsWith: TRANSCRIPT_FIELD_PREFIX } },
+      },
+    },
     assessment: true,
     readJobs: {
       orderBy: { updatedAt: "desc" as const },

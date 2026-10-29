@@ -287,6 +287,7 @@ export function experienceSystemPrompt(): string {
 
 Return JSON only matching this schema exactly:
 {
+  "applicantName": string|null,
   "rows": [
     {
       "employer": string|null,
@@ -323,6 +324,7 @@ Rules:
 - Do not compare roles against any target occupation. domainMatch is engineering-related only.
 - Sort is not required; the server will sort. Prefer most recent roles first if you can.
 - Skip Education / Skills / Projects / Certifications sections — only paid or professional roles under Experience / Work History / Employment (or a short Experience: line on a CV/profile).
-- If no jobs found, return {"rows": []}.
+- applicantName: the CV owner's full personal name as written at the top of the CV (or after "Name:"). Never a heading such as "Curriculum Vitae", "Resume" or "CV", never a job title, employer, referee or address. Use null if it is not clearly shown.
+- If no jobs found, return {"applicantName": <name or null>, "rows": []}.
 - confidence 0.0–1.0 when set.`;
 }

@@ -1,7 +1,7 @@
 import type { Rubric } from "./loadRubric.js";
 import { hasTopicWord } from "./matchSubjects.js";
 import type { QualificationCheckResult } from "./score.js";
-import { isDiplomaLevel, type QualificationType } from "./schemas.js";
+import type { Gate1AwardLevel, QualificationType } from "./schemas.js";
 
 /** One qualification on the case (level mapped for scoring, title as entered/extracted). */
 export type QualificationInfo = {
@@ -11,17 +11,26 @@ export type QualificationInfo = {
   rawLevel?: string | null;
   /** Transcript texts at this qualification's level (routing spots UEE62122 etc.). */
   texts?: string[];
+  /** Stated programme length in years (Qualification.durationYears; Gate 1 check). */
+  durationYears?: number | null;
+  /** Country / institution (Gate 1 "may be recognised higher" config hook). */
+  country?: string | null;
+  institution?: string | null;
+  /** Field of study (Upload & details); added to the title for the engineering signal. */
+  fieldOfStudy?: string | null;
+  /** Award level chosen by the assessor (null = detect from the title). */
+  awardOverride?: Gate1AwardLevel | null;
+  /** Counted duration entered by the assessor (Transcript data / Verify details). */
+  countedYearsOverride?: number | null;
+  /** Engineering subject share (0–1) entered by the assessor. */
+  engineeringShareOverride?: number | null;
 };
-
-export const DIPLOMA_ONLY_NOTE =
-  "diploma-level qualification; professional engineer occupations expect a bachelor's";
 
 /**
  * Step 1 qualification check for one occupation and one transcript pool.
  *
- * - Default (professional engineer flows, levelPolicy "bachelor_expected"):
- *   when the pool is diploma / advanced diploma / associate degree only, the
- *   result is capped at conditional with DIPLOMA_ONLY_NOTE.
+ * Qualification level and duration are decided by Gate 1 (gate1.ts) before
+ * any scoring, so there is no level cap here any more.
  * - levelPolicy "diploma_ok" + titleCheck (312511 Mechanical Engineering
  *   Draftsperson): diploma levels are fine, but the qualification title must
  *   read as the right field; a failing or missing title is capped at
@@ -32,21 +41,10 @@ export function checkQualification(
   poolLevels: readonly QualificationType[],
   qualifications: readonly QualificationInfo[] = [],
 ): QualificationCheckResult {
-  const policy = rubric.qualificationCheck?.levelPolicy ?? "bachelor_expected";
   const notes: string[] = [];
   let capAtConditional = false;
 
   const knownPool = poolLevels.filter((l) => l !== "unknown");
-  // Pool rows without a level: fall back to the case's qualification levels.
-  const levels = knownPool.length
-    ? knownPool
-    : qualifications.map((q) => q.level).filter((l) => l !== "unknown");
-  const diplomaOnly = levels.length > 0 && levels.every((l) => isDiplomaLevel(l));
-
-  if (policy === "bachelor_expected" && diplomaOnly) {
-    capAtConditional = true;
-    notes.push(DIPLOMA_ONLY_NOTE);
-  }
 
   const titleCheck = rubric.qualificationCheck?.titleCheck;
   if (titleCheck?.allOf.length) {

@@ -83,6 +83,11 @@ export function dedupeSubjects(rows: ExtractedSubjectRow[]): ExtractedSubjectRow
       existing.isRepeat = true;
       // Keep a unit code found by another chunk for the same subject.
       if (!existing.code && row.code) existing.code = row.code;
+      // Same for credits / year-semester printed only in another chunk.
+      if (!existing.credits && row.credits) existing.credits = row.credits;
+      if (!existing.yearOrSemester && row.yearOrSemester) {
+        existing.yearOrSemester = row.yearOrSemester;
+      }
       continue;
     }
     seen.set(key, { ...row, isRepeat: row.isRepeat ?? false });
@@ -131,7 +136,10 @@ async function extractChunkOnKey(
       }`,
     );
     return subjectExtractLlmSchema.parse(data).subjects.map((s) =>
-      subjectNameToExtractedRow(s.name, s.code ?? null),
+      subjectNameToExtractedRow(s.name, s.code ?? null, {
+        credits: s.credits ?? null,
+        yearOrSemester: s.yearOrSemester ?? null,
+      }),
     );
   } catch (err) {
     console.error(
@@ -222,9 +230,9 @@ export function hashSubjectInput(
   transcripts: Array<{ id: string; text: string; degreeLevel?: string | null }>,
 ): string {
   const h = createHash("sha256");
-  // v3: rows carry unit codes (vocational transcripts), so older saved rows
-  // without codes are re-extracted once.
-  h.update("subjects-v3-codes\0");
+  // v3: rows carry unit codes (vocational transcripts); v4: rows also carry
+  // credits and year / semester, so older saved rows are re-extracted once.
+  h.update("subjects-v4-terms\0");
   for (const t of transcripts) {
     h.update(t.id);
     h.update("\0");
@@ -243,7 +251,7 @@ export function hashSubjectInput(
  */
 export function hashScoringInput(parts: Record<string, unknown>): string {
   return createHash("sha256")
-    .update("score-v2\0")
+    .update("score-v3\0")
     .update(stableStringify(parts))
     .digest("hex");
 }

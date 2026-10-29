@@ -174,9 +174,14 @@ export function mergeExperienceParts(
 ): Record<string, unknown> {
   const rows: z.infer<typeof experienceExtractSchema>["rows"] = [];
   const seen = new Set<string>();
+  let applicantName: string | null = null;
   for (const part of parts) {
     const parsed = experienceExtractSchema.safeParse(part);
     if (!parsed.success) continue;
+    // First part holds the top of the CV, where the name is.
+    if (!applicantName && parsed.data.applicantName?.trim()) {
+      applicantName = parsed.data.applicantName.trim();
+    }
     for (const row of parsed.data.rows) {
       const key = [
         (row.employer ?? "").toLowerCase().replace(/\s+/g, " ").trim(),
@@ -188,7 +193,7 @@ export function mergeExperienceParts(
       rows.push(row);
     }
   }
-  return { rows };
+  return { rows, applicantName };
 }
 
 export type GroqFormParseResult = {

@@ -1,0 +1,217 @@
+{
+  "title": "ANZSCO Occupations Designated to Engineers Australia",
+  "categories": [
+    {
+      "category": "Professional Engineer",
+      "skillLevel": 1
+    },
+    {
+      "category": "Engineering Technologist",
+      "skillLevel": 1
+    },
+    {
+      "category": "Engineering Associate",
+      "skillLevel": 2
+    }
+  ],
+  "occupations": [
+    {
+      "anzscoCode": "233911",
+      "occupation": "Aeronautical Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "233912",
+      "occupation": "Agricultural Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including alternative title"
+    },
+    {
+      "anzscoCode": "233913",
+      "occupation": "Biomedical Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "233211",
+      "occupation": "Civil Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "233111",
+      "occupation": "Chemical Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1
+    },
+    {
+      "anzscoCode": "233411",
+      "occupation": "Electronics Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specialization"
+    },
+    {
+      "anzscoCode": "233311",
+      "occupation": "Electrical Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "233915",
+      "occupation": "Environmental Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1
+    },
+    {
+      "anzscoCode": "233212",
+      "occupation": "Geotechnical Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1
+    },
+    {
+      "anzscoCode": "233511",
+      "occupation": "Industrial Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specialization"
+    },
+    {
+      "anzscoCode": "233112",
+      "occupation": "Materials Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1
+    },
+    {
+      "anzscoCode": "233512",
+      "occupation": "Mechanical Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "233611",
+      "occupation": "Mining Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specialization"
+    },
+    {
+      "anzscoCode": "233916",
+      "occupation": "Naval Architect",
+      "category": "Professional Engineer",
+      "skillLevel": 1
+    },
+    {
+      "anzscoCode": "233612",
+      "occupation": "Petroleum Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "233513",
+      "occupation": "Production or Plant Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specialization"
+    },
+    {
+      "anzscoCode": "233214",
+      "occupation": "Structural Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1
+    },
+    {
+      "anzscoCode": "263311",
+      "occupation": "Telecommunications Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including specialization"
+    },
+    {
+      "anzscoCode": "263312",
+      "occupation": "Telecommunications Network Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1,
+      "note": "including alternative titles"
+    },
+    {
+      "anzscoCode": "233215",
+      "occupation": "Transport Engineer",
+      "category": "Professional Engineer",
+      "skillLevel": 1
+    },
+    {
+      "anzscoCode": "233999",
+      "occupation": "Engineering Professional nec",
+      "category": "Professional Engineer",
+      "skillLevel": 1
+    },
+    {
+      "anzscoCode": "233914",
+      "occupation": "Engineering Technologist",
+      "category": "Engineering Technologist",
+      "skillLevel": 1,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "312999",
+      "occupation": "Building and Engineering Technicians nec",
+      "category": "Engineering Associate",
+      "skillLevel": 2
+    },
+    {
+      "anzscoCode": "312211",
+      "occupation": "Civil Engineering Draftsperson",
+      "category": "Engineering Associate",
+      "skillLevel": 2,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "312311",
+      "occupation": "Electrical Engineering Draftsperson",
+      "category": "Engineering Associate",
+      "skillLevel": 2,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "312411",
+      "occupation": "Electronic Engineering Draftsperson",
+      "category": "Engineering Associate",
+      "skillLevel": 2,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "312511",
+      "occupation": "Mechanical Engineering Draftsperson",
+      "category": "Engineering Associate",
+      "skillLevel": 2,
+      "note": "including specializations"
+    },
+    {
+      "anzscoCode": "313212",
+      "occupation": "Telecommunication Field Engineer",
+      "category": "Engineering Associate",
+      "skillLevel": 2
+    },
+    {
+      "anzscoCode": "313213",
+      "occupation": "Telecommunications Network Planner",
+      "category": "Engineering Associate",
+      "skillLevel": 2
+    },
+    {
+      "anzscoCode": "313214",
+      "occupation": "Telecommunications Technical Officer or Technologist",
+      "category": "Engineering Associate",
+      "skillLevel": 2
+    }
+  ]
+}

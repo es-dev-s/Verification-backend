@@ -9,7 +9,6 @@ import {
   withCompetence,
 } from "./analyzeRisk.js";
 import { computeRiskScores } from "./scoreRisk.js";
-import { bandInputForCandidate } from "./bandInput.js";
 import type { Competence, RiskAssessmentResult } from "./schemas.js";
 
 const QUAL_PRIORITY = [
@@ -68,8 +67,9 @@ async function persistRisk(
 }
 
 /**
- * Compute Step-4 risk for a chosen ANZSCO from the Step 3 determination and
- * bands; historical outcomes are a modifier only, work experience a note.
+ * Compute Step 5 risk for a chosen ANZSCO: weighted overall academic alignment
+ * score (fundamental / core / historical, see riskBands.config.ts) mapped to
+ * the risk category. Work experience is a note only.
  */
 export async function runRiskAssessment(
   caseId: string,
@@ -86,6 +86,13 @@ export async function runRiskAssessment(
   }
 
   const assessment = caseRow.assessment.resultJson as StoredAssessment;
+  if (assessment.gate1 && assessment.gate1.result !== "open") {
+    throw new Error(
+      assessment.gate1.result === "not_eligible"
+        ? "Risk analysis is not available: the assessment Gate 1 result is not eligible."
+        : "Risk analysis is not available: the assessment Gate 1 result needs manual review.",
+    );
+  }
   const candidate = findCandidate(assessment, opts.anzscoCode);
   if (!candidate) {
     throw new Error(
@@ -130,8 +137,8 @@ export async function runRiskAssessment(
     precedent,
     workExperienceBoost,
     missingCore,
-    bands: bandInputForCandidate(candidate, assessment),
     assessmentFlow: candidate.assessmentFlow,
+    vocational: "vocational" in candidate ? candidate.vocational : null,
   });
 
   const llm = await judgeRiskWithLlm(scored, { deadlineMs });

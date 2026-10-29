@@ -304,7 +304,10 @@ describe("#6 cache keys", () => {
 describe("#9 work boost applied before the top-N cut", () => {
   it("lets a 4th-ranked related occupation into the top 3", () => {
     const rows = [sub("Engineering Mathematics"), sub("Engineering Physics")];
-    const all = scoreAllOccupations(rows);
+    const all = scoreAllOccupations(rows, undefined, {
+      workExperienceBoost: false,
+      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering", durationYears: 4 }],
+    });
     const shortlist = all.slice(0, 6);
     const fourth = shortlist[3]!;
     const result = applyBoostAndCut(

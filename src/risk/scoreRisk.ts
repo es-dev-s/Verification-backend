@@ -1,44 +1,41 @@
 import { emptyPrecedentCheck } from "./precedent.js";
+import {
+  RISK_SCORING_CONFIG,
+  type RiskBandThresholds,
+  type RiskScoringConfig,
+} from "./riskBands.config.js";
 import type {
   HistoricalStats,
   PrecedentCheck,
   RiskAssessmentResult,
+  RiskComponentKey,
+  RiskComponentScore,
   RiskLevel,
+  RiskScoringBreakdown,
 } from "./schemas.js";
+import type { VocationalAssessmentDetail } from "../assess/schemas.js";
 
 /**
- * Step 4 risk (aligned to the Step 3 bands).
+ * Step 5 risk: overall academic alignment score.
  *
- * The risk level comes from the Step 3 determination and tier bands:
- *   Verified + every tier No Risk   → No risk
- *   Verified + any tier Low Risk    → Low risk
- *   Conditional                     → Medium risk
- *   Not verified / no match         → High risk
- * Step 3 caps already live in the determination: a missing major-project gate
- * (Tier 3) and the Step 1 qualification / route caps turn Verified into
- * Conditional, so those cases are Medium here.
+ *   Overall = 0.30 × Fundamental + 0.50 × Core + 0.20 × Historical
  *
- * Historical outcomes are a modifier only: with at least
- * HISTORICAL_MIN_CASES past cases for the ANZSCO and a positive rate below
- * HISTORICAL_POSITIVE_FLOOR %, the level moves one step worse (with a note).
- * Otherwise the history is context. Work experience is a note only.
- * Foundational / core % and the old weighted alignment are display-only.
+ * Academic occupations: Fundamental = Tier 1 (foundational) coverage %,
+ * Core = Tier 2 (core) coverage %. Vocational unit-code occupations: Core =
+ * core-unit coverage %, Fundamental = elective coverage % (found ÷ required
+ * minimum) only when the rubric sets an elective minimum. Historical = positive
+ * outcome % of past cases for the ANZSCO, used only with at least
+ * historicalMinCases cases.
+ *
+ * A component without usable data is left out and the remaining weights are
+ * re-normalised. The overall score maps to the risk category through the
+ * thresholds in riskBands.config.ts (weights live there too).
  */
 
-/** Old weighted formula — display-only (no longer decides the level). */
-export const RISK_WEIGHTS = {
-  fundamental: 0.3,
-  core: 0.5,
-  historical: 0.2,
-} as const;
+/** Approved weights (from the governance config). */
+export const RISK_WEIGHTS = RISK_SCORING_CONFIG.weights;
 
-/** Historical modifier: minimum past cases for the ANZSCO. */
-export const HISTORICAL_MIN_CASES = 20;
-/** Historical modifier: positive-outcome rate (%) below which risk worsens one level. */
-export const HISTORICAL_POSITIVE_FLOOR = 40;
-
-const LEVEL_ORDER: RiskLevel[] = ["no_risk", "low", "medium", "high"];
-
+/** Older saved results may carry these; kept so their types still resolve. */
 export type StepThreeDetermination =
   | "verified_no_risk"
   | "conditional"
@@ -46,63 +43,141 @@ export type StepThreeDetermination =
   | "no_match";
 
 export type RiskBandInput = {
-  /** Step 3 determination before surfacing (bandDetermination), else determination. */
   determination: StepThreeDetermination;
-  /** Tier band outcomes (null / undefined when a tier is not used). */
   tierOutcomes: Array<string | null | undefined>;
-  /** Why Step 3 is conditional (gate / qualification / route caps), for the basis text. */
   capReasons?: string[];
 };
 
-const BAND_LABEL: Record<string, string> = {
-  no_risk: "No Risk",
-  low_risk: "Low Risk",
-  medium_risk: "Medium Risk",
-  high_risk: "High Risk",
-  flag: "Flag",
-};
-
-/** Base Step 4 level from the Step 3 determination + bands, with a plain-language basis. */
-export function baseRiskFromBands(input: RiskBandInput): { level: RiskLevel; basis: string } {
-  const bands = input.tierOutcomes.filter((t): t is string => Boolean(t));
-  const bandText = bands.length ? ` (${bands.map((b) => BAND_LABEL[b] ?? b).join(", ")})` : "";
-  const caps = input.capReasons?.length ? ` — ${input.capReasons.join("; ")}` : "";
-  switch (input.determination) {
-    case "verified_no_risk": {
-      const allNoRisk = bands.every((b) => b === "no_risk");
-      return allNoRisk
-        ? { level: "no_risk", basis: `Step 3: Verified – No Risk${bandText}` }
-        : { level: "low", basis: `Step 3: Verified – Low Risk${bandText}` };
-    }
-    case "conditional":
-      return { level: "medium", basis: `Step 3: Conditional${bandText}${caps}` };
-    case "not_verified":
-      return { level: "high", basis: `Step 3: Not verified${bandText}` };
-    default:
-      return { level: "high", basis: "Step 3: no occupation match" };
-  }
-}
-
-/** One level worse (High stays High). */
-export function worsenRiskLevel(level: RiskLevel): RiskLevel {
-  const i = LEVEL_ORDER.indexOf(level);
-  return LEVEL_ORDER[Math.min(LEVEL_ORDER.length - 1, i + 1)]!;
-}
-
-/** Does the historical modifier apply (≥ 20 cases and < 40 % positive)? */
-export function historicalModifierApplies(h: HistoricalStats): boolean {
-  return h.totalCases >= HISTORICAL_MIN_CASES && h.positivePct < HISTORICAL_POSITIVE_FLOOR;
+/** Overall score → risk category using the governance thresholds. */
+export function riskLevelFromScore(
+  overallPct: number,
+  bands: RiskBandThresholds = RISK_SCORING_CONFIG.bands,
+): RiskLevel {
+  if (overallPct >= bands.noRisk) return "no_risk";
+  if (overallPct >= bands.low) return "low";
+  if (overallPct >= bands.medium) return "medium";
+  return "high";
 }
 
 /**
- * Legacy score → level bands (old formula). Kept for reference / old saved
- * results only; Step 4 no longer uses it to decide the level.
+ * Vocational "fundamental" slot: elective coverage % (found ÷ required
+ * minimum, capped at 100). Null when electives are not assessed (no minimum).
  */
-export function riskLevelFromScore(overallPct: number): RiskLevel {
-  if (overallPct >= 85) return "no_risk";
-  if (overallPct >= 75) return "low";
-  if (overallPct >= 50) return "medium";
-  return "high";
+export function vocationalElectivePct(
+  detail: Pick<VocationalAssessmentDetail, "electiveStatus" | "electiveMinimum" | "electivesFound"> | null | undefined,
+): number | null {
+  if (!detail || detail.electiveStatus === "not_assessed") return null;
+  const min = detail.electiveMinimum;
+  if (min == null || min <= 0) return null;
+  return clampPct(Math.min(100, (detail.electivesFound.length / min) * 100));
+}
+
+const COMPONENT_LABELS: Record<"academic" | "vocational_units", Record<RiskComponentKey, string>> = {
+  academic: {
+    fundamental: "Fundamental subjects",
+    core: "Core subjects",
+    historical: "Historical outcomes",
+  },
+  vocational_units: {
+    fundamental: "Electives",
+    core: "Core units",
+    historical: "Historical outcomes",
+  },
+};
+
+function weightPct(w: number): string {
+  return `${Math.round(w * 1000) / 10}%`;
+}
+
+/** Weighted overall score with re-normalisation for missing components. */
+export function computeAlignmentScore(
+  input: {
+    /** Null when not applicable (vocational without an elective minimum). */
+    fundamentalPct: number | null;
+    corePct: number;
+    historical: HistoricalStats;
+    assessmentFlow?: "academic" | "vocational_units";
+  },
+  config: RiskScoringConfig = RISK_SCORING_CONFIG,
+): RiskScoringBreakdown {
+  const flow = input.assessmentFlow ?? "academic";
+  const labels = COMPONENT_LABELS[flow];
+  const historicalUsable = input.historical.totalCases >= config.historicalMinCases;
+
+  const raw: Array<{ key: RiskComponentKey; pct: number | null; reason?: string }> = [
+    {
+      key: "fundamental",
+      pct: input.fundamentalPct == null ? null : clampPct(input.fundamentalPct),
+      reason:
+        input.fundamentalPct == null
+          ? flow === "vocational_units"
+            ? "Electives not assessed (no minimum set in the rubric)"
+            : "No fundamental score"
+          : undefined,
+    },
+    { key: "core", pct: clampPct(input.corePct) },
+    {
+      key: "historical",
+      pct: input.historical.totalCases > 0 ? clampPct(input.historical.positivePct) : null,
+      reason: historicalUsable
+        ? undefined
+        : input.historical.totalCases > 0
+          ? `Only ${input.historical.totalCases} past case${input.historical.totalCases === 1 ? "" : "s"} (minimum ${config.historicalMinCases})`
+          : "No past cases for this ANZSCO",
+    },
+  ];
+
+  const used = (c: (typeof raw)[number]) =>
+    c.pct != null && (c.key !== "historical" || historicalUsable);
+  const usedWeight = raw.reduce((sum, c) => sum + (used(c) ? config.weights[c.key] : 0), 0);
+
+  const components: RiskComponentScore[] = raw.map((c) => {
+    const isUsed = used(c);
+    return {
+      key: c.key,
+      label: labels[c.key],
+      pct: c.pct,
+      weight: config.weights[c.key],
+      appliedWeight: isUsed && usedWeight > 0 ? Math.round((config.weights[c.key] / usedWeight) * 1000) / 1000 : 0,
+      used: isUsed,
+      ...(isUsed || !c.reason ? {} : { reason: c.reason }),
+    };
+  });
+
+  const overallPct =
+    usedWeight > 0
+      ? clampPct(
+          raw.reduce(
+            (sum, c) => sum + (used(c) ? (c.pct as number) * config.weights[c.key] : 0),
+            0,
+          ) / usedWeight,
+        )
+      : 0;
+
+  const renormalised = components.some((c) => !c.used);
+  const notes: string[] = [];
+  for (const c of components) {
+    if (!c.used) notes.push(`${c.label} not used: ${c.reason ?? "no data"}.`);
+  }
+  if (renormalised) {
+    notes.push(
+      `Weights re-normalised: ${components
+        .filter((c) => c.used)
+        .map((c) => `${c.label} ${weightPct(c.appliedWeight)}`)
+        .join(", ")}.`,
+    );
+  }
+
+  return {
+    configVersion: config.version,
+    components,
+    overallPct,
+    riskLevel: riskLevelFromScore(overallPct, config.bands),
+    bands: { ...config.bands },
+    historicalMinCases: config.historicalMinCases,
+    renormalised,
+    notes,
+  };
 }
 
 export function riskLevelLabel(level: RiskLevel): string {
@@ -143,7 +218,10 @@ export function buildMissingMajorDomainsSentence(
 }
 
 export function buildRiskDrivers(input: {
-  fundamentalPct: number;
+  /** Null when not applicable (vocational without an elective minimum). */
+  fundamentalPct: number | null;
+  /** "foundational" (academic) or "elective" (vocational). */
+  fundamentalLabel?: string;
   corePct: number;
   historical: HistoricalStats;
   workExperienceBoost: boolean;
@@ -152,13 +230,16 @@ export function buildRiskDrivers(input: {
   const reducingRisk: string[] = [];
   const increasingRisk: string[] = [];
 
-  if (input.fundamentalPct >= 80) {
+  const fLabel = input.fundamentalLabel ?? "foundational";
+  if (input.fundamentalPct == null) {
+    // Not applicable: no driver.
+  } else if (input.fundamentalPct >= 80) {
     reducingRisk.push(
-      `Strong foundational coverage (${input.fundamentalPct}%).`,
+      `Strong ${fLabel} coverage (${input.fundamentalPct}%).`,
     );
   } else if (input.fundamentalPct < 60) {
     increasingRisk.push(
-      `Weak foundational coverage (${input.fundamentalPct}%).`,
+      `Weak ${fLabel} coverage (${input.fundamentalPct}%).`,
     );
   }
 
@@ -184,7 +265,7 @@ export function buildRiskDrivers(input: {
 
   if (input.workExperienceBoost) {
     reducingRisk.push(
-      "Related work experience in the field (context only; does not change the risk level).",
+      "Related work experience in the field (context only; does not change the score).",
     );
   }
 
@@ -215,47 +296,35 @@ export function computeRiskScores(input: {
   precedent?: PrecedentCheck;
   workExperienceBoost: boolean;
   missingCore: string[];
-  /** Step 3 determination + bands (decides the level). */
-  bands: RiskBandInput;
   assessmentFlow?: "academic" | "vocational_units";
+  /** Vocational unit-code detail (electives feed the fundamental slot). */
+  vocational?: Pick<VocationalAssessmentDetail, "electiveStatus" | "electiveMinimum" | "electivesFound"> | null;
+  config?: RiskScoringConfig;
 }): Omit<
   RiskAssessmentResult,
   "competence" | "competenceSource" | "insight"
 > {
-  const fundamentalPct = clampPct(input.fundamentalPct);
+  const flow = input.assessmentFlow ?? "academic";
+  const vocational = flow === "vocational_units";
+  const fundamentalPct = vocational
+    ? vocationalElectivePct(input.vocational)
+    : clampPct(input.fundamentalPct);
   const corePct = clampPct(input.corePct);
   const historicalPct = clampPct(input.historical.positivePct);
 
-  // Display-only: the old weighted alignment (no work-experience points).
-  const overallPct = clampPct(
-    fundamentalPct * RISK_WEIGHTS.fundamental +
-      corePct * RISK_WEIGHTS.core +
-      historicalPct * RISK_WEIGHTS.historical,
+  const scoring = computeAlignmentScore(
+    { fundamentalPct, corePct, historical: input.historical, assessmentFlow: flow },
+    input.config,
   );
 
-  const base = baseRiskFromBands(input.bands);
-  const riskNotes: string[] = [];
-  const historicalModifierApplied = historicalModifierApplies(input.historical);
-  let riskLevel = base.level;
-  if (historicalModifierApplied) {
-    const worse = worsenRiskLevel(base.level);
-    riskNotes.push(
-      worse === base.level
-        ? `Historical outcomes for ${input.anzscoCode} are weak (${input.historical.positivePct}% positive of ${input.historical.totalCases} cases); already High risk.`
-        : `Moved one level worse (${riskLevelLabel(base.level)} → ${riskLevelLabel(worse)}): historical outcomes for ${input.anzscoCode} are ${input.historical.positivePct}% positive across ${input.historical.totalCases} cases (below ${HISTORICAL_POSITIVE_FLOOR}% with at least ${HISTORICAL_MIN_CASES} cases).`,
-    );
-    riskLevel = worse;
-  } else if (input.historical.totalCases > 0) {
-    riskNotes.push(
-      `Historical outcomes (context only): ${input.historical.positivePct}% positive across ${input.historical.totalCases} cases.`,
-    );
-  }
+  const riskNotes: string[] = [...scoring.notes];
   if (input.workExperienceBoost) {
-    riskNotes.push("Related work experience noted (context only; it does not change the risk level).");
+    riskNotes.push("Related work experience noted (context only; it does not change the score).");
   }
 
   const { reducingRisk, increasingRisk } = buildRiskDrivers({
     fundamentalPct,
+    fundamentalLabel: vocational ? "elective" : "foundational",
     corePct,
     historical: input.historical,
     workExperienceBoost: input.workExperienceBoost,
@@ -265,22 +334,19 @@ export function computeRiskScores(input: {
   return {
     anzscoCode: input.anzscoCode,
     title: input.title,
-    fundamentalPct,
+    fundamentalPct: fundamentalPct ?? 0,
     corePct,
     historicalPct,
     historical: input.historical,
     precedent: input.precedent ?? emptyPrecedentCheck(),
-    overallPctBeforeWork: overallPct,
+    overallPctBeforeWork: scoring.overallPct,
     workExperienceBoost: input.workExperienceBoost,
     workExperienceDelta: 0,
-    overallPct,
-    riskLevel,
-    baseRiskLevel: base.level,
-    riskBasis: base.basis,
-    stepThreeDetermination: input.bands.determination,
-    historicalModifierApplied,
+    overallPct: scoring.overallPct,
+    riskLevel: scoring.riskLevel,
+    scoring,
     riskNotes,
-    assessmentFlow: input.assessmentFlow ?? "academic",
+    assessmentFlow: flow,
     reducingRisk,
     increasingRisk,
     missingMajorDomains: buildMissingMajorDomainsSentence(input.missingCore),

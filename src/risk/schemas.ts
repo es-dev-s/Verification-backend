@@ -57,6 +57,36 @@ export type PrecedentCheck = {
   cases: PrecedentCaseRow[];
 };
 
+export type RiskComponentKey = "fundamental" | "core" | "historical";
+
+/** One component of the overall academic alignment score. */
+export type RiskComponentScore = {
+  key: RiskComponentKey;
+  /** Display label, e.g. "Fundamental subjects" / "Core units". */
+  label: string;
+  /** Component score (0–100); null when there is no data. */
+  pct: number | null;
+  /** Configured weight (0–1). */
+  weight: number;
+  /** Weight actually applied after re-normalisation (0 when not used). */
+  appliedWeight: number;
+  used: boolean;
+  /** Why the component was left out. */
+  reason?: string;
+};
+
+/** Weighted overall score and the governance settings used for it. */
+export type RiskScoringBreakdown = {
+  configVersion: string;
+  components: RiskComponentScore[];
+  overallPct: number;
+  riskLevel: RiskLevel;
+  bands: { noRisk: number; low: number; medium: number };
+  historicalMinCases: number;
+  renormalised: boolean;
+  notes: string[];
+};
+
 export type RiskAssessmentResult = {
   anzscoCode: string;
   title: string;
@@ -70,26 +100,28 @@ export type RiskAssessmentResult = {
    * Separate from subject-weighted scoring.
    */
   precedent: PrecedentCheck;
-  /** Display-only: old weighted alignment (no longer decides the level). */
+  /** Same as overallPct (work experience no longer adds points; kept for old saved results). */
   overallPctBeforeWork: number;
   workExperienceBoost: boolean;
   /** Always 0 now: work experience is a note only (kept for old saved results). */
   workExperienceDelta: number;
-  /** Display-only: old weighted alignment (0–100). */
+  /** Overall academic alignment score (0–100). */
   overallPct: number;
-  /** Final level: Step 3 base level, after the historical modifier. */
+  /** Risk category from the overall score and the governance thresholds. */
   riskLevel: RiskLevel;
-  /** Level from the Step 3 determination + bands, before the historical modifier. */
+  /** Components, weights and thresholds behind the score (absent on older saved results). */
+  scoring?: RiskScoringBreakdown;
+  /** Older saved results only (band-based rating, no longer produced). */
   baseRiskLevel?: RiskLevel;
-  /** Plain-language basis, e.g. "Step 3: Verified – Low Risk (No Risk, Low Risk)". */
+  /** Older saved results only (band-based rating, no longer produced). */
   riskBasis?: string;
   stepThreeDetermination?: "verified_no_risk" | "conditional" | "not_verified" | "no_match";
-  /** True when ≥ 20 cases and < 40 % positive moved the level one step worse. */
+  /** Older saved results only (band-based rating, no longer produced). */
   historicalModifierApplied?: boolean;
-  /** Notes: historical modifier / context, work experience, competence conflict. */
+  /** Notes: components left out / re-normalised weights, work experience, competence conflict. */
   riskNotes?: string[];
   assessmentFlow?: "academic" | "vocational_units";
-  /** True when the competence check disagrees with the band (band stands). */
+  /** True when the competence check disagrees with the risk category (category stands). */
   competenceConflict?: boolean;
   reducingRisk: string[];
   increasingRisk: string[];

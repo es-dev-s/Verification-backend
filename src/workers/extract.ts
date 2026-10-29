@@ -3,6 +3,7 @@ import { deleteBlob, loadBlob } from "../lib/blob.js";
 import { formatToExt, formatToMime } from "../lib/formats.js";
 import { prisma } from "../lib/prisma.js";
 import { correctOcrEducationText } from "../parse/ocrCorrect.js";
+import { ensureClientNameFromCv } from "../lib/clientName.js";
 import type { DocumentFormat } from "@prisma/client";
 
 export type ExtractorResult = {
@@ -71,6 +72,11 @@ export async function processExtractJob(documentId: string): Promise<void> {
     });
 
     await markReadsStale(doc.caseId);
+
+    // Clients page name from the CV text (no LLM; Step 2 Read refines it).
+    if (doc.type === "CV") {
+      await ensureClientNameFromCv(doc.caseId);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await prisma.document.update({

@@ -1,12 +1,14 @@
 import type { FastifyPluginAsync } from "fastify";
 import { createHash } from "node:crypto";
 import { DegreeLevel } from "@prisma/client";
+import { attachAwardDetails } from "../assess/awardDetails.js";
 import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
 import type { DegreeLevelLabel } from "../parse/schemas.js";
 import { documentMatchesDegreeLevel } from "../parse/documentScope.js";
 import { parseEducation, parseExperience } from "../workers/parse.js";
+import { ensureClientNameFromCv } from "../lib/clientName.js";
 
 const DEGREE_LEVELS = new Set<string>(Object.values(DegreeLevel));
 
@@ -106,6 +108,7 @@ async function runEducationRead(
       .send({ error: "No successfully extracted documents to read" });
   }
 
+  const levelTexts = ready.map((d) => d.text ?? "");
   const hash = inputHashFor(
     caseId,
     "EDUCATION",
@@ -124,7 +127,11 @@ async function runEducationRead(
       status: "DONE" as const,
       cached: true,
       degreeLevel,
-      result: existing.resultJson,
+      // Award level / field of study (Upload & details) also for reads cached
+      // before these fields existed.
+      result: existing.resultJson
+        ? await attachAwardDetails(caseId, degreeLevel, existing.resultJson as object, levelTexts)
+        : existing.resultJson,
     };
   }
 
@@ -153,7 +160,8 @@ async function runEducationRead(
   });
 
   try {
-    const result = await parseEducation(caseId, degreeLevel);
+    const parsed = await parseEducation(caseId, degreeLevel);
+    const result = await attachAwardDetails(caseId, degreeLevel, parsed, levelTexts);
     const resultJson = JSON.parse(JSON.stringify(result)) as object;
 
     await prisma.readJob.update({
@@ -249,6 +257,8 @@ async function runExperienceRead(
     console.log(
       `[read] EXPERIENCE case=${caseId} job=${jobId} CACHE HIT — no Gemini call`,
     );
+    // Older reads have no client name yet: fill it from the CV text (no LLM).
+    await ensureClientNameFromCv(caseId);
     return {
       jobId: existing.id,
       status: "DONE" as const,
