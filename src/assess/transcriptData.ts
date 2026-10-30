@@ -376,6 +376,12 @@ export async function resolveSubjects(input: {
   legacyHashMatches: boolean;
   docLevel: (t: { degreeLevel: string | null }) => QualificationType | "unknown";
   force?: boolean;
+  /**
+   * Saved subjects only (Assessment step re-run): never extract with the LLM.
+   * Saved rows are used even when the transcripts changed since they were
+   * read (the result is then not cached); null when nothing is saved.
+   */
+  savedOnly?: boolean;
   useLlm: boolean;
   deadlineMs: number;
 }): Promise<ResolvedSubjects | null> {
@@ -391,9 +397,17 @@ export async function resolveSubjects(input: {
   let rows: ExtractedSubjectRow[];
   let extraction: ExtractionReport;
   let cacheable = true;
-  if (!input.force && current) {
+  if ((!input.force || input.savedOnly) && current) {
     rows = persistedRows;
     extraction = { subjectHash, source: "persisted" };
+  } else if (input.savedOnly) {
+    if (!persistedRows.length) return null;
+    rows = persistedRows;
+    extraction = {
+      subjectHash: input.savedHash ?? input.previousExtraction?.subjectHash ?? "",
+      source: "persisted",
+    };
+    cacheable = false;
   } else if (input.useLlm && transcripts.length) {
     const sources: TranscriptSource[] = transcripts.map((t) => ({
       documentId: t.id,

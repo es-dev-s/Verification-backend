@@ -67,6 +67,21 @@ async function persistRisk(
 }
 
 /**
+ * Why risk analysis cannot run for this assessment (null when it can).
+ * Gate 1 must be open, or manual review with an assessor-selected occupation.
+ */
+export function riskGateBlockReason(
+  assessment: Pick<AssessmentResult, "gate1" | "assessorSelected">,
+): string | null {
+  const gate = assessment.gate1;
+  if (!gate || gate.result === "open") return null;
+  if (gate.result === "manual_review" && assessment.assessorSelected) return null;
+  return gate.result === "not_eligible"
+    ? "Risk analysis is not available: the assessment Gate 1 result is not eligible."
+    : "Risk analysis is not available: the assessment Gate 1 result needs manual review.";
+}
+
+/**
  * Compute Step 5 risk for a chosen ANZSCO: weighted overall academic alignment
  * score (fundamental / core / historical, see riskBands.config.ts) mapped to
  * the risk category. Work experience is a note only.
@@ -86,13 +101,8 @@ export async function runRiskAssessment(
   }
 
   const assessment = caseRow.assessment.resultJson as StoredAssessment;
-  if (assessment.gate1 && assessment.gate1.result !== "open") {
-    throw new Error(
-      assessment.gate1.result === "not_eligible"
-        ? "Risk analysis is not available: the assessment Gate 1 result is not eligible."
-        : "Risk analysis is not available: the assessment Gate 1 result needs manual review.",
-    );
-  }
+  const blocked = riskGateBlockReason(assessment);
+  if (blocked) throw new Error(blocked);
   const candidate = findCandidate(assessment, opts.anzscoCode);
   if (!candidate) {
     throw new Error(

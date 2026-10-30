@@ -28,8 +28,17 @@ import {
 } from "./qualificationCheck.js";
 import { routeQualifications, type RoutingDecision } from "./route.js";
 import { evidenceConfigFingerprint } from "./evidenceConfig.js";
+import {
+  ENGINEERING_TECHNOLOGIST_CODE,
+  familyAdjustmentForResult,
+  matchedBackfill,
+  matchedSlotsMissing,
+  normalizeCode,
+  type RankedCandidate,
+} from "./familyAdjust.js";
 import { evaluateGate1, gateIsOpen, openTracks, trackForAnzsco } from "./gate1.js";
 import { isDiplomaLevel } from "./schemas.js";
+import { manualSelectionFrom, NoSavedSubjectsError, type ManualSelection } from "./manualOccupation.js";
 import { preferFinalYearGate, withTermIndex } from "./qualificationEvidence.js";
 import {
   applyDocumentLevels,
@@ -47,6 +56,7 @@ import {
 export { applyDocumentLevels, chooseSubjectsAfterExtraction } from "./transcriptData.js";
 import type {
   AnzscoCandidate,
+  AssessorSelected,
   VocationalAssessmentDetail,
   AssessmentResult,
   ExtractedSubjectRow,
@@ -80,6 +90,14 @@ export type AssessCaseOpts = {
    * Default: score all academic occupations and return top candidates.
    */
   occupationId?: string;
+  /**
+   * Assessment-step run: score the saved subjects only, never extract with
+   * the LLM (re-reading transcripts is the Transcript data step's job).
+   * Throws NoSavedSubjectsError when the case has no saved subjects.
+   */
+  subjectsOnly?: boolean;
+  /** Re-score even when the cached result matches (no re-extraction). */
+  rescore?: boolean;
 };
 
 /** Which transcript rows were scored for an occupation. */
@@ -181,6 +199,8 @@ export async function assessCase(
     caseRow.fieldSources,
   );
   const gateOverrides = gateOverridesOf(qualificationInfos);
+  // Assessor-selected occupation (used only when Gate 1 = manual review).
+  const manualSelection = manualSelectionFrom(caseRow.fieldSources);
   const transcriptTexts = transcripts.map((t) => t.text ?? "");
 
   if (
@@ -211,6 +231,7 @@ export async function assessCase(
     engineeringTitledDegree: caseRow.engineeringTitledDegree,
     // Only when set, so cases without assessor values keep their cache key.
     ...(gateOverrides ? { gateOverrides } : {}),
+    ...(manualSelection ? { manualOccupation: manualSelection.occupationId } : {}),
     rubric: rubricFingerprint(),
     config: scoringConfigFingerprint(),
   });
@@ -223,6 +244,7 @@ export async function assessCase(
   // Cache hit
   if (
     !opts?.force &&
+    !opts?.rescore &&
     !opts?.injectedSubjects &&
     !opts?.occupationId &&
     caseRow.assessment &&
@@ -232,6 +254,19 @@ export async function assessCase(
     const cached = previous;
     if (!cached.extractedSubjects?.length && persistedRows.length) {
       cached.extractedSubjects = persistedRows;
+    }
+    // Saved results where ET took a top-N slot: fill the matched slot(s) from
+    // a deterministic re-score of the saved subjects (no LLM, not saved).
+    const backfilled = backfillCachedCandidates(cached, {
+      rows: persistedRows.length ? persistedRows : cached.extractedSubjects ?? [],
+      qualifications: qualificationInfos,
+      transcriptTexts,
+      engineeringTitledDegree: caseRow.engineeringTitledDegree,
+      manualSelection,
+    });
+    // Results saved before the family rules: derive them from the saved candidates.
+    if ((backfilled || !cached.familyAdjustment) && cached.candidates?.length) {
+      cached.familyAdjustment = familyAdjustmentForResult(cached);
     }
     return cached;
   }
@@ -261,9 +296,11 @@ export async function assessCase(
       legacyHashMatches: caseRow.assessment?.inputHash === legacyHash,
       docLevel,
       force: opts?.force,
+      savedOnly: opts?.subjectsOnly,
       useLlm,
       deadlineMs,
     });
+    if (!resolved && opts?.subjectsOnly) throw new NoSavedSubjectsError();
     if (!resolved) {
       return emptyNoMatch(
         "Could not extract subjects from the transcript (LLM unavailable and no cached subjects).",
@@ -276,14 +313,18 @@ export async function assessCase(
 
   // Gate 1 decides which tracks are scored (before any scoring); each
   // occupation in an open track is then sync-matched (no work experience in ranking).
-  const { scored: scoredAll, gate } = scoreRoutedOccupations(extracted, {
-    workExperienceBoost: false,
-    qualifications: qualificationInfos,
-    transcriptTexts,
-    occupationId: opts?.occupationId,
-    engineeringTitledDegree: caseRow.engineeringTitledDegree,
-  });
-  if (!gateIsOpen(gate) && !opts?.occupationId) {
+  const { scored: scoredAll, gate, assessorSelected } = scoreWithManualSelection(
+    extracted,
+    {
+      workExperienceBoost: false,
+      qualifications: qualificationInfos,
+      transcriptTexts,
+      occupationId: opts?.occupationId,
+      engineeringTitledDegree: caseRow.engineeringTitledDegree,
+    },
+    manualSelection,
+  );
+  if (!gateIsOpen(gate) && !opts?.occupationId && !assessorSelected) {
     // Not eligible / manual review: nothing is scored, the reason is the explanation.
     const blocked = gateBlockedResult(gate, extracted, extraction);
     await saveAssessment(caseId, blocked, cacheable ? inputHash : "");
@@ -333,6 +374,17 @@ export async function assessCase(
   if (!winner) {
     return emptyNoMatch("No academic ANZSCO rubrics available to assess.");
   }
+  // ET moved to Maybe Suitable: keep primary + (N − 1) matched alternatives.
+  const shown = [
+    ...top,
+    ...matchedBackfill(
+      top.map(rankedView),
+      [...shortlist, ...scoredAll],
+      assessConfig.maxCandidates,
+      rankedView,
+      assessorSelected?.anzscoCode,
+    ),
+  ];
 
   const unmatched = winner.unmatched.map((u) => ({
     name: u.name,
@@ -344,7 +396,7 @@ export async function assessCase(
   const transcriptSource = winner.vocational
     ? VOCATIONAL_SOURCE
     : buildTranscriptSource(winner.qualificationsUsed, winner.poolKind, extracted);
-  const candidates = top.map((s) => {
+  const candidates = shown.map((s) => {
     const m = dedupeMatchRows(s.matches);
     return buildCandidate(
       s.rubric,
@@ -397,7 +449,12 @@ export async function assessCase(
     extraction,
     qualificationEvidence: buildQualificationEvidence(winner, gate),
     finalProjectTitle: winner.finalProject?.title ?? null,
+    ...(assessorSelected ? { assessorSelected } : {}),
   };
+  result.familyAdjustment = familyAdjustmentForResult(
+    result,
+    etOwnScore(shortlist, scoredAll),
+  );
 
   // When nothing is recommended, still surface best coverage numbers from the top card
   if (!result.recommended) {
@@ -712,6 +769,30 @@ export function scoreRoutedOccupations(
 }
 
 /**
+ * Routed scoring plus the assessor-selected occupation: when Gate 1 asks for
+ * manual review and the assessor picked an occupation, that occupation alone
+ * is scored (targeted path, gate block bypassed). The gate decision is kept
+ * as manual_review; `assessorSelected` marks the result.
+ */
+export function scoreWithManualSelection(
+  extracted: ExtractedSubjectRow[],
+  ctx: ScoringContext,
+  manual: ManualSelection | null | undefined,
+): { scored: ScoredOccupation[]; gate: Gate1Decision; assessorSelected: AssessorSelected | null } {
+  const routed = scoreRoutedOccupations(extracted, ctx);
+  if (!manual || ctx.occupationId?.trim() || routed.gate.result !== "manual_review") {
+    return { ...routed, assessorSelected: null };
+  }
+  const targeted = scoreRoutedOccupations(extracted, { ...ctx, occupationId: manual.occupationId });
+  if (!targeted.scored.length) return { ...routed, assessorSelected: null };
+  return {
+    scored: targeted.scored,
+    gate: routed.gate,
+    assessorSelected: { anzscoCode: manual.anzscoCode, title: manual.title, occupationId: manual.occupationId },
+  };
+}
+
+/**
  * Cut a ranked list to n, keeping at least one occupation from every track
  * that was scored (the best of a missing track replaces the lowest entry of a
  * track that has more than one), then re-rank.
@@ -812,6 +893,92 @@ function applyWorkExperienceJudgements(
       confidenceScoreAfter: after,
     };
   }
+}
+
+/** Fields the family rules rank by. */
+function rankedView(s: ScoredOccupation): RankedCandidate {
+  return {
+    anzscoCode: s.rubric.anzscoCode,
+    recommended: s.scored.recommended,
+    confidenceScore: s.scored.confidenceScore,
+  };
+}
+
+/**
+ * Saved results that stored only the top-N, where ET took one of those slots
+ * and moved to Maybe Suitable: append the next-best matched occupation(s)
+ * from a deterministic re-score of the saved subjects (no LLM, nothing saved).
+ * Returns true when candidates were added.
+ */
+export function backfillCachedCandidates(
+  cached: AssessmentResult,
+  input: {
+    rows: ExtractedSubjectRow[];
+    qualifications?: QualificationInfo[];
+    transcriptTexts?: string[];
+    engineeringTitledDegree?: boolean | null;
+    manualSelection?: ManualSelection | null;
+  },
+): boolean {
+  const saved = cached.candidates ?? [];
+  const n = assessConfig.maxCandidates;
+  const assessorCode = cached.assessorSelected?.anzscoCode;
+  if (!saved.length || !input.rows.length) return false;
+  if (matchedSlotsMissing(saved, n, assessorCode) <= 0) return false;
+  try {
+    const { scored } = scoreWithManualSelection(
+      input.rows.map(withTermIndex),
+      {
+        workExperienceBoost: false,
+        qualifications: input.qualifications,
+        transcriptTexts: input.transcriptTexts,
+        engineeringTitledDegree: input.engineeringTitledDegree,
+      },
+      input.manualSelection,
+    );
+    const ranked = cutWithTracks(
+      scored,
+      Math.max(n, assessConfig.boostShortlist),
+    );
+    const fills = matchedBackfill(saved, [...ranked, ...scored], n, rankedView, assessorCode);
+    if (!fills.length) return false;
+    cached.candidates = [...saved, ...fills.map(candidateFromScored)];
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Step 4 card for a scored occupation (no work-experience judgement). */
+function candidateFromScored(s: ScoredOccupation): AnzscoCandidate {
+  const m = dedupeMatchRows(s.matches);
+  return buildCandidate(
+    s.rubric,
+    s.scored,
+    m,
+    computeMissingSubjects(m, s.rubric),
+    s.unmatched.map((u) => ({
+      name: u.name,
+      code: u.code ?? null,
+      qualification: u.qualification as QualificationType,
+    })),
+    {
+      workExperienceBoost: s.workExperienceBoost,
+      workExperienceAnalysis: s.workExperienceAnalysis,
+    },
+    s,
+  );
+}
+
+/** Engineering Technologist's own matching % when it was scored (first list that has it). */
+function etOwnScore(...lists: ScoredOccupation[][]): number | null {
+  for (const list of lists) {
+    const hit = list.find(
+      (s) => normalizeCode(s.rubric.anzscoCode) === ENGINEERING_TECHNOLOGIST_CODE,
+    );
+    if (hit) return hit.scored.confidenceScore;
+  }
+  return null;
 }
 
 /** Prefer recommended occupations, then Gate 1 track priority, then higher numeric confidence, then coverage. */
@@ -1149,10 +1316,12 @@ export function assessExtractedSubjects(
     transcriptTexts?: string[];
     /** Step 2 checkbox: assessor confirmed an engineering-titled degree. */
     engineeringTitledDegree?: boolean | null;
+    /** Assessor-selected occupation (used only when Gate 1 = manual review). */
+    manualSelection?: ManualSelection | null;
   },
 ): AssessmentResult {
   // Boost (test path) is already applied to every occupation before the cut.
-  const { scored: scoredAll, gate } = scoreRoutedOccupations(
+  const { scored: scoredAll, gate, assessorSelected } = scoreWithManualSelection(
     extracted.map(withTermIndex),
     {
       workExperienceBoost: opts?.workExperienceBoost ?? false,
@@ -1161,8 +1330,9 @@ export function assessExtractedSubjects(
       occupationId: opts?.occupationId,
       engineeringTitledDegree: opts?.engineeringTitledDegree,
     },
+    opts?.manualSelection,
   );
-  if (!gateIsOpen(gate) && !opts?.occupationId) {
+  if (!gateIsOpen(gate) && !opts?.occupationId && !assessorSelected) {
     return gateBlockedResult(gate, extracted);
   }
   const top = cutWithTracks(scoredAll, assessConfig.maxCandidates);
@@ -1170,6 +1340,17 @@ export function assessExtractedSubjects(
   if (!winner) {
     return emptyNoMatch("No academic ANZSCO rubrics available to assess.");
   }
+  // ET moved to Maybe Suitable: keep primary + (N − 1) matched alternatives.
+  const shown = [
+    ...top,
+    ...matchedBackfill(
+      top.map(rankedView),
+      scoredAll,
+      assessConfig.maxCandidates,
+      rankedView,
+      assessorSelected?.anzscoCode,
+    ),
+  ];
 
   const deduped = dedupeMatchRows(winner.matches);
   const unmatchedRows = winner.unmatched.map((u) => ({
@@ -1181,7 +1362,7 @@ export function assessExtractedSubjects(
   const transcriptSource = winner.vocational
     ? VOCATIONAL_SOURCE
     : buildTranscriptSource(winner.qualificationsUsed, winner.poolKind, extracted);
-  const candidates = top.map((s) => {
+  const candidates = shown.map((s) => {
     const m = dedupeMatchRows(s.matches);
     const boosted = opts?.workExperienceBoost ?? false;
     const before = boosted
@@ -1252,7 +1433,9 @@ export function assessExtractedSubjects(
     explanation: "",
     qualificationEvidence: buildQualificationEvidence(winner, gate),
     finalProjectTitle: winner.finalProject?.title ?? null,
+    ...(assessorSelected ? { assessorSelected } : {}),
   };
+  result.familyAdjustment = familyAdjustmentForResult(result, etOwnScore(scoredAll));
 
   if (!result.recommended) {
     result.anzscoCode = null;

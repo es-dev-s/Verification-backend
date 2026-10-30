@@ -1,0 +1,392 @@
+{
+  "meta": {
+    "description": "ANZSCO occupations grouped into five engineering families, tagged by ANZSCO skill level. Cross-listed occupations carry more than one family (relevant to the overlap exception in Part B).",
+    "source": "User-provided family list, 2026-10-29"
+  },
+  "families": [
+    {
+      "id": "ECE",
+      "family": "Family 1",
+      "name": "Electrical, Electronics & Communications",
+      "levelsPresent": [
+        "L1",
+        "L2"
+      ],
+      "anzscoCodes": [
+        "233311",
+        "233411",
+        "263311",
+        "263312",
+        "313212",
+        "233913",
+        "233914",
+        "312311",
+        "312411",
+        "313213",
+        "313214"
+      ]
+    },
+    {
+      "id": "CSI",
+      "family": "Family 2",
+      "name": "Civil, Structural & Infrastructure",
+      "levelsPresent": [
+        "L1",
+        "L2"
+      ],
+      "anzscoCodes": [
+        "233211",
+        "233212",
+        "233214",
+        "233215",
+        "233915",
+        "233912",
+        "233914",
+        "312211",
+        "312999"
+      ]
+    },
+    {
+      "id": "MIP",
+      "family": "Family 3",
+      "name": "Mechanical, Industrial & Production",
+      "levelsPresent": [
+        "L1",
+        "L2"
+      ],
+      "anzscoCodes": [
+        "233512",
+        "233511",
+        "233513",
+        "233911",
+        "233916",
+        "233913",
+        "233912",
+        "233914",
+        "312511"
+      ]
+    },
+    {
+      "id": "CMM",
+      "family": "Family 4",
+      "name": "Chemical, Materials, Mining & Resources",
+      "levelsPresent": [
+        "L1"
+      ],
+      "anzscoCodes": [
+        "233111",
+        "233112",
+        "233611",
+        "233612",
+        "233912",
+        "233915",
+        "233916",
+        "233914"
+      ]
+    },
+    {
+      "id": "OTHERS",
+      "family": "Family 5",
+      "name": "Other engineering occupations",
+      "levelsPresent": [
+        "L1",
+        "L2"
+      ],
+      "anzscoCodes": [
+        "233999",
+        "233914",
+        "133211"
+      ]
+    }
+  ],
+  "occupations": [
+    {
+      "anzscoCode": "233311",
+      "occupation": "Electrical Engineer",
+      "skillLevel": 1,
+      "families": [
+        "ECE"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233411",
+      "occupation": "Electronics Engineer",
+      "skillLevel": 1,
+      "families": [
+        "ECE"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "263311",
+      "occupation": "Telecommunications Engineer",
+      "skillLevel": 1,
+      "families": [
+        "ECE"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "263312",
+      "occupation": "Telecommunications Network Engineer",
+      "skillLevel": 1,
+      "families": [
+        "ECE"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "313212",
+      "occupation": "Telecommunication Field Engineer",
+      "skillLevel": 2,
+      "families": [
+        "ECE"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233913",
+      "occupation": "Biomedical Engineer",
+      "skillLevel": 1,
+      "families": [
+        "ECE",
+        "MIP"
+      ],
+      "crossListed": true
+    },
+    {
+      "anzscoCode": "233914",
+      "occupation": "Engineering Technologist",
+      "skillLevel": 1,
+      "families": [
+        "ECE",
+        "CSI",
+        "MIP",
+        "CMM",
+        "OTHERS"
+      ],
+      "crossListed": true
+    },
+    {
+      "anzscoCode": "312311",
+      "occupation": "Electrical Engineering Draftsperson",
+      "skillLevel": 2,
+      "families": [
+        "ECE"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "312411",
+      "occupation": "Electronic Engineering Draftsperson",
+      "skillLevel": 2,
+      "families": [
+        "ECE"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "313213",
+      "occupation": "Telecommunications Network Planner",
+      "skillLevel": 2,
+      "families": [
+        "ECE"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "313214",
+      "occupation": "Telecommunications Technical Officer or Technologist",
+      "skillLevel": 2,
+      "families": [
+        "ECE"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233211",
+      "occupation": "Civil Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CSI"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233212",
+      "occupation": "Geotechnical Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CSI"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233214",
+      "occupation": "Structural Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CSI"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233215",
+      "occupation": "Transport Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CSI"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233915",
+      "occupation": "Environmental Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CSI",
+        "CMM"
+      ],
+      "crossListed": true
+    },
+    {
+      "anzscoCode": "233912",
+      "occupation": "Agricultural Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CSI",
+        "MIP",
+        "CMM"
+      ],
+      "crossListed": true
+    },
+    {
+      "anzscoCode": "312211",
+      "occupation": "Civil Engineering Draftsperson",
+      "skillLevel": 2,
+      "families": [
+        "CSI"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "312999",
+      "occupation": "Building and Engineering Technicians nec",
+      "skillLevel": 2,
+      "families": [
+        "CSI"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233512",
+      "occupation": "Mechanical Engineer",
+      "skillLevel": 1,
+      "families": [
+        "MIP"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233511",
+      "occupation": "Industrial Engineer",
+      "skillLevel": 1,
+      "families": [
+        "MIP"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233513",
+      "occupation": "Production or Plant Engineer",
+      "skillLevel": 1,
+      "families": [
+        "MIP"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233911",
+      "occupation": "Aeronautical Engineer",
+      "skillLevel": 1,
+      "families": [
+        "MIP"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233916",
+      "occupation": "Naval Architect",
+      "skillLevel": 1,
+      "families": [
+        "MIP",
+        "CMM"
+      ],
+      "crossListed": true
+    },
+    {
+      "anzscoCode": "312511",
+      "occupation": "Mechanical Engineering Draftsperson",
+      "skillLevel": 2,
+      "families": [
+        "MIP"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233111",
+      "occupation": "Chemical Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CMM"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233112",
+      "occupation": "Materials Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CMM"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233611",
+      "occupation": "Mining Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CMM"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233612",
+      "occupation": "Petroleum Engineer",
+      "skillLevel": 1,
+      "families": [
+        "CMM"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "233999",
+      "occupation": "Engineering Professional nec",
+      "skillLevel": 1,
+      "families": [
+        "OTHERS"
+      ],
+      "crossListed": false
+    },
+    {
+      "anzscoCode": "133211",
+      "occupation": "Engineering Manager",
+      "skillLevel": 1,
+      "families": [
+        "OTHERS"
+      ],
+      "crossListed": false
+    }
+  ]
+}

@@ -413,6 +413,69 @@ export type AssessmentResult = {
   qualificationEvidence?: QualificationEvidence;
   /** Gate project / thesis title of the top occupation (null when none). */
   finalProjectTitle?: string | null;
+  /**
+   * Set when Gate 1 asked for manual review and the assessor picked the
+   * occupation: only that occupation was scored (gate1 stays manual_review).
+   */
+  assessorSelected?: AssessorSelected;
+  /** Family rules on the suggested ANZSCOs (primary, alternatives, ET Maybe Suitable). */
+  familyAdjustment?: FamilyAdjustment;
+};
+
+/** One occupation after the family rules (Step 4 ANZSCO cards). */
+export type FamilyAdjustedOccupation = {
+  anzscoCode: string;
+  title: string;
+  isPrimary: boolean;
+  /** Family ids from anzsco_families.json (ECE / CSI / MIP / CMM / OTHERS). */
+  families: string[];
+  skillLevel: 1 | 2 | null;
+  /** Families shared with the primary (empty when none / unknown). */
+  sharedFamilies: string[];
+  /** Subject-matching % before the family rules. */
+  originalConfidence: number;
+  adjustedConfidence: number;
+  changed: boolean;
+  /** True when it was capped one point below the primary. */
+  capped: boolean;
+  /** Short reason, e.g. "Same family (CSI)", "Different family −20 pp". */
+  reason: string;
+};
+
+/** Engineering Technologist added as "Maybe Suitable" (primary is PE and above 50%). */
+export type MaybeSuitableEntry = {
+  anzscoCode: string;
+  title: string;
+  label: "Maybe Suitable";
+  /** ET's own matching % when it was scored (null when not scored). */
+  originalConfidence: number | null;
+  /** primary − (10 − 0.1 × (primary − 50)). */
+  formulaConfidence: number;
+  /** Higher of own and formula, capped below the primary. */
+  adjustedConfidence: number;
+  source: "formula" | "own_score";
+  capped: boolean;
+  /** True when ET was one of the suggested candidates (detail view available). */
+  inCandidates: boolean;
+};
+
+/** Family rules applied to the suggested ANZSCOs (confidence = matching %). */
+export type FamilyAdjustment = {
+  primaryCode: string;
+  primaryConfidence: number;
+  primaryFamilies: string[];
+  /** Primary first, then alternatives by adjusted confidence (ET excluded when maybeSuitable is set). */
+  occupations: FamilyAdjustedOccupation[];
+  maybeSuitable: MaybeSuitableEntry | null;
+  /** E.g. occupations missing from the family list. */
+  notes: string[];
+};
+
+/** Occupation picked by the assessor for a manual-review case. */
+export type AssessorSelected = {
+  anzscoCode: string;
+  title: string;
+  occupationId: string;
 };
 
 /** Unit a printed year / semester was read in. */
