@@ -21,7 +21,6 @@ import {
   parseAwardLevel,
 } from "./awardDetails.js";
 import { assessConfig } from "./config.js";
-import { evidenceConfig } from "./evidenceConfig.js";
 import {
   degreeLevelToQualification,
   extractSubjectsFromTranscripts,
@@ -30,8 +29,15 @@ import {
   type TranscriptSource,
 } from "./extractSubjects.js";
 import { awardLevelOf, rowsFor } from "./gate1.js";
+import {
+  lateralEntryView,
+  lateralStateOf,
+  priorStudyDocumentIds,
+  type LateralEntryView,
+} from "./lateralEntry.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
 import {
+  applyTextPeriods,
   countDuration,
   creditContextOf,
   decideEngineering,
@@ -87,7 +93,6 @@ type TranscriptDoc = {
 type QualificationRow = {
   degreeLevel: string;
   degreeTitle: string | null;
-  durationYears: number | null;
   country: string | null;
   institution: string | null;
 };
@@ -203,10 +208,47 @@ export async function persistExtractedSubjects(
 /** Finished transcripts with text, in deterministic order. */
 export function usableTranscripts<T extends TranscriptDoc & { type: string; status: string }>(
   documents: T[],
+  /** Prior-study transcripts (lateral entry): never part of the qualification's own subjects. */
+  exclude?: ReadonlySet<string>,
 ): T[] {
   return sortTranscripts(
-    documents.filter((d) => d.type === "TRANSCRIPT" && d.status === "DONE" && d.text?.trim()),
+    documents.filter(
+      (d) =>
+        d.type === "TRANSCRIPT" &&
+        d.status === "DONE" &&
+        d.text?.trim() &&
+        !exclude?.has(d.id),
+    ),
   );
+}
+
+/**
+ * Lateral-entry view for the bachelor (built over every qualification, as
+ * the gate is). Null when the case has no bachelor being assessed.
+ */
+export function lateralEntryForCase(input: {
+  infos: readonly QualificationInfo[];
+  rows: readonly ExtractedSubjectRow[];
+  fieldSources: readonly FieldSourceLike[];
+  documents?: ReadonlyArray<{
+    id: string;
+    originalName: string;
+    format: string;
+    status: string;
+    error?: string | null;
+  }>;
+}): LateralEntryView | null {
+  const q = input.infos.find((i) => (i.rawLevel ?? i.level) === "bachelor");
+  if (!q) return null;
+  const summaries = buildQualificationSummaries([q, ...input.infos.filter((i) => i !== q)], input.rows, input.fieldSources);
+  return lateralEntryView({
+    summaries: summaries.slice(0, 1),
+    rows: rowsFor(q, input.rows, input.infos.length === 1),
+    texts: q.texts ?? [],
+    title: q.title,
+    state: lateralStateOf(input.fieldSources),
+    documents: input.documents,
+  });
 }
 
 export function subjectHashOf(transcripts: TranscriptDoc[]): string {
@@ -268,7 +310,6 @@ export function qualificationInfosFor(
       level: degreeLevelToQualification(q.degreeLevel, q.degreeTitle),
       title: q.degreeTitle ?? null,
       rawLevel: raw,
-      durationYears: q.durationYears ?? null,
       country: q.country ?? null,
       institution: q.institution ?? null,
       // Transcript text at this level, so routing can spot a qualification code.
@@ -445,9 +486,14 @@ export async function resolveSubjects(input: {
 
   // Saved rows from diploma-level transcripts were stored as "unknown" before
   // diploma levels existed: tag them from their document now.
-  rows = applyDocumentLevels(
-    rows,
-    transcripts.map((t) => ({ id: t.id, level: input.docLevel(t) })),
+  // Year / semester from the heading each subject is printed under, when the
+  // read did not give one (saved rows included, no re-extraction needed).
+  rows = applyTextPeriods(
+    applyDocumentLevels(
+      rows,
+      transcripts.map((t) => ({ id: t.id, level: input.docLevel(t) })),
+    ),
+    transcripts,
   ).map(withTermIndex);
   return { rows, extraction, cacheable };
 }
@@ -457,15 +503,13 @@ export async function resolveSubjects(input: {
 // ---------------------------------------------------------------------------
 
 export type DurationCheckStatus =
-  /** Counted and stated agree within the tolerance. */
-  | "match"
-  /** Counted and stated differ by more than the tolerance: manual review. */
-  | "mismatch"
-  /** No reliable count: the stated duration is used (flagged). */
-  | "fallback"
-  /** Counted only: no stated duration on file. */
-  | "no_stated"
-  /** Neither stated nor counted. */
+  /** Entered by the assessor in Transcript data (or Verify details). */
+  | "edited"
+  /** Counted from the printed years / semesters. */
+  | "transcript"
+  /** Converted from the credit total (no usable years / semesters). */
+  | "credits"
+  /** Nothing counted or entered: the case goes to manual review. */
   | "missing";
 
 export type TranscriptFinalProject = {
@@ -486,7 +530,6 @@ export type QualificationTranscriptSummary = {
   /** Award level read from the title (shown when it differs from the chosen one). */
   detectedAward: Gate1AwardLevel;
   subjectCount: number;
-  statedYears: number | null;
   transcript: {
     countedYears: number | null;
     /** Count of semesters / trimesters / quarters (null for year-based or no count). */
@@ -496,6 +539,8 @@ export type QualificationTranscriptSummary = {
     reliable: boolean;
     method: string;
     rowsWithTerm: number;
+    /** First and last period printed, e.g. semester 3 → 8 (null when not counted from periods). */
+    periodRange: { unit: "semester" | "trimester" | "quarter" | "year"; first: number; last: number } | null;
     creditTotal: number | null;
     finalProject: TranscriptFinalProject | null;
     engineeringShare: number | null;
@@ -508,21 +553,17 @@ export type QualificationTranscriptSummary = {
     engineeringShare: number | null;
   };
   /** Duration the gate uses and where it comes from. */
-  basis: "counted" | "manual" | "stated" | "none";
+  basis: "counted" | "manual" | "none";
   basisLabel: string;
   /**
    * Flag text when the counted duration was converted from the credit total
    * (no usable years / semesters), e.g. "Converted from credits (240 credits ÷ 60 per year)".
    */
   creditConversion: string | null;
-  /** True when the stated duration is used because the transcript could not be counted. */
-  fallback: boolean;
   showEngineeringShare: boolean;
   durationCheck: {
     status: DurationCheckStatus;
-    toleranceYears: number;
-    differenceYears: number | null;
-    /** True when this qualification may go on to the ANZSCO step. */
+    /** False when no duration is available (the case goes to manual review). */
     ok: boolean;
     message: string;
   };
@@ -534,11 +575,12 @@ export type TranscriptDataSummary = {
   /** Saved subjects came from the current transcripts. */
   subjectsCurrent: boolean;
   source: ExtractionReport["source"] | null;
-  toleranceYears: number;
-  /** Every qualification passes the duration check. */
+  /** Every qualification has a duration (else Gate 1 sends the case to manual review). */
   durationOk: boolean;
   message: string | null;
   qualifications: QualificationTranscriptSummary[];
+  /** Lateral-entry check for the bachelor (null when there is no bachelor). */
+  lateralEntry: LateralEntryView | null;
 };
 
 const PROJECT_RE = /\b(?:project|thesis|capstone|dissertation)\b/i;
@@ -580,60 +622,28 @@ export function findFinalProject(
   };
 }
 
-const EPS = 1e-9;
 const fmtYears = (n: number) => `${n} year${n === 1 ? "" : "s"}`;
 
 function durationCheckFor(
-  stated: number | null,
+  basis: QualificationTranscriptSummary["basis"],
   counted: number | null,
-  manual: boolean,
-  tol: number,
+  creditConversion: string | null,
 ): QualificationTranscriptSummary["durationCheck"] {
-  const base = { toleranceYears: tol };
-  if (counted == null && stated == null) {
+  if (counted == null || basis === "none") {
     return {
-      ...base,
       status: "missing",
-      differenceYears: null,
       ok: false,
-      message: "No stated duration and the transcript could not be counted. Enter the stated or counted duration.",
+      message:
+        "The duration could not be counted from the transcript. Enter it here or in Transcript data, otherwise the case goes to manual review.",
     };
   }
-  if (counted == null) {
-    return {
-      ...base,
-      status: "fallback",
-      differenceYears: null,
-      ok: true,
-      message: `The transcript could not be counted reliably; the stated duration (${fmtYears(stated!)}) will be used.`,
-    };
+  if (basis === "manual") {
+    return { status: "edited", ok: true, message: `${fmtYears(counted)}, entered by the assessor.` };
   }
-  if (stated == null) {
-    return {
-      ...base,
-      status: "no_stated",
-      differenceYears: null,
-      ok: true,
-      message: `No stated duration on file; the counted duration (${fmtYears(counted)}) will be used.`,
-    };
+  if (creditConversion) {
+    return { status: "credits", ok: true, message: creditConversion };
   }
-  const diff = Math.round(Math.abs(counted - stated) * 100) / 100;
-  if (diff > tol + EPS) {
-    return {
-      ...base,
-      status: "mismatch",
-      differenceYears: diff,
-      ok: false,
-      message: `Stated (${fmtYears(stated)}) and counted (${fmtYears(counted)}${manual ? ", entered manually" : ""}) durations differ by ${fmtYears(diff)}, more than the ${fmtYears(tol)} tolerance.`,
-    };
-  }
-  return {
-    ...base,
-    status: "match",
-    differenceYears: diff,
-    ok: true,
-    message: `Stated and counted durations agree (within ${fmtYears(tol)}).`,
-  };
+  return { status: "transcript", ok: true, message: `${fmtYears(counted)}, counted from the transcript.` };
 }
 
 /** Per-qualification summary (pure; rows must carry document levels). */
@@ -642,13 +652,12 @@ export function buildQualificationSummaries(
   rows: readonly ExtractedSubjectRow[],
   fieldSources: readonly FieldSourceLike[],
 ): QualificationTranscriptSummary[] {
-  const tol = evidenceConfig.duration.toleranceYears;
   const single = infos.length === 1;
   return infos.map((q) => {
     const raw = q.rawLevel ?? q.level;
     const levelRows = rowsFor(q, rows, single);
     const overrides = overridesFor(fieldSources, raw);
-    // Printed years / semesters → credits (assessor total first) → stated.
+    // Assessor's entry → printed years / semesters → credits (assessor total first).
     const count = countDuration(levelRows, {
       ...creditContextOf(q),
       creditTotalOverride: overrides.creditTotal,
@@ -662,16 +671,15 @@ export function buildQualificationSummaries(
       : null;
     const { award, aqfLevel } = awardLevelOf(q);
     const detected = awardLevelOf({ ...q, awardOverride: null });
-    const counted = overrides.countedYears ?? countedAuto;
-    const stated = q.durationYears ?? null;
-    const manual = overrides.countedYears != null;
+    const entered = overrides.countedYears ?? q.countedYearsOverride ?? null;
+    const counted = entered ?? countedAuto;
+    const manual = entered != null;
     const basis: QualificationTranscriptSummary["basis"] = manual
       ? "manual"
       : countedAuto != null
         ? "counted"
-        : stated != null
-          ? "stated"
-          : "none";
+        : "none";
+    const creditConversion = basis === "counted" ? count.creditConversion?.label ?? null : null;
     const basisLabel =
       basis === "manual"
         ? "Counted duration entered manually"
@@ -679,9 +687,7 @@ export function buildQualificationSummaries(
           ? count.creditConversion
             ? count.creditConversion.label
             : `Counted from the transcript (${count.method})`
-          : basis === "stated"
-            ? `Stated duration used: ${count.method}`
-            : "No duration available";
+          : `No duration available: ${count.method}`;
     const finalProject: TranscriptFinalProject | null = overrides.finalProject
       ? { title: overrides.finalProject, term: null, inFinalYear: null }
       : project;
@@ -695,7 +701,6 @@ export function buildQualificationSummaries(
       awardManual: Boolean(q.awardOverride),
       detectedAward: detected.award,
       subjectCount: levelRows.filter((r) => !r.isRepeat).length,
-      statedYears: stated,
       transcript: {
         countedYears: countedAuto,
         terms: countedAuto != null && tpy ? Math.round(countedAuto * tpy) : null,
@@ -704,6 +709,7 @@ export function buildQualificationSummaries(
         reliable,
         method: count.method,
         rowsWithTerm: count.rowsWithTerm,
+        periodRange: reliable && count.source === "terms" ? count.span ?? null : null,
         creditTotal: count.creditTotal,
         finalProject: project,
         engineeringShare: share,
@@ -717,10 +723,9 @@ export function buildQualificationSummaries(
       },
       basis,
       basisLabel,
-      creditConversion: basis === "counted" ? count.creditConversion?.label ?? null : null,
-      fallback: basis === "stated",
+      creditConversion,
       showEngineeringShare: award !== "certificate",
-      durationCheck: durationCheckFor(stated, counted, manual, tol),
+      durationCheck: durationCheckFor(basis, counted, creditConversion),
     };
   });
 }
@@ -756,11 +761,11 @@ export async function getTranscriptData(
 ): Promise<TranscriptDataSummary | null> {
   let row = await loadCase(caseId);
   if (!row) return null;
-  const transcripts = usableTranscripts(row.documents);
+  const transcripts = usableTranscripts(row.documents, priorStudyDocumentIds(row.fieldSources));
   const subjectHash = subjectHashOf(transcripts);
   const savedHash = await readSavedSubjectHash(caseId);
   const docLevel = documentLevelResolver(row.qualifications.map(asQualificationRow));
-  const persistedRows = row.extractedSubjects.map(rowFromDb);
+  const persistedRows = applyTextPeriods(row.extractedSubjects.map(rowFromDb), transcripts);
   const previousExtraction = previousExtractionOf(row);
   const legacyHashMatches = assessmentLegacyMatch(row, transcripts);
   let source: ExtractionReport["source"] | null = null;
@@ -820,15 +825,19 @@ export async function getTranscriptData(
   const qualifications = buildQualificationSummaries(infos, rows, row.fieldSources).filter(
     (q) => !selected.size || selected.has(q.degreeLevel),
   );
+  const lateralEntry =
+    !selected.size || selected.has("bachelor")
+      ? lateralEntryForCase({ infos, rows, fieldSources: row.fieldSources, documents: row.documents })
+      : null;
   return {
     transcriptCount: transcripts.length,
     subjectCount: rows.filter((r) => !r.isRepeat).length,
     subjectsCurrent,
     source,
-    toleranceYears: evidenceConfig.duration.toleranceYears,
     durationOk: qualifications.every((q) => q.durationCheck.ok),
     message,
     qualifications,
+    lateralEntry,
   };
 }
 
@@ -836,7 +845,6 @@ function asQualificationRow(q: CaseForTranscript["qualifications"][number]): Qua
   return {
     degreeLevel: String(q.degreeLevel),
     degreeTitle: q.degreeTitle ?? null,
-    durationYears: q.durationYears ?? null,
     country: q.country ?? null,
     institution: q.institution ?? null,
   };

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { LateralEntryView } from "./lateralEntry.js";
 
 export const qualificationTypeSchema = z.enum([
   "bachelor",
@@ -50,6 +51,8 @@ export const subjectExtractLlmItemSchema = z.object({
   credits: z.union([z.number(), z.string()]).nullable().optional(),
   /** Year / semester heading the subject sits under, as printed (null when not printed). */
   yearOrSemester: z.union([z.string(), z.number()]).nullable().optional(),
+  /** Entry granted by credit transfer / advanced standing ("credited") or exemption ("exempt"). */
+  entryStatus: z.string().nullable().optional(),
 });
 
 export const subjectExtractLlmSchema = z.object({
@@ -112,7 +115,11 @@ export function normalizeYearOrSemester(v: string | number | null | undefined): 
 export function subjectNameToExtractedRow(
   name: string,
   code?: string | null,
-  extra?: { credits?: number | string | null; yearOrSemester?: string | number | null },
+  extra?: {
+    credits?: number | string | null;
+    yearOrSemester?: string | number | null;
+    entryStatus?: string | null;
+  },
 ): ExtractedSubjectRow {
   const split = splitUnitCode(name);
   const given = normalizeUnitCode(code);
@@ -121,12 +128,24 @@ export function subjectNameToExtractedRow(
     name: unitCode ? split.name : name.trim(),
     code: unitCode ?? (given || null),
     credits: normalizeCredits(extra?.credits),
-    grade: null,
+    grade: entryStatusGrade(extra?.entryStatus),
     yearOrSemester: normalizeYearOrSemester(extra?.yearOrSemester),
     qualification: "unknown",
     sourceSnippet: null,
     isRepeat: false,
   });
+}
+
+/**
+ * Credited / exempt entry → the `grade` value Gate 1 and the lateral-entry
+ * check read ("Credit transfer" / "Exempt"); anything else → null.
+ */
+export function entryStatusGrade(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (!s || s === "null" || s === "none") return null;
+  if (/exempt|exemption|\bex\b/.test(s)) return "Exempt";
+  if (/credit|advanced\s*standing|\bct\b|rpl|recogni[sz]ed/.test(s)) return "Credit transfer";
+  return null;
 }
 
 export const llmMatchDecisionSchema = z.object({
@@ -194,6 +213,8 @@ export type SubjectMatch = {
   method: MatchMethod;
   confidence: number;
   reason?: string;
+  /** Matched from the earlier study's transcript (lateral entry, Route 3). */
+  priorStudy?: boolean;
 };
 
 export type TierOutcome =
@@ -391,6 +412,8 @@ export type AssessmentResult = {
   routing?: RoutingInfo;
   /** Gate 1 qualification eligibility (decides which tracks were scored). */
   gate1?: Gate1Decision;
+  /** Lateral-entry check for the bachelor (route, reason and audit trail). */
+  lateralEntry?: LateralEntryView | null;
   /** Flow of the top occupation. */
   assessmentFlow?: "academic" | "vocational_units";
   /** Step 3 result of the top occupation before no_match surfacing. */
@@ -490,8 +513,6 @@ export type DurationStatus = "ok" | "below_minimum" | "mismatch" | "not_counted"
 export type DurationEvidence = {
   level: QualificationType;
   title: string | null;
-  /** Qualification.durationYears as entered (null when not stated). */
-  statedYears: number | null;
   /** Counted from the printed years / semesters (null when not countable). */
   countedYears: number | null;
   minimumYears: number | null;
@@ -575,13 +596,14 @@ export type Gate1Qualification = {
   aqfLevel: number | null;
   engineering: "yes" | "no" | "unclear";
   engineeringReason: string;
-  /** Qualification.durationYears as entered (null when not stated). */
-  statedYears: number | null;
-  /** Counted from printed years / semesters (null when not reliably countable). */
+  /**
+   * Duration from Transcript data: entered by the assessor, else counted from
+   * printed years / semesters, else converted from credits (null when none).
+   */
   countedYears: number | null;
-  /** Duration Gate 1 used (counted, else stated). */
+  /** Duration Gate 1 used (same as countedYears). */
   durationYears: number | null;
-  durationSource: "counted" | "stated" | "none";
+  durationSource: "counted" | "none";
   /** How the count was made (or why it could not be). */
   durationMethod: string;
   /**
@@ -608,9 +630,6 @@ export type Gate1Decision = {
   qualificationUsed: string | null;
   tracks: Gate1Track[];
   qualifications: Gate1Qualification[];
-  /** True when the duration used was the stated one (transcript had no years / semesters). */
-  durationFallback: boolean;
-  fallbackNote: string | null;
   /** Credit-conversion flag of the qualification that decided the gate (absent on older results). */
   creditConversionNote?: string | null;
   /** Engineering decision for the qualification that decided the gate (null when none). */

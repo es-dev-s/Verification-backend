@@ -105,7 +105,7 @@ describe("assessExtractedSubjects tracks (Gate 1)", () => {
   it("4-year engineering bachelor: PE + Technologist scored, Associate (312511 / 312311) closed", () => {
     const rows = [row("Engineering Drawing"), row("Thermodynamics"), row("Fluid Mechanics"), row("Machine Design")];
     const res = assessExtractedSubjects(rows, {
-      qualifications: [{ level: "bachelor", title: "Bachelor of Mechanical Engineering", durationYears: 4 }],
+      qualifications: [{ level: "bachelor", title: "Bachelor of Mechanical Engineering", countedYearsOverride: 4 }],
     });
     assert.equal(res.gate1?.rule, 3);
     assert.ok(!res.candidates!.some((c) => c.anzscoCode === "312511"));

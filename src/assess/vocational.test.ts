@@ -183,7 +183,7 @@ describe("assessExtractedSubjects (vocational route)", () => {
           level: "advanced_diploma",
           title: "Advanced Diploma of Engineering Technology - Electrical",
           texts: ["UEE62122"],
-          durationYears: 2,
+          countedYearsOverride: 2,
         },
       ],
     });

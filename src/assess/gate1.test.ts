@@ -114,7 +114,7 @@ describe("awardLevelOf (Honours, certificate, AQF level)", () => {
 
 describe("Rule 1: not eligible", () => {
   it("not engineering", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Business Administration", durationYears: 4 }], BUSINESS.map((n) => sub(n)));
+    const g = gate([{ level: "bachelor", title: "Bachelor of Business Administration", countedYearsOverride: 4 }], BUSINESS.map((n) => sub(n)));
     assert.equal(g.result, "not_eligible");
     assert.equal(g.rule, 1);
     assert.match(g.reason, /not an engineering qualification/);
@@ -122,7 +122,7 @@ describe("Rule 1: not eligible", () => {
   });
 
   it("certificate only", () => {
-    const g = gate([{ level: "unknown", title: "Certificate IV in Engineering", durationYears: 1 }], engRows("unknown"));
+    const g = gate([{ level: "unknown", title: "Certificate IV in Engineering", countedYearsOverride: 1 }], engRows("unknown"));
     assert.equal(g.result, "not_eligible");
     assert.equal(g.rule, 1);
     assert.match(g.reason, /certificate/i);
@@ -130,7 +130,7 @@ describe("Rule 1: not eligible", () => {
   });
 
   it("under 2 years counted / stated", () => {
-    const g = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering", durationYears: 1.5 }], engRows("advanced_diploma"));
+    const g = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering", countedYearsOverride: 1.5 }], engRows("advanced_diploma"));
     assert.equal(g.result, "not_eligible");
     assert.equal(g.rule, 1);
     assert.match(g.reason, /under 2 years/);
@@ -139,7 +139,7 @@ describe("Rule 1: not eligible", () => {
 
 describe("Rule 2: manual review", () => {
   it("Diploma (AQF 5)", () => {
-    const g = gate([{ level: "diploma", title: "Diploma of Engineering", durationYears: 2 }], engRows("diploma"));
+    const g = gate([{ level: "diploma", title: "Diploma of Engineering", countedYearsOverride: 2 }], engRows("diploma"));
     assert.equal(g.result, "manual_review");
     assert.equal(g.rule, 2);
     assert.match(g.reason, /Diploma \(AQF 5\)/);
@@ -149,7 +149,7 @@ describe("Rule 2: manual review", () => {
   it("3-year degree that may be recognised higher (config hook)", () => {
     const entry = { titlePattern: "engineering", country: "India", institution: null, note: "test programme" };
     const list = evidenceConfig.gate.recognisedHigherProgrammes as unknown as Array<typeof entry>;
-    const q: QualificationInfo = { level: "bachelor", title: "Bachelor of Engineering (Civil)", durationYears: 3, country: "India" };
+    const q: QualificationInfo = { level: "bachelor", title: "Bachelor of Engineering (Civil)", countedYearsOverride: 3, country: "India" };
     assert.equal(gate([q], engRows()).rule, 4, "empty hook: technologist");
     list.push(entry);
     try {
@@ -165,11 +165,11 @@ describe("Rule 2: manual review", () => {
   });
 
   it("combined degree (3+2)", () => {
-    const g = gate([{ level: "master", title: "Integrated Bachelor and Master of Technology (Mechanical Engineering)", durationYears: 5 }], engRows("master"));
+    const g = gate([{ level: "master", title: "Integrated Bachelor and Master of Technology (Mechanical Engineering)", countedYearsOverride: 5 }], engRows("master"));
     assert.equal(g.result, "manual_review");
     assert.ok(g.reason.includes(FLAG.combined));
     const t = gate([
-      { level: "bachelor", title: "Bachelor of Engineering", durationYears: 3, texts: ["This is a 3+2 programme"] },
+      { level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: 3, texts: ["This is a 3+2 programme"] },
     ], engRows());
     assert.equal(t.result, "manual_review");
   });
@@ -177,8 +177,8 @@ describe("Rule 2: manual review", () => {
   it("non-engineering bachelor followed by an engineering master", () => {
     const g = gate(
       [
-        { level: "bachelor", title: "Bachelor of Business Administration", durationYears: 4 },
-        { level: "master", title: "Master of Engineering (Mechanical)", durationYears: 2 },
+        { level: "bachelor", title: "Bachelor of Business Administration", countedYearsOverride: 4 },
+        { level: "master", title: "Master of Engineering (Mechanical)", countedYearsOverride: 2 },
       ],
       [...BUSINESS.map((n) => sub(n)), ...engRows("master")],
     );
@@ -187,39 +187,38 @@ describe("Rule 2: manual review", () => {
   });
 
   it("part-time, bridging and credit-transfer study", () => {
-    const pt = gate([{ level: "bachelor", title: "Bachelor of Engineering", durationYears: 4, texts: ["Mode of study: Part-time"] }], engRows());
+    const pt = gate([{ level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: 4, texts: ["Mode of study: Part-time"] }], engRows());
     assert.equal(pt.result, "manual_review");
     assert.ok(pt.reason.includes(FLAG.partTime));
-    const br = gate([{ level: "bachelor", title: "Bachelor of Engineering (Top-up)", durationYears: 1 }], engRows());
+    const br = gate([{ level: "bachelor", title: "Bachelor of Engineering (Top-up)", countedYearsOverride: 1 }], engRows());
     // Under 2 years is checked first (rule 1); a longer top-up is manual review.
     assert.equal(br.result, "not_eligible");
-    const br2 = gate([{ level: "bachelor", title: "Bachelor of Engineering (Lateral Entry)", durationYears: 3 }], engRows());
+    const br2 = gate([{ level: "bachelor", title: "Bachelor of Engineering (Lateral Entry)", countedYearsOverride: 3 }], engRows());
     assert.equal(br2.result, "manual_review");
     assert.ok(br2.reason.includes(FLAG.bridging));
     const ct = gate(
-      [{ level: "bachelor", title: "Bachelor of Engineering", durationYears: 4 }],
+      [{ level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: 4 }],
       [...engRows(), sub("Calculus I", "bachelor", null, "CT"), sub("Physics I", "bachelor", null, "Exempt")],
     );
     assert.equal(ct.result, "manual_review");
     assert.ok(ct.reason.includes(FLAG.creditTransfer));
     const one = gate(
-      [{ level: "bachelor", title: "Bachelor of Engineering", durationYears: 4 }],
+      [{ level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: 4 }],
       [...engRows(), sub("Calculus I", "bachelor", null, "CT")],
     );
     assert.equal(one.rule, 3, "a single CT row is not enough");
   });
 
-  it("stated and counted duration differ by more than 0.5 years", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 4 }], engWithSemesters(6));
-    assert.equal(g.result, "manual_review");
-    assert.match(g.reason, /differ by more than 0.5/);
-    const ok = gate([{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 4 }], engWithSemesters(8));
-    assert.equal(ok.rule, 3);
-    assert.equal(ok.durationFallback, false);
+  it("the assessor's duration in Transcript data wins over the count", () => {
+    const counted = gate([{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)" }], engWithSemesters(6));
+    assert.equal(counted.qualifications[0]!.countedYears, 3);
+    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", countedYearsOverride: 4 }], engWithSemesters(6));
+    assert.equal(g.rule, 3);
+    assert.equal(g.qualifications[0]!.countedYears, 4);
   });
 
   it("decision (b): engineering master with no bachelor on file → manual review, no scores", () => {
-    const q: QualificationInfo = { level: "master", title: "Master of Engineering (Mechanical)", durationYears: 2 };
+    const q: QualificationInfo = { level: "master", title: "Master of Engineering (Mechanical)", countedYearsOverride: 2 };
     const g = gate([q], engRows("master"));
     assert.equal(g.result, "manual_review");
     assert.equal(g.rule, 2);
@@ -242,7 +241,7 @@ describe("Rule 2: manual review", () => {
 
 describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
   it("opens PE (1) and Technologist (2); Associate closed with a reason", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 4 }], engRows());
+    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", countedYearsOverride: 4 }], engRows());
     assert.equal(g.result, "open");
     assert.equal(g.rule, 3);
     assert.deepEqual(openIds(g), ["professional_engineer:1", "engineering_technologist:2"]);
@@ -251,7 +250,7 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
   });
 
   it("Honours ≥ 4 years", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering (Honours)", durationYears: 4 }], engRows());
+    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering (Honours)", countedYearsOverride: 4 }], engRows());
     assert.equal(g.rule, 3);
     assert.equal(g.qualifications[0]!.award, "honours");
   });
@@ -259,8 +258,8 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
   it("master on top of an engineering bachelor: the bachelor decides", () => {
     const g = gate(
       [
-        { level: "bachelor", title: "Bachelor of Engineering (Civil)", durationYears: 4 },
-        { level: "master", title: "Master of Engineering (Structural)", durationYears: 2 },
+        { level: "bachelor", title: "Bachelor of Engineering (Civil)", countedYearsOverride: 4 },
+        { level: "master", title: "Master of Engineering (Structural)", countedYearsOverride: 2 },
       ],
       [...engRows(), ...engRows("master")],
     );
@@ -270,8 +269,8 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
 
   it("3-year engineering bachelor + separate master → manual review (not Technologist)", () => {
     const q: QualificationInfo[] = [
-      { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 3 },
-      { level: "master", title: "Master of Engineering (Mechanical)", durationYears: 2 },
+      { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", countedYearsOverride: 3 },
+      { level: "master", title: "Master of Engineering (Mechanical)", countedYearsOverride: 2 },
     ];
     const g = gate(q, [...engRows(), ...engRows("master")]);
     assert.equal(g.result, "manual_review");
@@ -293,7 +292,7 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
     const g = gate(
       [
         { level: "bachelor", title: "Bachelor of Engineering (Civil)" },
-        { level: "master", title: "Master of Engineering (Structural)", durationYears: 2 },
+        { level: "master", title: "Master of Engineering (Structural)", countedYearsOverride: 2 },
       ],
       [...engWithSemesters(6), ...engRows("master")],
     );
@@ -302,12 +301,12 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
   });
 
   it("3-year bachelor alone stays Technologist; 4-year bachelor + master stays rule 3", () => {
-    const solo = gate([{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 3 }], engRows());
+    const solo = gate([{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", countedYearsOverride: 3 }], engRows());
     assert.equal(solo.rule, 4);
     const four = gate(
       [
-        { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 4 },
-        { level: "master", title: "Master of Engineering (Mechanical)", durationYears: 2 },
+        { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", countedYearsOverride: 4 },
+        { level: "master", title: "Master of Engineering (Mechanical)", countedYearsOverride: 2 },
       ],
       [...engRows(), ...engRows("master")],
     );
@@ -316,7 +315,7 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
 
   it("single combined 3+2 title is unchanged (combined flag, not the bachelor+master rule)", () => {
     const g = gate(
-      [{ level: "master", title: "Integrated Bachelor and Master of Technology (Mechanical Engineering)", durationYears: 5 }],
+      [{ level: "master", title: "Integrated Bachelor and Master of Technology (Mechanical Engineering)", countedYearsOverride: 5 }],
       engRows("master"),
     );
     assert.equal(g.result, "manual_review");
@@ -327,8 +326,8 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
   it("3-year bachelor + a clearly non-engineering master stays Technologist", () => {
     const g = gate(
       [
-        { level: "bachelor", title: "Bachelor of Engineering (Electrical)", durationYears: 3 },
-        { level: "master", title: "Master of Business Administration", durationYears: 2 },
+        { level: "bachelor", title: "Bachelor of Engineering (Electrical)", countedYearsOverride: 3 },
+        { level: "master", title: "Master of Business Administration", countedYearsOverride: 2 },
       ],
       [...engRows(), ...BUSINESS.map((n) => sub(n, "master"))],
     );
@@ -338,8 +337,8 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
   it("durations are never combined (Adv Dip 2 + Bachelor 3 → Technologist, not PE)", () => {
     const g = gate(
       [
-        { level: "advanced_diploma", title: "Advanced Diploma of Engineering", durationYears: 2 },
-        { level: "bachelor", title: "Bachelor of Engineering (Electrical)", durationYears: 3 },
+        { level: "advanced_diploma", title: "Advanced Diploma of Engineering", countedYearsOverride: 2 },
+        { level: "bachelor", title: "Bachelor of Engineering (Electrical)", countedYearsOverride: 3 },
       ],
       [...engRows("advanced_diploma"), ...engRows()],
     );
@@ -349,7 +348,7 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
 
   it("scores only open tracks and ranks PE first among recommended", () => {
     const res = assessExtractedSubjects(engRows(), {
-      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 4 }],
+      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", countedYearsOverride: 4 }],
     });
     assert.equal(res.gate1?.rule, 3);
     for (const c of res.candidates ?? []) {
@@ -360,7 +359,7 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
 
 describe("Rule 4: engineering bachelor 3 to under 4 years → Technologist only", () => {
   it("3-year engineering bachelor", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering Technology (Mechanical)", durationYears: 3 }], engRows());
+    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering Technology (Mechanical)", countedYearsOverride: 3 }], engRows());
     assert.equal(g.result, "open");
     assert.equal(g.rule, 4);
     assert.deepEqual(openIds(g), ["engineering_technologist:1"]);
@@ -369,23 +368,23 @@ describe("Rule 4: engineering bachelor 3 to under 4 years → Technologist only"
   });
 
   it("decision (c): 3-year engineering bachelor not titled engineering technology → Technologist", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering (Civil)", durationYears: 3 }], engRows());
+    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering (Civil)", countedYearsOverride: 3 }], engRows());
     assert.equal(g.rule, 4);
     assert.deepEqual(openIds(g), ["engineering_technologist:1"]);
     const res = assessExtractedSubjects(engRows(), {
-      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering (Civil)", durationYears: 3 }],
+      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering (Civil)", countedYearsOverride: 3 }],
     });
     assert.ok((res.candidates ?? []).every((c) => c.track === "engineering_technologist"));
   });
 
   it("3.5 years is still Technologist", () => {
-    assert.equal(gate([{ level: "bachelor", title: "Bachelor of Engineering", durationYears: 3.5 }], engRows()).rule, 4);
+    assert.equal(gate([{ level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: 3.5 }], engRows()).rule, 4);
   });
 });
 
 describe("Rule 5: Advanced Diploma / Associate Degree ≥ 2 years → Associate only", () => {
   it("Advanced Diploma of Engineering, 2 years", () => {
-    const g = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering (Mechanical)", durationYears: 2 }], engRows("advanced_diploma"));
+    const g = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering (Mechanical)", countedYearsOverride: 2 }], engRows("advanced_diploma"));
     assert.equal(g.result, "open");
     assert.equal(g.rule, 5);
     assert.deepEqual(openIds(g), ["engineering_associate:1"]);
@@ -394,30 +393,28 @@ describe("Rule 5: Advanced Diploma / Associate Degree ≥ 2 years → Associate 
   });
 
   it("Associate Degree in Engineering, 2 years", () => {
-    const g = gate([{ level: "associate_degree", title: "Associate Degree in Engineering", durationYears: 2 }], engRows("associate_degree"));
+    const g = gate([{ level: "associate_degree", title: "Associate Degree in Engineering", countedYearsOverride: 2 }], engRows("associate_degree"));
     assert.equal(g.rule, 5);
   });
 });
 
-describe("duration fallback", () => {
-  it("no years or semesters printed → stated duration with a flag", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering", durationYears: 4 }], engRows());
-    assert.equal(g.rule, 3);
-    assert.equal(g.durationFallback, true);
-    assert.match(g.fallbackNote ?? "", /stated programme length \(4 years\)/);
-    assert.equal(g.qualifications[0]!.durationSource, "stated");
-  });
-
-  it("no stated duration and nothing to count → manual review", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering", durationYears: null }], engRows());
+describe("duration comes only from Transcript data", () => {
+  it("no years, semesters or credits and nothing entered → manual review", () => {
+    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering" }], engRows());
     assert.equal(g.result, "manual_review");
-    assert.match(g.reason, /not stated and could not be counted/);
+    assert.match(g.reason, /could not be counted from the transcript and was not entered in Transcript data/);
+    assert.equal(g.qualifications[0]!.durationSource, "none");
   });
 
-  it("counted duration is used when no duration is stated", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering", durationYears: null }], engWithSemesters(8));
+  it("nothing to count but entered by the assessor → used", () => {
+    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: 4 }], engRows());
     assert.equal(g.rule, 3);
-    assert.equal(g.durationFallback, false);
+    assert.equal(g.qualifications[0]!.durationSource, "counted");
+  });
+
+  it("counted from printed semesters when nothing is entered", () => {
+    const g = gate([{ level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: null }], engWithSemesters(8));
+    assert.equal(g.rule, 3);
     assert.equal(g.qualifications[0]!.countedYears, 4);
   });
 });

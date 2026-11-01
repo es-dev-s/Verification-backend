@@ -42,10 +42,10 @@ const ENG = [
 
 /** Gate 1 = manual review (bridging / lateral-entry title). */
 const MANUAL_REVIEW: QualificationInfo[] = [
-  { level: "bachelor", title: "Bachelor of Engineering (Lateral Entry)", durationYears: 3 },
+  { level: "bachelor", title: "Bachelor of Engineering (Lateral Entry)", countedYearsOverride: 3 },
 ];
 const OPEN: QualificationInfo[] = [
-  { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 4 },
+  { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", countedYearsOverride: 4 },
 ];
 
 describe("manual occupation options", () => {

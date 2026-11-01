@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { correctOcrEducationText } from "../parse/ocrCorrect.js";
 import { ensureClientNameFromCv } from "../lib/clientName.js";
 import type { DocumentFormat } from "@prisma/client";
+import { LATERAL_FIELD, priorStudyDocumentIds } from "../assess/lateralEntry.js";
 
 export type ExtractorResult = {
   ok: boolean;
@@ -71,7 +72,10 @@ export async function processExtractJob(documentId: string): Promise<void> {
       },
     });
 
-    await markReadsStale(doc.caseId);
+    // An earlier study's transcript (lateral entry) does not change the reads.
+    if (!(await isPriorStudyDoc(doc.caseId, documentId))) {
+      await markReadsStale(doc.caseId);
+    }
 
     // Clients page name from the CV text (no LLM; Step 2 Read refines it).
     if (doc.type === "CV") {
@@ -130,6 +134,13 @@ async function callExtractor(
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function isPriorStudyDoc(caseId: string, documentId: string): Promise<boolean> {
+  const lateral = await prisma.fieldSource.findMany({
+    where: { caseId, field: LATERAL_FIELD },
+  });
+  return priorStudyDocumentIds(lateral).has(documentId);
 }
 
 export async function markReadsStale(caseId: string): Promise<void> {

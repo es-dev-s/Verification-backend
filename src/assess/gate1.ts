@@ -10,17 +10,17 @@
  *     followed by an engineering master; an engineering master (or doctorate)
  *     with no bachelor on file; a 3-year engineering bachelor with a separate
  *     master qualification on file; part-time, bridging or credit-transfer
- *     study; stated vs counted duration differing by more than the tolerance.
+ *     study; no duration available (nothing counted and nothing entered).
  *  3. Engineering Bachelor / Honours / Master counted ≥ 4 years → Professional
  *     Engineer (priority 1) + Engineering Technologist (priority 2).
  *  4. Engineering Bachelor counted 3 to < 4 years → Engineering Technologist only.
  *  5. Advanced Diploma / Associate Degree counted ≥ 2 years → Engineering Associate only.
  *
  * With several qualifications the highest-level engineering qualification is
- * used (durations are never added together). The counted duration comes from
- * the printed years / semesters; when the transcript does not print them it is
- * converted from the credit total (flagged, see evidenceConfig.duration.credits);
- * with neither, the stated duration is used and the result carries a fallback flag.
+ * used (durations are never added together). The duration is the one entered
+ * by the assessor in Transcript data, else counted from the printed years /
+ * semesters, else converted from the credit total (flagged, see
+ * evidenceConfig.duration.credits). With none of these it goes to manual review.
  *
  * Detection is heuristic (titles, training-package codes, transcript text):
  * no schema change, no LLM call.
@@ -201,15 +201,15 @@ const COMBINED_TEXT_RE = /\b(?:integrated|dual|double|combined)\s+(?:degree|prog
 const PART_TIME_TITLE_RE = /\bpart[\s-]?time\b/i;
 const PART_TIME_TEXT_RE =
   /\b(?:mode(?:\s+of\s+(?:study|attendance))?|attendance(?:\s+(?:mode|type))?|study\s+(?:mode|load|type)|enrol(?:l)?ment(?:\s+(?:type|status))?|load|status)\s*[:\-]?\s*part[\s-]?time\b|\bpart[\s-]?time\s+(?:student|study|programme|program|course|basis|mode)\b/i;
-const BRIDGING_TITLE_RE = /\b(?:bridging|lateral\s+entry|top[\s-]?up|conversion)\b/i;
-const BRIDGING_TEXT_RE =
+export const BRIDGING_TITLE_RE = /\b(?:bridging|lateral\s+entry|top[\s-]?up|conversion)\b/i;
+export const BRIDGING_TEXT_RE =
   /\blateral\s+entry\b|\bbridging\s+(?:course|program(?:me)?|study|studies|subject|unit)s?\b|\bdirect\s+(?:second|2nd|third|3rd)[\s-]year\s+(?:entry|admission)\b/i;
-const CREDIT_TITLE_RE = /\bcredit\s+transfer\b|\badvanced\s+standing\b/i;
-const CREDIT_TEXT_RE =
+export const CREDIT_TITLE_RE = /\bcredit\s+transfer\b|\badvanced\s+standing\b/i;
+export const CREDIT_TEXT_RE =
   /\b(?:credit\s+transfer|advanced\s+standing|exemptions?)\s+(?:granted|awarded|approved|given)\b|\b(?:granted|awarded|approved)\s+(?:credit\s+transfer|advanced\s+standing|exemptions?)\b/i;
-const CREDIT_GRADE_RE =
+export const CREDIT_GRADE_RE =
   /^(?:ct|crt|credit\s*transfer(?:red)?|transfer(?:red)?(?:\s+credit)?|advanced\s+standing|adv\.?\s*st(?:anding)?|ex|exe|exempt(?:ed|ion)?|rpl|recogni[sz]ed\s+prior\s+learning)$/i;
-const CREDIT_NAME_RE = /\b(?:credit\s+transfer|advanced\s+standing|exempt(?:ed|ion)?|rpl)\b/i;
+export const CREDIT_NAME_RE = /\b(?:credit\s+transfer|advanced\s+standing|exempt(?:ed|ion)?|rpl)\b/i;
 /** Rows with a credit-transfer grade / name at or above which the flag is raised. */
 const CREDIT_ROWS_MIN = 2;
 
@@ -269,6 +269,17 @@ export type Gate1Input = {
   vocational?: readonly VocationalOccupation[];
   /** ANZSCO codes that have an academic scoring rubric (for "assess manually" notes). */
   rubricCodes?: readonly string[];
+  /**
+   * Lateral-entry check decided Route 2 or 3 for the bachelor: its bridging /
+   * credit-transfer review flags are already answered and are skipped.
+   */
+  lateralEntryDecided?: boolean;
+  /**
+   * Lateral entry confirmed (Route 3: the applicant entered the bachelor after
+   * earlier study). A 2 to under 3-year engineering bachelor then opens the
+   * Technologist track instead of the top-up / bridging manual review.
+   */
+  lateralEntryConfirmed?: boolean;
 };
 
 type QualEval = {
@@ -276,21 +287,19 @@ type QualEval = {
   award: Gate1AwardLevel;
   aqf: number | null;
   engineering: EngineeringDecision;
-  stated: number | null;
   counted: number | null;
   used: number | null;
-  source: "counted" | "stated" | "none";
+  source: "counted" | "none";
   /** True when the counted duration was entered by the assessor. */
   manualCount: boolean;
   /** Flag text when the counted duration was converted from credits. */
   creditConversion: string | null;
   method: string;
-  mismatch: boolean;
   flags: string[];
 };
 
 type Outcome =
-  | { kind: "open"; rule: 3 | 4 | 5; reason: string }
+  | { kind: "open"; rule: 3 | 4 | 5; reason: string; lateral?: true }
   | { kind: "manual"; reason: string }
   | { kind: "fail"; reason: string }
   | { kind: "skip"; reason: string };
@@ -321,7 +330,7 @@ export const RULE_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
 };
 
 function basisLabel(e: Pick<QualEval, "source" | "manualCount" | "creditConversion">): string {
-  if (e.source !== "counted") return "stated duration";
+  if (e.source !== "counted") return "no duration";
   if (e.manualCount) return "counted duration entered manually";
   return e.creditConversion ? "converted from credits" : "counted from the transcript";
 }
@@ -376,20 +385,14 @@ function evaluateQualification(
   // details) replaces the transcript count.
   const manualCount = q.countedYearsOverride ?? null;
   const counted = manualCount ?? (isReliableCount(count) ? count.countedYears : null);
-  const stated = q.durationYears ?? null;
-  const used = counted ?? stated;
-  const source = counted != null ? "counted" : stated != null ? "stated" : "none";
-  const tol = evidenceConfig.duration.toleranceYears;
-  const mismatch = counted != null && stated != null && Math.abs(counted - stated) > tol + EPS;
   return {
     q,
     award,
     aqf: aqfLevel,
     engineering,
-    stated,
     counted,
-    used,
-    source,
+    used: counted,
+    source: counted != null ? "counted" : "none",
     manualCount: manualCount != null,
     creditConversion:
       manualCount == null && counted != null ? count.creditConversion?.label ?? null : null,
@@ -397,12 +400,11 @@ function evaluateQualification(
       manualCount != null
         ? `entered manually (transcript count: ${count.countedYears != null ? yrs(count.countedYears) : "none"})`
         : count.method,
-    mismatch,
     flags: flagsFor(q, rows),
   };
 }
 
-function outcomeFor(e: QualEval, all: readonly QualEval[]): Outcome {
+function outcomeFor(e: QualEval, all: readonly QualEval[], lateralEntryConfirmed = false): Outcome {
   const g = evidenceConfig.gate;
   const name = label(e);
   const d = e.used;
@@ -425,17 +427,11 @@ function outcomeFor(e: QualEval, all: readonly QualEval[]): Outcome {
   if (d == null) {
     return {
       kind: "manual",
-      reason: `the duration of "${name}" is not stated and could not be counted from the transcript.`,
+      reason: `the duration of "${name}" could not be counted from the transcript and was not entered in Transcript data.`,
     };
   }
   if (d < g.notEligibleBelowYears - EPS) {
     return { kind: "fail", reason: `"${name}" is under ${g.notEligibleBelowYears} years (${yrs(d)}, ${basis}).` };
-  }
-  if (e.mismatch) {
-    return {
-      kind: "manual",
-      reason: `stated duration (${yrs(e.stated!)}) and counted duration (${yrs(e.counted!)}) of "${name}" differ by more than ${evidenceConfig.duration.toleranceYears} years.`,
-    };
   }
   if (e.award === "diploma") {
     return { kind: "manual", reason: `"${name}" is a Diploma (AQF 5).` };
@@ -457,6 +453,14 @@ function outcomeFor(e: QualEval, all: readonly QualEval[]): Outcome {
         kind: "open",
         rule: 4,
         reason: `"${name}" is an engineering ${AWARD_LABELS[e.award]} of ${yrs(d)} (${basis}).`,
+      };
+    }
+    if (lateralEntryConfirmed && (e.q.rawLevel ?? e.q.level) === "bachelor") {
+      return {
+        kind: "open",
+        rule: 4,
+        lateral: true,
+        reason: `"${name}" is an engineering ${AWARD_LABELS[e.award]} of ${yrs(d)} (${basis}) entered by confirmed lateral entry.`,
       };
     }
     return {
@@ -498,7 +502,12 @@ const BELOW_PE =
 const BELOW_TECH =
   "Below the minimum level and duration required for Engineering Technologist assessment (an engineering Bachelor of at least 3 years).";
 
-function buildTracks(rule: 1 | 2 | 3 | 4 | 5, input: Gate1Input, blockedReason: string): Gate1Track[] {
+function buildTracks(
+  rule: 1 | 2 | 3 | 4 | 5,
+  input: Gate1Input,
+  blockedReason: string,
+  lateral = false,
+): Gate1Track[] {
   const open: Partial<Record<Gate1TrackId, { priority: number; reason: string }>> = {};
   const closed: Partial<Record<Gate1TrackId, string>> = {};
   if (rule === 3) {
@@ -507,7 +516,12 @@ function buildTracks(rule: 1 | 2 | 3 | 4 | 5, input: Gate1Input, blockedReason: 
     closed.engineering_associate =
       "Not assessed: the qualification meets the Professional Engineer level (Associate is for Advanced Diploma / Associate Degree qualifications).";
   } else if (rule === 4) {
-    open.engineering_technologist = { priority: 1, reason: "3-year engineering bachelor." };
+    open.engineering_technologist = {
+      priority: 1,
+      reason: lateral
+        ? "Engineering bachelor entered by lateral entry (earlier study counted)."
+        : "3-year engineering bachelor.",
+    };
     closed.professional_engineer = BELOW_PE;
     closed.engineering_associate = "Not assessed: the qualification meets the Engineering Technologist level.";
   } else if (rule === 5) {
@@ -543,7 +557,6 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
     reason: string,
     usedEval: QualEval | null,
   ): Gate1Decision => {
-    const fallback = usedEval ? usedEval.source === "stated" : false;
     const blocked =
       result === "not_eligible" ? "Gate 1 result is not eligible." : "Gate 1 needs manual review.";
     return {
@@ -552,7 +565,12 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
       ruleLabel: RULE_LABELS[rule],
       reason,
       qualificationUsed: usedEval ? label(usedEval) : null,
-      tracks: buildTracks(rule, input, blocked),
+      tracks: buildTracks(
+        rule,
+        input,
+        blocked,
+        Boolean(usedEval && (outcomes.get(usedEval) as { lateral?: true } | undefined)?.lateral),
+      ),
       qualifications: evals.map((e) => ({
         title: e.q.title?.trim() || null,
         level: e.q.level,
@@ -560,20 +578,15 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
         aqfLevel: e.aqf,
         engineering: e.engineering.decision,
         engineeringReason: e.engineering.reason,
-        statedYears: e.stated,
         countedYears: e.counted,
         durationYears: e.used,
         durationSource: e.source,
         durationMethod: e.method,
         creditConversion: e.creditConversion,
-        flags: [...e.flags, ...(e.mismatch ? ["stated and counted duration differ"] : [])],
+        flags: e.flags,
         used: e === usedEval,
         outcome: outcomeText(e, outcomes.get(e)),
       })),
-      durationFallback: fallback,
-      fallbackNote: fallback
-        ? `Duration taken from the stated programme length (${yrs(usedEval!.stated!)}): the transcript does not print years or semesters that could be counted. Confirm before relying on it.`
-        : null,
       creditConversionNote: usedEval?.creditConversion ?? null,
       engineering: usedEval ? usedEval.engineering : null,
       notes,
@@ -634,7 +647,15 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
     );
   }
   for (const flag of [FLAG.combined, FLAG.partTime, FLAG.bridging, FLAG.creditTransfer]) {
-    const hit = considered.find((e) => e.flags.includes(flag));
+    const hit = considered.find(
+      (e) =>
+        e.flags.includes(flag) &&
+        !(
+          input.lateralEntryDecided &&
+          (flag === FLAG.bridging || flag === FLAG.creditTransfer) &&
+          (e.q.rawLevel ?? e.q.level) === "bachelor"
+        ),
+    );
     if (hit) {
       return finish("manual_review", 2, `Manual review needed: ${flag} ("${label(hit)}").`, hit);
     }
@@ -643,7 +664,7 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
   // ---- Highest-level engineering qualification decides ---------------------
   const candidates = [...engYes].sort((a, b) => (b.aqf ?? 0) - (a.aqf ?? 0));
   for (const e of candidates) {
-    const o = outcomeFor(e, evals);
+    const o = outcomeFor(e, evals, Boolean(input.lateralEntryConfirmed));
     outcomes.set(e, o);
     if (o.kind === "open" && o.rule === 4) {
       // A 3-year engineering bachelor plus a SEPARATE master qualification

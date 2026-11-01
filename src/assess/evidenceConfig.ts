@@ -29,8 +29,6 @@ export const evidenceConfig = {
     }>,
   },
   duration: {
-    /** Counted vs stated duration may differ by this much (years). */
-    toleranceYears: 0.5,
     /** Share of a level's subjects that must carry a year / semester to count at all. */
     minTermCoverage: 0.5,
     /** Fewer rows with term info than this → not counted. */

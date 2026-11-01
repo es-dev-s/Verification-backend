@@ -67,10 +67,10 @@ function chemWithSemesters(semesters: number): ExtractedSubjectRow[] {
   });
 }
 
-const chemQual = (durationYears: number | null): QualificationInfo => ({
+const chemQual = (countedYearsOverride: number | null = null): QualificationInfo => ({
   level: "bachelor",
   title: "Bachelor of Engineering (Chemical)",
-  durationYears,
+  countedYearsOverride,
 });
 
 describe("A. extraction: credits and year / semester", () => {
@@ -128,39 +128,37 @@ describe("B. counted duration / Gate 1", () => {
     assert.equal(c.confidence, "low");
   });
 
-  it("duration basis carries counted and stated years for Gate 1", () => {
-    const [b] = durationBasisFor(chemWithSemesters(6), [chemQual(4)]);
+  it("duration basis carries the counted years for Gate 1", () => {
+    const [b] = durationBasisFor(chemWithSemesters(6), [chemQual()]);
     assert.equal(b!.count.countedYears, 3);
-    assert.equal(b!.statedYears, 4);
   });
 
-  it("Gate 1 opens Professional Engineer when counted matches stated (4 years)", () => {
-    const full = assessExtractedSubjects(chemWithSemesters(8), { qualifications: [chemQual(4)] });
+  it("Gate 1 opens Professional Engineer on a counted 4 years", () => {
+    const full = assessExtractedSubjects(chemWithSemesters(8), { qualifications: [chemQual()] });
     assert.equal(full.gate1?.result, "open");
     assert.equal(full.gate1?.rule, 3);
-    assert.equal(full.gate1?.durationFallback, false);
     assert.equal(full.anzscoCode, "233111");
   });
 
-  it("Gate 1 sends a counted 3 years vs stated 4 to manual review (no scores)", () => {
-    const short = assessExtractedSubjects(chemWithSemesters(6), { qualifications: [chemQual(4)] });
-    assert.equal(short.gate1?.result, "manual_review");
-    assert.equal(short.gate1?.rule, 2);
-    assert.match(short.gate1?.reason ?? "", /differ/i);
-    assert.deepEqual(short.candidates, []);
-    assert.equal(short.confidenceScore, 0);
-    assert.equal(short.explanation, short.gate1?.reason);
+  it("Gate 1: a counted 3-year bachelor does not open Professional Engineer", () => {
+    const short = assessExtractedSubjects(chemWithSemesters(6), { qualifications: [chemQual()] });
+    assert.notEqual(short.gate1?.rule, 3);
   });
 
-  it("saved rows without terms fall back to the stated duration with a flag", () => {
+  it("saved rows without terms or credits and no entry → manual review (no scores)", () => {
+    const plain = CHEM.map((n) => sub(n));
+    const res = assessExtractedSubjects(plain, { qualifications: [chemQual()] });
+    assert.equal(res.gate1?.result, "manual_review");
+    assert.match(res.gate1?.reason ?? "", /could not be counted from the transcript/);
+    assert.deepEqual(res.candidates, []);
+    assert.equal(res.confidenceScore, 0);
+  });
+
+  it("saved rows without terms but a duration entered in Transcript data → used", () => {
     const plain = CHEM.map((n) => sub(n));
     const res = assessExtractedSubjects(plain, { qualifications: [chemQual(4)] });
     assert.equal(res.gate1?.result, "open");
-    assert.equal(res.gate1?.durationFallback, true);
-    assert.ok(res.gate1?.fallbackNote);
     assert.equal(res.anzscoCode, "233111");
-    assert.deepEqual(res.qualificationEvidence?.duration, []);
-    assert.ok(!(res.candidates?.[0]?.qualificationNotes ?? []).some((n) => n.startsWith("Duration")));
   });
 });
 
@@ -214,26 +212,25 @@ describe("B2. credits → years (no printed years / semesters)", () => {
     assert.equal(creditsToYears(600, "default"), null); // 20 years
   });
 
-  it("Gate 1 uses the converted years before the stated duration, with a flag", () => {
-    const res = assessExtractedSubjects(noTerms("7.5"), { qualifications: [chemQual(4)] });
+  it("Gate 1 uses the years converted from credits", () => {
+    const res = assessExtractedSubjects(noTerms("7.5"), { qualifications: [chemQual()] });
     assert.equal(res.gate1?.result, "open");
     assert.equal(res.gate1?.rule, 3);
-    assert.equal(res.gate1?.durationFallback, false);
     assert.equal(res.gate1?.creditConversionNote, "Converted from credits (120 credits ÷ 30 per year)");
     const q = res.gate1?.qualifications[0];
     assert.equal(q?.durationSource, "counted");
     assert.equal(q?.countedYears, 4);
   });
 
-  it("Gate 1: converted 3 years vs stated 4 → manual review", () => {
-    const res = assessExtractedSubjects(noTerms("5.625"), { qualifications: [chemQual(4)] }); // 90
-    assert.equal(res.gate1?.result, "manual_review");
-    assert.match(res.gate1?.reason ?? "", /differ/i);
+  it("Gate 1: converted 3 years does not open Professional Engineer", () => {
+    const res = assessExtractedSubjects(noTerms("5.625"), { qualifications: [chemQual()] }); // 90
+    assert.equal(res.gate1?.qualifications[0]?.countedYears, 3);
+    assert.notEqual(res.gate1?.rule, 3);
   });
 
   it("Gate 1: a manual counted duration still wins over credits", () => {
     const res = assessExtractedSubjects(noTerms("5.625"), {
-      qualifications: [{ ...chemQual(4), countedYearsOverride: 4 }],
+      qualifications: [chemQual(4)],
     });
     assert.equal(res.gate1?.result, "open");
     assert.equal(res.gate1?.creditConversionNote, null);
@@ -281,7 +278,7 @@ describe("C. final-year project", () => {
   });
 
   it("stores the final project title on the result", () => {
-    const res = assessExtractedSubjects(chemWithSemesters(8), { qualifications: [chemQual(4)] });
+    const res = assessExtractedSubjects(chemWithSemesters(8), { qualifications: [chemQual()] });
     assert.equal(res.finalProjectTitle, "Final Year Project");
     assert.equal(res.qualificationEvidence?.finalProject?.inFinalYear, true);
   });
@@ -295,7 +292,7 @@ describe("D. engineering decision", () => {
   ].map((n) => sub(n));
 
   it("yes for an engineering title", () => {
-    const d = decideEngineering({ qualifications: [chemQual(4)], rows: CHEM.map((n) => sub(n)) });
+    const d = decideEngineering({ qualifications: [chemQual()], rows: CHEM.map((n) => sub(n)) });
     assert.equal(d.decision, "yes");
     assert.equal(d.capped, false);
   });
@@ -331,7 +328,7 @@ describe("D. engineering decision", () => {
   it("a clear no is not eligible at Gate 1: nothing is scored", () => {
     const rows = [...business, ...CHEM.slice(0, 1).map((n) => sub(n))];
     const quals: QualificationInfo[] = [
-      { level: "bachelor", title: "Bachelor of Business Administration", durationYears: 4 },
+      { level: "bachelor", title: "Bachelor of Business Administration", countedYearsOverride: 4 },
     ];
     const { scored, gate } = scoreRoutedOccupations(rows, { workExperienceBoost: false, qualifications: quals });
     assert.equal(gate.result, "not_eligible");

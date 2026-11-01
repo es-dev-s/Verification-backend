@@ -46,7 +46,7 @@ const ROWS = [
   "Project Management",
   "Final Year Project",
 ].map(sub);
-const QUALS = [{ level: "bachelor" as const, title: "Bachelor of Engineering", durationYears: 4 }];
+const QUALS = [{ level: "bachelor" as const, title: "Bachelor of Engineering", countedYearsOverride: 4 }];
 
 const related = (anzscoCode: string): OccupationWorkJudgement => ({
   anzscoCode,

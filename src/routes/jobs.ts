@@ -9,6 +9,7 @@ import type { DegreeLevelLabel } from "../parse/schemas.js";
 import { documentMatchesDegreeLevel } from "../parse/documentScope.js";
 import { parseEducation, parseExperience } from "../workers/parse.js";
 import { ensureClientNameFromCv } from "../lib/clientName.js";
+import { LATERAL_FIELD, priorStudyDocumentIds } from "../assess/lateralEntry.js";
 
 const DEGREE_LEVELS = new Set<string>(Object.values(DegreeLevel));
 
@@ -83,8 +84,12 @@ async function runEducationRead(
       .send({ error: "Too many jobs in flight for this case" });
   }
 
-  const needed = caseRow.documents.filter((d) =>
-    documentMatchesDegreeLevel(d, degreeLevel),
+  // Earlier-study transcripts (lateral entry) are not part of this read.
+  const priorStudy = priorStudyDocumentIds(
+    await prisma.fieldSource.findMany({ where: { caseId, field: LATERAL_FIELD } }),
+  );
+  const needed = caseRow.documents.filter(
+    (d) => documentMatchesDegreeLevel(d, degreeLevel) && !priorStudy.has(d.id),
   );
 
   if (!needed.length) {

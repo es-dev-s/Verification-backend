@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { computeDuration, extractYearRange } from "./duration.js";
 import {
   institutionAcronym,
   isLikelyAcronymMatch,
@@ -8,36 +7,6 @@ import {
 } from "./institutionMatch.js";
 import { mergeEducation } from "./mergeEducation.js";
 import { correctOcrEducationText } from "./ocrCorrect.js";
-
-describe("extractYearRange / duration", () => {
-  it("parses SESSION 2019-2023", () => {
-    assert.deepEqual(extractYearRange("SESSION 2019-2023"), {
-      startYear: 2019,
-      endYear: 2023,
-    });
-  });
-
-  it("computes 4 years from year-only start/end", () => {
-    const d = computeDuration({ start: "2019", end: "2023" });
-    assert.equal(d.years, 4);
-    assert.equal(d.calculated, true);
-  });
-
-  it("ignores Result Declaration style stamps as end-only", () => {
-    const d = computeDuration({ start: null, end: "16-AUG-23" });
-    assert.equal(d.years, null);
-  });
-
-  it("prefers stated years over session when both present", () => {
-    const d = computeDuration({
-      statedDuration: "4 years",
-      start: "2019",
-      end: "2023",
-    });
-    assert.equal(d.years, 4);
-    assert.equal(d.calculated, false);
-  });
-});
 
 describe("OCR institution corrections", () => {
   it("fixes Aniversity → University", () => {
@@ -131,7 +100,5 @@ describe("mergeEducation institution acronym", () => {
       ),
       true,
     );
-    assert.equal(merged.fields.durationYears.value, "4");
-    assert.equal(merged.durationCalculated, true);
   });
 });

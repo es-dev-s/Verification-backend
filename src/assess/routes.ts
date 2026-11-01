@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { assessCase } from "../assess/assessCase.js";
+import { assessCase, checkOccupationForCase } from "../assess/assessCase.js";
 import { prisma } from "../lib/prisma.js";
 import {
   listManualOccupationOptions,
@@ -9,6 +9,17 @@ import {
   saveManualSelection,
 } from "./manualOccupation.js";
 import { getTranscriptData, saveTranscriptOverrides } from "./transcriptData.js";
+import {
+  answerLateralEntry,
+  ensurePriorStudySubjects,
+  PriorStudyNotReadyError,
+  readPriorStudySubjects,
+} from "./lateralEntryStore.js";
+
+const lateralAnswerBody = z.object({
+  question: z.enum(["answer", "confirm"]),
+  answer: z.enum(["yes", "no"]),
+});
 
 const assessBody = z.object({
   force: z.boolean().optional(),
@@ -16,7 +27,8 @@ const assessBody = z.object({
 
 /**
  * Assessment step run. Always scores the saved subjects (never re-extracts:
- * re-reading transcripts is the Transcript data step). `rescore` skips the
+ * re-reading transcripts is the Transcript data step). A lateral-entry
+ * prior-study transcript with no subjects yet is read first. `rescore` skips the
  * cached result; legacy `force` means the same here.
  */
 const assessRunBody = z.object({
@@ -24,6 +36,11 @@ const assessRunBody = z.object({
   force: z.boolean().optional(),
   /** Manual review: occupation id or ANZSCO code to score; null clears it. */
   manualOccupation: z.string().trim().max(120).nullable().optional(),
+});
+
+/** Assessor check of one ANZSCO (read-only). */
+const checkOccupationBody = z.object({
+  occupation: z.string().trim().min(1).max(120),
 });
 
 const degreeLevelSchema = z.enum(["diploma", "advanced_diploma", "bachelor", "master", "phd"]);
@@ -64,6 +81,10 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    // Lateral entry: a prior-study transcript without subjects is read now
+    // (only that file; the bachelor's own transcripts are never re-read here).
+    await ensurePriorStudySubjects(id);
+
     try {
       const result = await assessCase(id, {
         subjectsOnly: true,
@@ -77,6 +98,31 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
       const message = err instanceof Error ? err.message : String(err);
       req.log.error({ err }, "assess failed");
       return reply.code(500).send({ error: message });
+    }
+  });
+
+  // Assessor check of any ANZSCO on the saved subjects. Read-only: nothing is
+  // saved, and the assessment result, manual selection and case are untouched.
+  app.post("/cases/:id/assess/check", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = checkOccupationBody.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid request" });
+    const existing = await prisma.case.findFirst({ where: { id, clientId: req.clientId } });
+    if (!existing) return reply.code(404).send({ error: "Case not found" });
+    const resolved = resolveManualOccupation(parsed.data.occupation);
+    if (!resolved.ok) return reply.code(400).send({ error: resolved.error });
+    try {
+      const check = await checkOccupationForCase(id, resolved.selection.occupationId);
+      if (!check) {
+        return reply.code(422).send({ error: "Matching is not available for this occupation." });
+      }
+      return check;
+    } catch (err) {
+      if (err instanceof NoSavedSubjectsError) {
+        return reply.code(409).send({ error: err.message });
+      }
+      req.log.error({ err }, "occupation check failed");
+      return reply.code(500).send({ error: "Could not check this occupation" });
     }
   });
 
@@ -110,6 +156,34 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
     if (!existing) return reply.code(404).send({ error: "Case not found" });
     const { degreeLevel, ...patch } = parsed.data;
     await saveTranscriptOverrides(id, degreeLevel, patch);
+    return getTranscriptData(id, { mode: "read" });
+  });
+
+  // Lateral entry (Verify details): answer the question / re-confirmation.
+  app.put("/cases/:id/lateral-entry", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = lateralAnswerBody.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid answer" });
+    const existing = await prisma.case.findFirst({ where: { id, clientId: req.clientId } });
+    if (!existing) return reply.code(404).send({ error: "Case not found" });
+    await answerLateralEntry(id, parsed.data.question, parsed.data.answer);
+    return getTranscriptData(id, { mode: "read" });
+  });
+
+  // Lateral entry Route 3: read the earlier study's subjects from its transcript.
+  app.post("/cases/:id/lateral-entry/prior-subjects", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const existing = await prisma.case.findFirst({ where: { id, clientId: req.clientId } });
+    if (!existing) return reply.code(404).send({ error: "Case not found" });
+    try {
+      await readPriorStudySubjects(id);
+    } catch (err) {
+      if (err instanceof PriorStudyNotReadyError) {
+        return reply.code(409).send({ error: err.message });
+      }
+      req.log.error({ err }, "prior study read failed");
+      return reply.code(500).send({ error: "Could not read the earlier study's subjects" });
+    }
     return getTranscriptData(id, { mode: "read" });
   });
 

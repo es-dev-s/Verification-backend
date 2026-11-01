@@ -175,6 +175,121 @@ export function withTermIndex<T extends ExtractedSubjectRow>(row: T): T {
   return { ...row, termIndex: t.termIndex, termUnit: t.unit };
 }
 
+// ---------------------------------------------------------------------------
+// Period headings in the transcript text
+// ---------------------------------------------------------------------------
+
+const H_TERM = "(?:semester|sem|trimester|term|quarter|qtr)";
+const H_YEAR = "(?:year|yr|level|part)";
+/** One period token at the start of a heading ("SEM : 3", "Semester III", "3rd Semester", "Second Year"). */
+const H_ONE = `(?:${H_TERM}\\.?\\s*[-:#.]?\\s*${NUM}|${NUM}\\s*-?\\s*${H_TERM}|${H_YEAR}\\.?\\s*[-:#.]?\\s*${NUM}|${NUM}\\s*-?\\s*${H_YEAR})`;
+const HEADING_RE = new RegExp(`^${H_ONE}\\b(?:[\\s,;:/–—-]*${H_ONE}\\b)?`, "i");
+/** Words allowed after a heading on the same line (session / result columns, not a subject title). */
+const HEADING_TAIL_WORDS = new Set([
+  "trial", "attempt", "spi", "cpi", "sgpa", "cgpa", "gpa", "credits", "credit", "hrs", "hours", "week",
+  "result", "results", "exam", "examination", "session", "odd", "even", "regular", "supplementary",
+  "backlog", "marks", "total", "grade", "grades", "pass", "passed", "held", "month", "autumn", "spring",
+  "fall", "summer", "winter", "year", "semester", "code", "subject", "name", "status", "remarks",
+  "with", "from", "and", "the", "of", "in", "for",
+]);
+
+export type TextPeriodHeading = {
+  /** Character offset of the heading in the text. */
+  offset: number;
+  /** Heading as printed (cleaned), e.g. "SEM :3". */
+  label: string;
+  term: TermInfo;
+};
+
+/**
+ * Year / semester headings printed in a transcript's text, in order. A heading
+ * starts a line (or a "|"-separated cell) and may share the line with
+ * session columns ("SEM : 3 | TRIAL : 2 | SPI: 3.61"), but not with a subject title.
+ */
+export function periodHeadingsOf(text: string | null | undefined): TextPeriodHeading[] {
+  if (!text) return [];
+  const out: TextPeriodHeading[] = [];
+  let lineStart = 0;
+  for (const line of text.split("\n")) {
+    let cellStart = 0;
+    for (const cell of line.split("|")) {
+      const lead = cell.match(/^[\s*•·>#\-–—]*/)![0].length;
+      const body = cell.slice(lead);
+      const m = body.match(HEADING_RE);
+      if (m) {
+        const tail = body.slice(m[0].length);
+        const words = tail.toLowerCase().match(/[a-z]{3,}/g) ?? [];
+        const term = parseTerm(m[0]);
+        if (term && term.unit !== "calendar" && words.every((w) => HEADING_TAIL_WORDS.has(w))) {
+          out.push({ offset: lineStart + cellStart + lead, label: m[0].replace(/\s+/g, " ").trim(), term });
+        }
+      }
+      cellStart += cell.length + 1;
+    }
+    lineStart += line.length + 1;
+  }
+  return out;
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Where a subject row is printed in the text (unit code first, then its name); -1 when not found. */
+function rowOffsetIn(text: string, row: Pick<ExtractedSubjectRow, "name" | "code">): number {
+  const code = row.code?.trim();
+  if (code && code.length >= 4) {
+    const m = new RegExp(`(?<![A-Za-z0-9])${escapeRe(code)}(?![A-Za-z0-9])`).exec(text);
+    if (m) return m.index;
+  }
+  const words = row.name.match(/[A-Za-z0-9]+/g) ?? [];
+  for (const take of [words.length, Math.min(words.length, 3)]) {
+    if (!take || words.slice(0, take).join("").length < 6) continue;
+    const re = new RegExp(words.slice(0, take).map(escapeRe).join("[^A-Za-z0-9]{1,6}"), "i");
+    const m = re.exec(text);
+    if (m) return m.index;
+  }
+  return -1;
+}
+
+/**
+ * Fill each row's year / semester from the heading it is printed under in its
+ * transcript's text, when the row has no usable study period of its own
+ * (empty, or something that is not a year / semester such as an exam session
+ * "W2019"). Rows whose label already reads as a year / semester are kept. Used
+ * on every read, so saved subjects benefit without being extracted again.
+ */
+export function applyTextPeriods<T extends ExtractedSubjectRow>(
+  rows: readonly T[],
+  documents: ReadonlyArray<{ id: string; text?: string | null }>,
+): T[] {
+  const headings = new Map<string, TextPeriodHeading[]>();
+  const texts = new Map<string, string>();
+  for (const d of documents) {
+    const h = periodHeadingsOf(d.text);
+    // Two or more distinct periods: a single stray match is not a layout.
+    if (new Set(h.map((x) => x.term.label)).size >= 2) {
+      headings.set(d.id, h);
+      texts.set(d.id, d.text!);
+    }
+  }
+  if (!headings.size) return [...rows];
+  const only = documents.length === 1 ? documents[0]!.id : null;
+  return rows.map((r) => {
+    const own = parseTerm(r.yearOrSemester);
+    if (own && own.unit !== "calendar") return r;
+    const docId = r.documentId ?? only;
+    const h = docId ? headings.get(docId) : undefined;
+    if (!h) return r;
+    const at = rowOffsetIn(texts.get(docId!)!, r);
+    if (at < 0) return r;
+    let under: TextPeriodHeading | null = null;
+    for (const x of h) {
+      if (x.offset > at) break;
+      under = x;
+    }
+    return under ? { ...r, yearOrSemester: under.label } : r;
+  });
+}
+
 /** Year position of a term (Year 3 Sem 2 of 2 → 3; calendar → academic year). */
 function yearOf(t: TermInfo): number | null {
   if (t.unit === "calendar") return t.academicYear;
@@ -200,6 +315,8 @@ export type DurationCount = {
   source: "terms" | "credits" | null;
   /** Set when countedYears was converted from the credit total. */
   creditConversion: CreditConversion | null;
+  /** First and last study period printed (display only; null for calendar years or no periods). */
+  span?: { unit: Exclude<TermUnit, "calendar">; first: number; last: number } | null;
 };
 
 export type CreditSystem = "default" | "ects" | "usSemester" | "australianCreditPoints";
@@ -347,6 +464,8 @@ function countFromTerms(rows: readonly ExtractedSubjectRow[]): DurationCount {
   let method: string;
   let finalYear: number;
   let maxConfidence: "high" | "medium" = "high";
+  let startsLate = false;
+  let printedSpan: DurationCount["span"] = null;
 
   if (study.length >= calendar.length) {
     const subYear = study.filter((t) => t.unit !== "year");
@@ -356,24 +475,48 @@ function countFromTerms(rows: readonly ExtractedSubjectRow[]): DurationCount {
       for (const t of subYear) tpyCounts.set(t.termsPerYear, (tpyCounts.get(t.termsPerYear) ?? 0) + 1);
       const tpy = [...tpyCounts.entries()].sort((a, b) => b[1] - a[1])[0]![0];
       unit = subYear.find((t) => t.termsPerYear === tpy)!.unit;
-      const indexes = study.map((t) =>
-        t.unit === "year" ? (t.yearOfStudy ?? 1) * tpy : (t.termIndex! / t.termsPerYear) * tpy,
-      );
-      const maxIdx = Math.max(...indexes);
-      const distinct = new Set(indexes.map((i) => Math.ceil(i))).size;
-      counted = maxIdx / tpy;
-      coverage = distinct / Math.ceil(maxIdx);
-      finalYear = Math.ceil(counted);
-      method = `highest ${unit} printed: ${Math.ceil(maxIdx)} (${distinct} of ${Math.ceil(maxIdx)} ${unit}s have subjects)`;
+      // Each row covers a range of terms in this unit: a semester row one term,
+      // a year-only row ("Year 2") every term of that year.
+      const ranges = study.map((t): [number, number] => {
+        if (t.unit === "year") {
+          const y = t.yearOfStudy ?? 1;
+          return [(y - 1) * tpy + 1, y * tpy];
+        }
+        const hi = Math.ceil((t.termIndex! / t.termsPerYear) * tpy);
+        const lo = Math.max(1, Math.ceil(((t.termIndex! - 1) / t.termsPerYear) * tpy + 0.0001));
+        return [Math.min(lo, hi), hi];
+      });
+      const minIdx = Math.min(...ranges.map((r) => r[0]));
+      const maxIdx = Math.max(...ranges.map((r) => r[1]));
+      const covered = new Set<number>();
+      for (const [lo, hi] of ranges) for (let i = lo; i <= hi; i++) covered.add(i);
+      const span = maxIdx - minIdx + 1;
+      // The span actually studied (first to last term printed), not the
+      // highest term number: a transcript printing semesters 3–8 is 3 years.
+      counted = span / tpy;
+      coverage = covered.size / span;
+      finalYear = Math.ceil(maxIdx / tpy);
+      method =
+        minIdx === 1
+          ? `${unit}s 1–${maxIdx} printed (${covered.size} of ${span} ${unit}s have subjects)`
+          : `${unit}s ${minIdx}–${maxIdx} printed: ${span} ${unit}s studied (${covered.size} of ${span} have subjects)`;
+      startsLate = minIdx > 1;
+      printedSpan = { unit: unit as Exclude<TermUnit, "calendar">, first: minIdx, last: maxIdx };
     } else {
       unit = "year";
       const years = study.map((t) => t.yearOfStudy!);
+      const minYear = Math.min(...years);
       const maxYear = Math.max(...years);
       const distinct = new Set(years).size;
-      counted = maxYear;
-      coverage = distinct / maxYear;
+      counted = maxYear - minYear + 1;
+      coverage = distinct / counted;
       finalYear = maxYear;
-      method = `highest year printed: ${maxYear} (${distinct} of ${maxYear} years have subjects)`;
+      method =
+        minYear === 1
+          ? `years 1–${maxYear} printed (${distinct} of ${counted} years have subjects)`
+          : `years ${minYear}–${maxYear} printed: ${counted} years studied (${distinct} of ${counted} have subjects)`;
+      startsLate = minYear > 1;
+      printedSpan = { unit: "year", first: minYear, last: maxYear };
     }
   } else {
     unit = "calendar";
@@ -391,6 +534,13 @@ function countFromTerms(rows: readonly ExtractedSubjectRow[]): DurationCount {
 
   let confidence: "high" | "medium" | "low" =
     coverage >= 0.75 ? "high" : coverage >= 0.5 ? "medium" : "low";
+  // Starting later than the first period and spanning under the minimum
+  // programme length reads as a partial record (e.g. one year's results),
+  // not a whole programme: not counted from the periods.
+  if (startsLate && counted < evidenceConfig.gate.notEligibleBelowYears) {
+    confidence = "low";
+    method = `${method}; too short a span to be the whole programme`;
+  }
   if (confidence === "high" && (shareWithTerm < 0.75 || maxConfidence === "medium")) {
     confidence = "medium";
   }
@@ -402,6 +552,7 @@ function countFromTerms(rows: readonly ExtractedSubjectRow[]): DurationCount {
     method,
     finalYear,
     source: "terms",
+    span: printedSpan,
   };
 }
 
@@ -419,11 +570,10 @@ export function creditContextOf(q: QualificationInfo | null | undefined): Credit
   };
 }
 
-/** Rows and stated duration for each qualification level on the case. */
+/** Rows and duration count for each qualification level on the case. */
 export type LevelDurationBasis = {
   level: QualificationType;
   title: string | null;
-  statedYears: number | null;
   count: DurationCount;
 };
 
@@ -450,7 +600,6 @@ export function durationBasisFor(
     out.push({
       level,
       title: q?.title ?? null,
-      statedYears: q?.durationYears ?? null,
       count: countDuration(atLevel, creditContextOf(q)),
     });
   }

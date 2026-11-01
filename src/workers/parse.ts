@@ -1,7 +1,7 @@
 import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
+import { LATERAL_FIELD, priorStudyDocumentIds } from "../assess/lateralEntry.js";
 import { acquireParseSlot } from "../lib/rateLimit.js";
-import { computeDuration } from "../parse/duration.js";
 import {
   generateJsonGroqSplit,
   mergeCvEducationParts,
@@ -167,8 +167,12 @@ export async function parseEducation(
     },
   });
 
+  // Earlier-study transcripts (lateral entry) are not part of this qualification.
+  const priorStudy = priorStudyDocumentIds(
+    await prisma.fieldSource.findMany({ where: { caseId, field: LATERAL_FIELD } }),
+  );
   const cvDoc = docs.find((d) => d.type === "CV");
-  const levelDocs = docs.filter((d) => d.type !== "CV");
+  const levelDocs = docs.filter((d) => d.type !== "CV" && !priorStudy.has(d.id));
 
   if (!cvDoc && !levelDocs.length) {
     return {
@@ -319,19 +323,11 @@ export async function parseEducation(
   }
 
   const merged = mergeEducation(sources);
-  const durationYears =
-    merged.fields.durationYears.value != null
-      ? Number(merged.fields.durationYears.value)
-      : null;
 
   const qualificationData = {
     degreeTitle: merged.fields.degreeTitle.value,
     institution: merged.fields.institution.value,
     country: merged.fields.country.value,
-    durationYears: Number.isFinite(durationYears as number)
-      ? (durationYears as number)
-      : null,
-    durationCalculated: merged.durationCalculated,
   };
 
   await prisma.qualification.upsert({
@@ -377,10 +373,7 @@ export async function parseEducation(
     });
   }
 
-  const block = {
-    ...qualificationData,
-    durationYears: qualificationData.durationYears,
-  };
+  const block = qualificationData;
 
   return {
     qualification: { degreeLevel, ...block },
@@ -398,11 +391,6 @@ export async function parseEducation(
       documentType: s.documentType,
       degreeLevel: s.degreeLevel ?? degreeLevel,
       extract: s.extract,
-      duration: computeDuration({
-        statedDuration: s.extract.statedDuration,
-        start: s.extract.start,
-        end: s.extract.end,
-      }),
     })),
   };
 }

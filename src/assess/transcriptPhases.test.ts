@@ -52,11 +52,10 @@ const withSemesters = (semesters: number) =>
   }).map(withTermIndex);
 const noTerms = () => ENG.map((n) => sub(n));
 
-const bachelor = (durationYears: number | null, extra: Partial<QualificationInfo> = {}): QualificationInfo => ({
+const bachelor = (extra: Partial<QualificationInfo> = {}): QualificationInfo => ({
   level: "bachelor",
   rawLevel: "bachelor",
   title: "Bachelor of Engineering in Mechanical Engineering",
-  durationYears,
   ...extra,
 });
 
@@ -97,7 +96,7 @@ describe("Phase 1: award level and field of study", () => {
 
 describe("Phase 2: transcript summary", () => {
   it("counts duration, credits and the final-year project", () => {
-    const [s] = buildQualificationSummaries([bachelor(4)], withSemesters(8), []);
+    const [s] = buildQualificationSummaries([bachelor()], withSemesters(8), []);
     assert.equal(s!.transcript.countedYears, 4);
     assert.equal(s!.transcript.terms, 8);
     assert.equal(s!.transcript.creditTotal, 36);
@@ -120,7 +119,7 @@ describe("Phase 2: transcript summary", () => {
       finalProject: "Capstone design",
       engineeringShare: 0.8,
     });
-    const [s] = buildQualificationSummaries([bachelor(4)], withSemesters(8), sources);
+    const [s] = buildQualificationSummaries([bachelor()], withSemesters(8), sources);
     assert.equal(s!.effective.creditTotal, 120);
     assert.equal(s!.effective.finalProject?.title, "Capstone design");
     assert.equal(s!.effective.engineeringShare, 0.8);
@@ -128,58 +127,57 @@ describe("Phase 2: transcript summary", () => {
   });
 });
 
-describe("Phase 3: duration check (0.5-year tolerance)", () => {
-  it("match within tolerance passes", () => {
-    const [s] = buildQualificationSummaries([bachelor(4)], withSemesters(8), []);
-    assert.equal(s!.durationCheck.status, "match");
+describe("Phase 3: duration from Transcript data (no Step 1 duration)", () => {
+  it("counted from the printed semesters", () => {
+    const [s] = buildQualificationSummaries([bachelor()], withSemesters(8), []);
+    assert.equal(s!.durationCheck.status, "transcript");
     assert.equal(s!.durationCheck.ok, true);
-    assert.equal(s!.durationCheck.toleranceYears, 0.5);
-    const [half] = buildQualificationSummaries([bachelor(3.5)], withSemesters(8), []);
-    assert.equal(half!.durationCheck.status, "match");
+    assert.equal(s!.effective.countedYears, 4);
   });
 
-  it("mismatch needs manual review", () => {
-    const [s] = buildQualificationSummaries([bachelor(3)], withSemesters(8), []);
-    assert.equal(s!.durationCheck.status, "mismatch");
-    assert.equal(s!.durationCheck.ok, false);
-    assert.equal(s!.durationCheck.differenceYears, 1);
-  });
-
-  it("a manual counted duration resolves the mismatch", () => {
+  it("the assessor's entry in Transcript data wins over the count", () => {
     const sources = [fs(TRANSCRIPT_FIELDS.countedYears, "3")];
-    const [s] = buildQualificationSummaries([bachelor(3)], withSemesters(8), sources);
+    const [s] = buildQualificationSummaries([bachelor()], withSemesters(8), sources);
     assert.equal(s!.basis, "manual");
-    assert.equal(s!.durationCheck.status, "match");
+    assert.equal(s!.effective.countedYears, 3);
+    assert.equal(s!.durationCheck.status, "edited");
     assert.equal(s!.durationCheck.ok, true);
   });
 
-  it("no countable terms falls back to the stated duration", () => {
-    const [s] = buildQualificationSummaries([bachelor(4)], noTerms(), []);
-    assert.equal(s!.durationCheck.status, "fallback");
-    assert.equal(s!.durationCheck.ok, true);
-    assert.equal(s!.fallback, true);
-  });
-
-  it("no stated and no counted duration blocks", () => {
-    const [s] = buildQualificationSummaries([bachelor(null)], noTerms(), []);
+  it("nothing to count and nothing entered: missing, prompts for an entry", () => {
+    const [s] = buildQualificationSummaries([bachelor()], noTerms(), []);
+    assert.equal(s!.basis, "none");
+    assert.equal(s!.effective.countedYears, null);
     assert.equal(s!.durationCheck.status, "missing");
     assert.equal(s!.durationCheck.ok, false);
+    assert.match(s!.durationCheck.message, /Transcript data/);
+  });
+
+  it("an old stored Step 1 duration is ignored", () => {
+    const quals = [
+      { degreeLevel: "bachelor", degreeTitle: "Bachelor of Engineering", durationYears: 4, country: null, institution: null },
+    ];
+    const infos = qualificationInfosFor(quals, [], []);
+    assert.equal(infos[0]!.countedYearsOverride ?? null, null);
+    const [s] = buildQualificationSummaries(infos, noTerms(), []);
+    assert.equal(s!.durationCheck.status, "missing");
+    const g = evaluateGate1({ qualifications: infos, rows: noTerms(), vocational: voc });
+    assert.equal(g.result, "manual_review");
   });
 
   it("no terms but a credit total: years converted from credits, with a flag", () => {
     const sources = [fs(TRANSCRIPT_FIELDS.creditTotal, "120")];
-    const [s] = buildQualificationSummaries([bachelor(4)], noTerms(), sources);
+    const [s] = buildQualificationSummaries([bachelor()], noTerms(), sources);
     assert.equal(s!.basis, "counted");
-    assert.equal(s!.fallback, false);
     assert.equal(s!.effective.countedYears, 4);
     assert.equal(s!.creditConversion, "Converted from credits (120 credits ÷ 30 per year)");
     assert.equal(s!.basisLabel, s!.creditConversion);
-    assert.equal(s!.durationCheck.status, "match");
+    assert.equal(s!.durationCheck.status, "credits");
   });
 
   it("a manual counted duration wins over the credit conversion", () => {
     const sources = [fs(TRANSCRIPT_FIELDS.creditTotal, "120"), fs(TRANSCRIPT_FIELDS.countedYears, "3.5")];
-    const [s] = buildQualificationSummaries([bachelor(4)], noTerms(), sources);
+    const [s] = buildQualificationSummaries([bachelor()], noTerms(), sources);
     assert.equal(s!.basis, "manual");
     assert.equal(s!.effective.countedYears, 3.5);
     assert.equal(s!.creditConversion, null);
@@ -187,7 +185,7 @@ describe("Phase 3: duration check (0.5-year tolerance)", () => {
 
   it("printed semesters win over the credit total", () => {
     const sources = [fs(TRANSCRIPT_FIELDS.creditTotal, "240")];
-    const [s] = buildQualificationSummaries([bachelor(4)], withSemesters(8), sources);
+    const [s] = buildQualificationSummaries([bachelor()], withSemesters(8), sources);
     assert.equal(s!.effective.countedYears, 4);
     assert.equal(s!.creditConversion, null);
   });

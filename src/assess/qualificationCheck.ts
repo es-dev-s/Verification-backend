@@ -11,8 +11,6 @@ export type QualificationInfo = {
   rawLevel?: string | null;
   /** Transcript texts at this qualification's level (routing spots UEE62122 etc.). */
   texts?: string[];
-  /** Stated programme length in years (Qualification.durationYears; Gate 1 check). */
-  durationYears?: number | null;
   /** Country / institution (Gate 1 "may be recognised higher" config hook). */
   country?: string | null;
   institution?: string | null;

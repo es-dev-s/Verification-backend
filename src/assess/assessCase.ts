@@ -36,14 +36,25 @@ import {
   normalizeCode,
   type RankedCandidate,
 } from "./familyAdjust.js";
-import { evaluateGate1, gateIsOpen, openTracks, trackForAnzsco } from "./gate1.js";
+import { evaluateGate1, gateIsOpen, openTracks, TRACK_LABELS, trackForAnzsco } from "./gate1.js";
 import { isDiplomaLevel } from "./schemas.js";
 import { manualSelectionFrom, NoSavedSubjectsError, type ManualSelection } from "./manualOccupation.js";
-import { preferFinalYearGate, withTermIndex } from "./qualificationEvidence.js";
+import { applyTextPeriods, preferFinalYearGate, withTermIndex } from "./qualificationEvidence.js";
+import {
+  hasLateralState,
+  lateralEntryConfirmed,
+  lateralEntryDecided,
+  lateralStateOf,
+  priorStudyDocumentIds,
+  priorStudyMatches,
+  priorStudyRowsFor,
+  type LateralEntryState,
+} from "./lateralEntry.js";
 import {
   applyDocumentLevels,
   documentLevelResolver,
   gateOverridesOf,
+  lateralEntryForCase,
   qualificationInfosFor,
   readSavedSubjectHash,
   resolveSubjects,
@@ -63,6 +74,7 @@ import type {
   ExtractionReport,
   FinalProjectEvidence,
   Gate1Decision,
+  Gate1Result,
   Gate1TrackId,
   QualificationEvidence,
   MissingSubjectsByTier,
@@ -131,6 +143,8 @@ export type ScoredOccupation = {
   finalProject?: FinalProjectEvidence | null;
   /** Professional Engineer / Technologist tracks never score diploma-level rows. */
   excludeDiplomaRows?: boolean;
+  /** Earlier-study rows (lateral entry Route 3) added as Foundational matches. */
+  priorStudyRows?: ExtractedSubjectRow[];
 };
 
 /** Inputs shared by every occupation scored for one case. */
@@ -144,6 +158,12 @@ export type ScoringContext = {
   occupationId?: string;
   /** Step 2 checkbox: assessor confirmed an engineering-titled degree. */
   engineeringTitledDegree?: boolean | null;
+  /** Lateral-entry check decided (Route 2 / 3): Gate 1 skips its bridging / credit flags. */
+  lateralEntryDecided?: boolean;
+  /** Lateral entry confirmed (Route 3): Gate 1 opens a 2 to under 3-year bachelor. */
+  lateralEntryConfirmed?: boolean;
+  /** Lateral entry Route 3: earlier-study rows (degree path only, Foundational only). */
+  priorStudyRows?: ExtractedSubjectRow[];
 };
 
 /**
@@ -172,7 +192,12 @@ export async function assessCase(
   });
   if (!caseRow) throw new Error("Case not found");
 
-  const transcripts = usableTranscripts(caseRow.documents);
+  // Earlier-study transcripts (lateral entry) are never the bachelor's own subjects.
+  const transcripts = usableTranscripts(
+    caseRow.documents,
+    priorStudyDocumentIds(caseRow.fieldSources),
+  );
+  const lateralState = lateralStateOf(caseRow.fieldSources);
   // Latest finished CV wins (a re-upload replaces the older one).
   const cvDoc = [...caseRow.documents]
     .reverse()
@@ -180,13 +205,13 @@ export async function assessCase(
   const cvText = cvDoc?.text ?? null;
   // Clients page name only (no LLM, not part of any hash or the result).
   if (!opts?.injectedSubjects?.length) await ensureClientNameFromCv(caseId);
-  const persistedRows = caseRow.extractedSubjects.map(rowFromDb);
+  // Year / semester filled from the transcript's headings where the read gave none.
+  const persistedRows = applyTextPeriods(caseRow.extractedSubjects.map(rowFromDb), transcripts);
   // Qualification titles by DB level: refine a document's level (associate
   // degree has no DB enum value) and feed the Step 1 qualification check.
   const qualificationRows = caseRow.qualifications.map((q) => ({
     degreeLevel: String(q.degreeLevel),
     degreeTitle: q.degreeTitle ?? null,
-    durationYears: q.durationYears ?? null,
     country: q.country ?? null,
     institution: q.institution ?? null,
   }));
@@ -232,6 +257,9 @@ export async function assessCase(
     // Only when set, so cases without assessor values keep their cache key.
     ...(gateOverrides ? { gateOverrides } : {}),
     ...(manualSelection ? { manualOccupation: manualSelection.occupationId } : {}),
+    // lateralGate: bumped when the Gate 1 lateral-entry rules change, so saved
+    // lateral cases re-score once (other cases keep their cache key).
+    ...(hasLateralState(lateralState) ? { lateralEntry: lateralHashOf(lateralState), lateralGate: 2 } : {}),
     rubric: rubricFingerprint(),
     config: scoringConfigFingerprint(),
   });
@@ -255,12 +283,23 @@ export async function assessCase(
     if (!cached.extractedSubjects?.length && persistedRows.length) {
       cached.extractedSubjects = persistedRows;
     }
+    const cachedRows = persistedRows.length ? persistedRows : cached.extractedSubjects ?? [];
+    const cachedLateral = lateralEntryForCase({
+      infos: qualificationInfos,
+      rows: cachedRows,
+      fieldSources: caseRow.fieldSources,
+      documents: caseRow.documents,
+    });
+    cached.lateralEntry = cachedLateral;
     // Saved results where ET took a top-N slot: fill the matched slot(s) from
     // a deterministic re-score of the saved subjects. The filled card gets the
     // saved work-experience judgement, else a check for that occupation only
     // (AI allowed). Nothing is saved on this read-only load.
     const backfilled = await backfillCachedCandidates(cached, {
-      rows: persistedRows.length ? persistedRows : cached.extractedSubjects ?? [],
+      rows: cachedRows,
+      lateralEntryDecided: lateralEntryDecided(cachedLateral),
+      lateralEntryConfirmed: lateralEntryConfirmed(cachedLateral),
+      priorStudyRows: priorStudyRowsFor(cachedLateral, lateralState),
       qualifications: qualificationInfos,
       transcriptTexts,
       engineeringTitledDegree: caseRow.engineeringTitledDegree,
@@ -291,9 +330,12 @@ export async function assessCase(
   // stored without a valid cache key so the next run extracts again.
   let cacheable = true;
   if (opts?.injectedSubjects) {
-    extracted = applyDocumentLevels(
-      opts.injectedSubjects,
-      transcripts.map((t) => ({ id: t.id, level: docLevel(t) })),
+    extracted = applyTextPeriods(
+      applyDocumentLevels(
+        opts.injectedSubjects,
+        transcripts.map((t) => ({ id: t.id, level: docLevel(t) })),
+      ),
+      transcripts,
     ).map(withTermIndex);
     extraction = { subjectHash, source: "injected" };
   } else {
@@ -322,6 +364,15 @@ export async function assessCase(
     cacheable = resolved.cacheable;
   }
 
+  // Lateral entry (before Gate 1): route, answers and the earlier study's subjects.
+  const lateral = lateralEntryForCase({
+    infos: qualificationInfos,
+    rows: extracted,
+    fieldSources: caseRow.fieldSources,
+    documents: caseRow.documents,
+  });
+  const priorStudyRows = priorStudyRowsFor(lateral, lateralState);
+
   // Gate 1 decides which tracks are scored (before any scoring); each
   // occupation in an open track is then sync-matched (no work experience in ranking).
   const { scored: scoredAll, gate, assessorSelected } = scoreWithManualSelection(
@@ -332,12 +383,16 @@ export async function assessCase(
       transcriptTexts,
       occupationId: opts?.occupationId,
       engineeringTitledDegree: caseRow.engineeringTitledDegree,
+      lateralEntryDecided: lateralEntryDecided(lateral),
+      lateralEntryConfirmed: lateralEntryConfirmed(lateral),
+      priorStudyRows,
     },
     manualSelection,
   );
   if (!gateIsOpen(gate) && !opts?.occupationId && !assessorSelected) {
     // Not eligible / manual review: nothing is scored, the reason is the explanation.
     const blocked = gateBlockedResult(gate, extracted, extraction);
+    blocked.lateralEntry = lateral;
     await saveAssessment(caseId, blocked, cacheable ? inputHash : "");
     return blocked;
   }
@@ -359,6 +414,7 @@ export async function assessCase(
       pool: best.poolRows,
       qualifications: qualificationInfos,
       excludeDiplomaRows: best.excludeDiplomaRows,
+      priorStudyRows: best.priorStudyRows,
     });
     shortlist = [
       { ...refined, track: best.track, trackPriority: best.trackPriority },
@@ -463,6 +519,7 @@ export async function assessCase(
     extractedSubjects: extracted,
     qualificationNotes: winner.scored.qualificationNotes,
     gate1: gate,
+    lateralEntry: lateral,
     assessmentFlow: winner.vocational ? "vocational_units" : "academic",
     bandDetermination: winner.scored.bandDetermination,
     explanation: "",
@@ -588,6 +645,8 @@ function scoreOccupation(
     qualifications?: QualificationInfo[];
     /** Professional Engineer / Technologist tracks: skip the diploma-level pool. */
     excludeDiplomaRows?: boolean;
+    /** Lateral entry Route 3: earlier-study rows (Foundational matches only). */
+    priorStudyRows?: ExtractedSubjectRow[];
   },
 ): ScoredOccupation {
   const rubricSubjects = flattenRubricSubjects(rubric);
@@ -597,7 +656,7 @@ function scoreOccupation(
   for (const pool of candidatePools(extracted, opts.excludeDiplomaRows)) {
     const matchResult = matchSubjectsSync(pool.rows, rubricSubjects, matchOptions);
     const gate = preferFinalYearGate(matchResult.matches, pool.rows, gateNameOf(rubric));
-    matchResult.matches = gate.matches;
+    matchResult.matches = withPriorStudy(gate.matches, pool.kind, opts.priorStudyRows, rubric);
     const qualificationsUsed = qualificationsOf(pool.rows);
     const qualificationCheck = checkQualification(rubric, qualificationsUsed, opts.qualifications ?? []);
     const scored = scoreAssessment({
@@ -625,10 +684,44 @@ function scoreOccupation(
         vocational: null,
         finalProject: gate.finalProject,
         excludeDiplomaRows: opts.excludeDiplomaRows,
+        ...(opts.priorStudyRows?.length ? { priorStudyRows: opts.priorStudyRows } : {}),
       };
     }
   }
   return best!;
+}
+
+/**
+ * Lateral entry Route 3: add the earlier study's Foundational matches to a
+ * bachelor (or bachelor + master) pool. Primary matches are never replaced.
+ */
+function withPriorStudy(
+  matches: SubjectMatch[],
+  kind: PoolKind,
+  priorStudyRows: ExtractedSubjectRow[] | undefined,
+  rubric: Rubric,
+): SubjectMatch[] {
+  if (!priorStudyRows?.length || (kind !== "bachelor" && kind !== "combined")) return matches;
+  return [
+    ...matches,
+    ...priorStudyMatches(
+      matches,
+      priorStudyRows,
+      flattenRubricSubjects(rubric),
+      matchOptionsForRubric(rubric),
+    ),
+  ];
+}
+
+/** Cache-key part of the lateral-entry state (answers and earlier-study subjects, no timestamps). */
+export function lateralHashOf(state: LateralEntryState) {
+  return {
+    answer: state.answer?.value ?? null,
+    confirm: state.confirm?.value ?? null,
+    priorSubjects: state.priorSubjects
+      ? state.priorSubjects.rows.map((r) => `${r.name}|${r.code ?? ""}|${r.isRepeat ? 1 : 0}`)
+      : null,
+  };
 }
 
 /** Rubric Tier 3 gate subject name (same default as score.ts). */
@@ -731,6 +824,8 @@ export function scoreRoutedOccupations(
     engineeringTitledDegree: ctx.engineeringTitledDegree,
     vocational,
     rubricCodes: academicAll.map((r) => r.anzscoCode),
+    lateralEntryDecided: ctx.lateralEntryDecided,
+    lateralEntryConfirmed: ctx.lateralEntryConfirmed,
   });
   const routing = routeQualifications(ctx.qualifications ?? [], vocational);
   const out: ScoredOccupation[] = [];
@@ -744,12 +839,15 @@ export function scoreRoutedOccupations(
       }
     } else {
       const rubric = loadRubric(target);
+      const track = trackForAnzsco(rubric.anzscoCode) ?? undefined;
       out.push({
         ...scoreOccupation(extracted, rubric, {
           workExperienceBoost: ctx.workExperienceBoost,
           qualifications: ctx.qualifications,
+          // Earlier-study subjects count on the degree path only.
+          priorStudyRows: track !== "engineering_associate" ? ctx.priorStudyRows : undefined,
         }),
-        track: trackForAnzsco(rubric.anzscoCode) ?? undefined,
+        track,
       });
     }
     return { scored: out, gate };
@@ -767,6 +865,7 @@ export function scoreRoutedOccupations(
         workExperienceBoost: ctx.workExperienceBoost,
         qualifications: ctx.qualifications,
         excludeDiplomaRows,
+        priorStudyRows: track !== "engineering_associate" ? ctx.priorStudyRows : undefined,
       }),
       track,
       trackPriority: priority.get(track),
@@ -811,6 +910,149 @@ export function scoreWithManualSelection(
     gate: routed.gate,
     assessorSelected: { anzscoCode: manual.anzscoCode, title: manual.title, occupationId: manual.occupationId },
   };
+}
+
+/** Assessor "check an ANZSCO" result: one occupation scored on the saved subjects, never saved. */
+export type OccupationCheck = {
+  candidate: AnzscoCandidate;
+  track: Gate1TrackId | null;
+  trackLabel: string | null;
+  /** False when Gate 1 did not open this occupation's track for the case. */
+  trackOpen: boolean;
+  gateResult: Gate1Result;
+};
+
+/**
+ * Score one occupation for the assessor's check (pure, deterministic, no AI).
+ * Gate 1 never blocks it; the result says whether Gate 1 opened the track.
+ * An occupation in an open track is scored exactly like its ranked card;
+ * otherwise like the manual-review targeted run. Null when the occupation
+ * has no usable rubric.
+ */
+export function checkOccupation(
+  extracted: ExtractedSubjectRow[],
+  ctx: Omit<ScoringContext, "occupationId" | "workExperienceBoost">,
+  occupationId: string,
+): OccupationCheck | null {
+  const rows = extracted.map(withTermIndex);
+  const full: ScoringContext = { ...ctx, workExperienceBoost: false };
+  let routed: { scored: ScoredOccupation[]; gate: Gate1Decision };
+  try {
+    routed = scoreRoutedOccupations(rows, { ...full, occupationId });
+  } catch {
+    return null;
+  }
+  let s = routed.scored[0];
+  if (!s) return null;
+  const track = s.track ?? null;
+  const trackOpen = track !== null && openTracks(routed.gate).some((t) => t.track === track);
+  if (!s.vocational && trackOpen && track !== "engineering_associate") {
+    s = {
+      ...scoreOccupation(rows, s.rubric, {
+        workExperienceBoost: false,
+        qualifications: ctx.qualifications,
+        excludeDiplomaRows: true,
+        priorStudyRows: ctx.priorStudyRows,
+      }),
+      track,
+    };
+  }
+  const matches = dedupeMatchRows(s.matches);
+  const candidate = buildCandidate(
+    s.rubric,
+    s.scored,
+    matches,
+    computeMissingSubjects(matches, s.rubric),
+    s.unmatched.map((u) => ({
+      name: u.name,
+      code: u.code ?? null,
+      qualification: u.qualification as QualificationType,
+    })),
+    { workExperienceBoost: false, workExperienceAnalysis: null },
+    s,
+  );
+  return {
+    candidate,
+    track,
+    trackLabel: track ? TRACK_LABELS[track] : null,
+    trackOpen,
+    gateResult: routed.gate.result,
+  };
+}
+
+/** Read the case rows the occupation check needs (read-only). */
+function loadCaseForCheck(caseId: string) {
+  return prisma.case.findUnique({
+    where: { id: caseId },
+    include: {
+      documents: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+      qualifications: { orderBy: [{ degreeLevel: "asc" }, { id: "asc" }] },
+      extractedSubjects: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      fieldSources: true,
+    },
+  });
+}
+
+export type CheckCaseLoader = typeof loadCaseForCheck;
+
+/**
+ * Assessor check of one ANZSCO for a case: the saved subjects (no AI
+ * re-extraction), the same Gate 1 / lateral-entry inputs as the assessment,
+ * scored for that occupation only. Reads the case and nothing else: the
+ * saved assessment, the manual-review selection and the case are untouched.
+ */
+export async function checkOccupationForCase(
+  caseId: string,
+  occupationId: string,
+  load: CheckCaseLoader = loadCaseForCheck,
+): Promise<OccupationCheck | null> {
+  const caseRow = await load(caseId);
+  if (!caseRow) throw new Error("Case not found");
+  const transcripts = usableTranscripts(
+    caseRow.documents,
+    priorStudyDocumentIds(caseRow.fieldSources),
+  );
+  const lateralState = lateralStateOf(caseRow.fieldSources);
+  const qualificationRows = caseRow.qualifications.map((q) => ({
+    degreeLevel: String(q.degreeLevel),
+    degreeTitle: q.degreeTitle ?? null,
+    country: q.country ?? null,
+    institution: q.institution ?? null,
+  }));
+  const docLevel = documentLevelResolver(qualificationRows);
+  const saved = caseRow.extractedSubjects.map(rowFromDb);
+  if (!saved.length) throw new NoSavedSubjectsError();
+  // Same tagging as a saved-subjects assessment run (document level, printed period).
+  const rows = applyTextPeriods(
+    applyDocumentLevels(
+      saved,
+      transcripts.map((t) => ({ id: t.id, level: docLevel(t) })),
+    ),
+    transcripts,
+  ).map(withTermIndex);
+  const qualificationInfos = qualificationInfosFor(
+    qualificationRows,
+    transcripts,
+    caseRow.fieldSources,
+  );
+  const lateral = lateralEntryForCase({
+    infos: qualificationInfos,
+    rows,
+    fieldSources: caseRow.fieldSources,
+    documents: caseRow.documents,
+  });
+  return checkOccupation(
+    rows,
+    {
+      qualifications: qualificationInfos,
+      transcriptTexts: transcripts.map((t) => t.text ?? ""),
+      engineeringTitledDegree: caseRow.engineeringTitledDegree,
+      lateralEntryDecided: lateralEntryDecided(lateral),
+      lateralEntryConfirmed: lateralEntryConfirmed(lateral),
+      priorStudyRows: priorStudyRowsFor(lateral, lateralState),
+    },
+    occupationId,
+  );
 }
 
 /**
@@ -977,6 +1219,9 @@ export async function backfillCachedCandidates(
     engineeringTitledDegree?: boolean | null;
     manualSelection?: ManualSelection | null;
     judge?: WorkJudge | null;
+    lateralEntryDecided?: boolean;
+    lateralEntryConfirmed?: boolean;
+    priorStudyRows?: ExtractedSubjectRow[];
   },
 ): Promise<boolean> {
   const saved = cached.candidates ?? [];
@@ -992,6 +1237,9 @@ export async function backfillCachedCandidates(
         qualifications: input.qualifications,
         transcriptTexts: input.transcriptTexts,
         engineeringTitledDegree: input.engineeringTitledDegree,
+        lateralEntryDecided: input.lateralEntryDecided,
+        lateralEntryConfirmed: input.lateralEntryConfirmed,
+        priorStudyRows: input.priorStudyRows,
       },
       input.manualSelection,
     );
@@ -1418,6 +1666,12 @@ export function assessExtractedSubjects(
     engineeringTitledDegree?: boolean | null;
     /** Assessor-selected occupation (used only when Gate 1 = manual review). */
     manualSelection?: ManualSelection | null;
+    /** Lateral-entry check decided (Route 2 / 3). */
+    lateralEntryDecided?: boolean;
+    /** Lateral entry confirmed (Route 3). */
+    lateralEntryConfirmed?: boolean;
+    /** Lateral entry Route 3: earlier-study rows. */
+    priorStudyRows?: ExtractedSubjectRow[];
   },
 ): AssessmentResult {
   // Work-experience boost (opts, tests) is applied in scoring, before the cut.
@@ -1429,6 +1683,9 @@ export function assessExtractedSubjects(
       transcriptTexts: opts?.transcriptTexts,
       occupationId: opts?.occupationId,
       engineeringTitledDegree: opts?.engineeringTitledDegree,
+      lateralEntryDecided: opts?.lateralEntryDecided,
+      lateralEntryConfirmed: opts?.lateralEntryConfirmed,
+      priorStudyRows: opts?.priorStudyRows,
     },
     opts?.manualSelection,
   );
@@ -1524,12 +1781,14 @@ export async function scoreOccupationWithLlm(
     pool?: ExtractedSubjectRow[];
     qualifications?: QualificationInfo[];
     excludeDiplomaRows?: boolean;
+    priorStudyRows?: ExtractedSubjectRow[];
   },
 ): Promise<ScoredOccupation> {
   const sync = scoreOccupation(extracted, rubric, {
     workExperienceBoost: opts.workExperienceBoost,
     qualifications: opts.qualifications,
     excludeDiplomaRows: opts.excludeDiplomaRows,
+    priorStudyRows: opts.priorStudyRows,
   });
   const pool = opts.pool ?? sync.poolRows;
   const qualificationsUsed = qualificationsOf(pool);
@@ -1541,6 +1800,7 @@ export async function scoreOccupationWithLlm(
     ...matchOptionsForRubric(rubric),
   });
   const gate = preferFinalYearGate(matchResult.matches, pool, gateNameOf(rubric));
+  gate.matches = withPriorStudy(gate.matches, sync.poolKind, opts.priorStudyRows, rubric);
   const qualificationCheck = checkQualification(rubric, qualificationsUsed, opts.qualifications ?? []);
   const scored = scoreAssessment({
     matches: gate.matches,

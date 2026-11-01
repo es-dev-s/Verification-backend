@@ -100,7 +100,7 @@ describe("matchSubjectsSync", () => {
 describe("scoreAssessment / assessExtractedSubjects", () => {
   it("recommends 233111 for a Chemical Engineering transcript", () => {
     const result = assessExtractedSubjects(CHEM_ENG_TRANSCRIPT, {
-      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering (Chemical)", durationYears: 4 }],
+      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering (Chemical)", countedYearsOverride: 4 }],
     });
     assert.equal(result.gate1?.result, "open");
     assert.equal(result.recommended, true);

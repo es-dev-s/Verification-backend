@@ -306,7 +306,7 @@ describe("#9 work boost applied before the top-N cut", () => {
     const rows = [sub("Engineering Mathematics"), sub("Engineering Physics")];
     const all = scoreAllOccupations(rows, undefined, {
       workExperienceBoost: false,
-      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering", durationYears: 4 }],
+      qualifications: [{ level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: 4 }],
     });
     const shortlist = all.slice(0, 6);
     const fourth = shortlist[3]!;

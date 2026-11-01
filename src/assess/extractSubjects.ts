@@ -88,6 +88,7 @@ export function dedupeSubjects(rows: ExtractedSubjectRow[]): ExtractedSubjectRow
       if (!existing.yearOrSemester && row.yearOrSemester) {
         existing.yearOrSemester = row.yearOrSemester;
       }
+      if (!existing.grade && row.grade) existing.grade = row.grade;
       continue;
     }
     seen.set(key, { ...row, isRepeat: row.isRepeat ?? false });
@@ -139,6 +140,7 @@ async function extractChunkOnKey(
       subjectNameToExtractedRow(s.name, s.code ?? null, {
         credits: s.credits ?? null,
         yearOrSemester: s.yearOrSemester ?? null,
+        entryStatus: s.entryStatus ?? null,
       }),
     );
   } catch (err) {
@@ -251,7 +253,7 @@ export function hashSubjectInput(
  */
 export function hashScoringInput(parts: Record<string, unknown>): string {
   return createHash("sha256")
-    .update("score-v3\0")
+    .update("score-v4\0") // v4: duration counts the span studied
     .update(stableStringify(parts))
     .digest("hex");
 }
