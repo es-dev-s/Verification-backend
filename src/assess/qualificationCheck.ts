@@ -22,6 +22,8 @@ export type QualificationInfo = {
   awardOverride?: Gate1AwardLevel | null;
   /** Counted duration entered by the assessor (Transcript data / Verify details). */
   countedYearsOverride?: number | null;
+  /** Credit total entered by the assessor (used for the credits → years conversion). */
+  creditTotalOverride?: number | null;
   /** Engineering subject share (0–1) entered by the assessor. */
   engineeringShareOverride?: number | null;
 };

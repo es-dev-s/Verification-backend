@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import { assessExtractedSubjects, scoreRoutedOccupations } from "./assessCase.js";
 import {
   countDuration,
+  creditsToYears,
   decideEngineering,
+  detectCreditSystem,
   durationBasisFor,
   NOT_ENGINEERING_NOTE,
   parseTerm,
@@ -159,6 +161,82 @@ describe("B. counted duration / Gate 1", () => {
     assert.equal(res.anzscoCode, "233111");
     assert.deepEqual(res.qualificationEvidence?.duration, []);
     assert.ok(!(res.candidates?.[0]?.qualificationNotes ?? []).some((n) => n.startsWith("Duration")));
+  });
+});
+
+describe("B2. credits → years (no printed years / semesters)", () => {
+  /** CHEM subjects with no term, `each` credits per subject (16 subjects). */
+  const noTerms = (each: string) => CHEM.map((n) => sub(n, null, "bachelor", each));
+
+  it("converts the credit total at the default 30 per year", () => {
+    const c = countDuration(noTerms("7.5")); // 120 credits
+    assert.equal(c.source, "credits");
+    assert.equal(c.countedYears, 4);
+    assert.equal(c.confidence, "medium");
+    assert.equal(c.creditConversion?.perYear, 30);
+    assert.equal(c.creditConversion?.label, "Converted from credits (120 credits ÷ 30 per year)");
+  });
+
+  it("uses ECTS 60 per year when the transcript names ECTS", () => {
+    const c = countDuration(noTerms("15 ECTS")); // 240 ECTS
+    assert.equal(c.creditConversion?.system, "ects");
+    assert.equal(c.countedYears, 4);
+    assert.equal(c.creditConversion?.label, "Converted from credits (240 credits ÷ 60 per year)");
+  });
+
+  it("detects the system from the country (Australia 48, Germany ECTS, US 30)", () => {
+    assert.equal(detectCreditSystem([], { country: "Australia" }), "australianCreditPoints");
+    assert.equal(detectCreditSystem([], { country: "Germany" }), "ects");
+    assert.equal(detectCreditSystem([], { country: "United States" }), "usSemester");
+    assert.equal(detectCreditSystem([{ credits: "3 semester hours" }]), "usSemester");
+    assert.equal(detectCreditSystem([{ credits: "3" }], { country: "Nepal" }), "default");
+    const au = countDuration(noTerms("12"), { country: "Australia" }); // 192 cp
+    assert.equal(au.countedYears, 4);
+    assert.equal(au.creditConversion?.perYear, 48);
+  });
+
+  it("printed semesters win over credits", () => {
+    const c = countDuration(chemWithSemesters(8));
+    assert.equal(c.source, "terms");
+    assert.equal(c.creditConversion, null);
+    assert.equal(c.countedYears, 4);
+  });
+
+  it("an assessor credit total replaces the transcript total", () => {
+    const c = countDuration(noTerms("7.5"), { creditTotalOverride: 90 });
+    assert.equal(c.countedYears, 3);
+    assert.equal(c.creditConversion?.credits, 90);
+  });
+
+  it("ignores no or implausible credit totals", () => {
+    assert.equal(countDuration(CHEM.map((n) => sub(n))).source, null);
+    assert.equal(creditsToYears(0, "default"), null);
+    assert.equal(creditsToYears(600, "default"), null); // 20 years
+  });
+
+  it("Gate 1 uses the converted years before the stated duration, with a flag", () => {
+    const res = assessExtractedSubjects(noTerms("7.5"), { qualifications: [chemQual(4)] });
+    assert.equal(res.gate1?.result, "open");
+    assert.equal(res.gate1?.rule, 3);
+    assert.equal(res.gate1?.durationFallback, false);
+    assert.equal(res.gate1?.creditConversionNote, "Converted from credits (120 credits ÷ 30 per year)");
+    const q = res.gate1?.qualifications[0];
+    assert.equal(q?.durationSource, "counted");
+    assert.equal(q?.countedYears, 4);
+  });
+
+  it("Gate 1: converted 3 years vs stated 4 → manual review", () => {
+    const res = assessExtractedSubjects(noTerms("5.625"), { qualifications: [chemQual(4)] }); // 90
+    assert.equal(res.gate1?.result, "manual_review");
+    assert.match(res.gate1?.reason ?? "", /differ/i);
+  });
+
+  it("Gate 1: a manual counted duration still wins over credits", () => {
+    const res = assessExtractedSubjects(noTerms("5.625"), {
+      qualifications: [{ ...chemQual(4), countedYearsOverride: 4 }],
+    });
+    assert.equal(res.gate1?.result, "open");
+    assert.equal(res.gate1?.creditConversionNote, null);
   });
 });
 

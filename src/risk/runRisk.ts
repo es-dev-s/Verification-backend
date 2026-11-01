@@ -8,7 +8,7 @@ import {
   judgeRiskWithLlm,
   withCompetence,
 } from "./analyzeRisk.js";
-import { computeRiskScores } from "./scoreRisk.js";
+import { computeRiskScores, withCurrentScoring } from "./scoreRisk.js";
 import type { Competence, RiskAssessmentResult } from "./schemas.js";
 
 const QUAL_PRIORITY = [
@@ -173,10 +173,10 @@ export async function getStoredRisk(
   if (!row?.resultJson) return null;
   const json = row.resultJson as StoredAssessment;
   if (!json.risk) return null;
-  return {
+  return withCurrentScoring({
     ...json.risk,
     precedent: json.risk.precedent ?? emptyPrecedentCheck(),
-  };
+  });
 }
 
 export async function patchRiskCompetence(
@@ -203,5 +203,5 @@ export async function patchRiskCompetence(
     ),
   };
   await persistRisk(caseId, assessment, next);
-  return next;
+  return withCurrentScoring(next);
 }

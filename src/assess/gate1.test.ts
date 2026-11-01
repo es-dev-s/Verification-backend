@@ -268,6 +268,73 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
     assert.equal(g.qualificationUsed, "Bachelor of Engineering (Civil)");
   });
 
+  it("3-year engineering bachelor + separate master → manual review (not Technologist)", () => {
+    const q: QualificationInfo[] = [
+      { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 3 },
+      { level: "master", title: "Master of Engineering (Mechanical)", durationYears: 2 },
+    ];
+    const g = gate(q, [...engRows(), ...engRows("master")]);
+    assert.equal(g.result, "manual_review");
+    assert.equal(g.rule, 2);
+    assert.ok(g.reason.includes(FLAG.bachelorPlusMaster), g.reason);
+    assert.equal(g.qualificationUsed, "Bachelor of Engineering (Mechanical)");
+    assertBlocked(g);
+    // Order of the qualifications on file does not matter.
+    const r = gate([...q].reverse(), [...engRows(), ...engRows("master")]);
+    assert.equal(r.result, "manual_review");
+    assert.ok(r.reason.includes(FLAG.bachelorPlusMaster));
+    // Nothing is scored.
+    const res = assessExtractedSubjects([...engRows(), ...engRows("master")], { qualifications: q });
+    assert.equal(res.gate1?.result, "manual_review");
+    assert.deepEqual(res.candidates, []);
+  });
+
+  it("3-year bachelor + separate master: counted (not only stated) 3 years also goes to manual review", () => {
+    const g = gate(
+      [
+        { level: "bachelor", title: "Bachelor of Engineering (Civil)" },
+        { level: "master", title: "Master of Engineering (Structural)", durationYears: 2 },
+      ],
+      [...engWithSemesters(6), ...engRows("master")],
+    );
+    assert.equal(g.result, "manual_review");
+    assert.ok(g.reason.includes(FLAG.bachelorPlusMaster), g.reason);
+  });
+
+  it("3-year bachelor alone stays Technologist; 4-year bachelor + master stays rule 3", () => {
+    const solo = gate([{ level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 3 }], engRows());
+    assert.equal(solo.rule, 4);
+    const four = gate(
+      [
+        { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", durationYears: 4 },
+        { level: "master", title: "Master of Engineering (Mechanical)", durationYears: 2 },
+      ],
+      [...engRows(), ...engRows("master")],
+    );
+    assert.equal(four.rule, 3);
+  });
+
+  it("single combined 3+2 title is unchanged (combined flag, not the bachelor+master rule)", () => {
+    const g = gate(
+      [{ level: "master", title: "Integrated Bachelor and Master of Technology (Mechanical Engineering)", durationYears: 5 }],
+      engRows("master"),
+    );
+    assert.equal(g.result, "manual_review");
+    assert.ok(g.reason.includes(FLAG.combined));
+    assert.ok(!g.reason.includes(FLAG.bachelorPlusMaster));
+  });
+
+  it("3-year bachelor + a clearly non-engineering master stays Technologist", () => {
+    const g = gate(
+      [
+        { level: "bachelor", title: "Bachelor of Engineering (Electrical)", durationYears: 3 },
+        { level: "master", title: "Master of Business Administration", durationYears: 2 },
+      ],
+      [...engRows(), ...BUSINESS.map((n) => sub(n, "master"))],
+    );
+    assert.equal(g.rule, 4);
+  });
+
   it("durations are never combined (Adv Dip 2 + Bachelor 3 → Technologist, not PE)", () => {
     const g = gate(
       [

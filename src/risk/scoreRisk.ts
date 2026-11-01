@@ -24,8 +24,8 @@ import type { VocationalAssessmentDetail } from "../assess/schemas.js";
  * Core = Tier 2 (core) coverage %. Vocational unit-code occupations: Core =
  * core-unit coverage %, Fundamental = elective coverage % (found ÷ required
  * minimum) only when the rubric sets an elective minimum. Historical = positive
- * outcome % of past cases for the ANZSCO, used only with at least
- * historicalMinCases cases.
+ * outcome % of past cases for the ANZSCO (verification_datasheet.json), used
+ * whenever at least one past case exists; with none it is left out.
  *
  * A component without usable data is left out and the remaining weights are
  * re-normalised. The overall score maps to the risk category through the
@@ -102,7 +102,7 @@ export function computeAlignmentScore(
 ): RiskScoringBreakdown {
   const flow = input.assessmentFlow ?? "academic";
   const labels = COMPONENT_LABELS[flow];
-  const historicalUsable = input.historical.totalCases >= config.historicalMinCases;
+  const historicalUsable = input.historical.totalCases > 0;
 
   const raw: Array<{ key: RiskComponentKey; pct: number | null; reason?: string }> = [
     {
@@ -119,11 +119,7 @@ export function computeAlignmentScore(
     {
       key: "historical",
       pct: input.historical.totalCases > 0 ? clampPct(input.historical.positivePct) : null,
-      reason: historicalUsable
-        ? undefined
-        : input.historical.totalCases > 0
-          ? `Only ${input.historical.totalCases} past case${input.historical.totalCases === 1 ? "" : "s"} (minimum ${config.historicalMinCases})`
-          : "No past cases for this ANZSCO",
+      reason: historicalUsable ? undefined : "No past cases for this ANZSCO",
     },
   ];
 
@@ -174,9 +170,62 @@ export function computeAlignmentScore(
     overallPct,
     riskLevel: riskLevelFromScore(overallPct, config.bands),
     bands: { ...config.bands },
-    historicalMinCases: config.historicalMinCases,
     renormalised,
     notes,
+  };
+}
+
+/** Notes produced by computeAlignmentScore (replaced when a result is re-scored). */
+const SCORING_NOTE_RE = /\bnot used:|re-normalised|\bOnly \d+ past cases?\b/i;
+
+/**
+ * A saved risk result shown with the CURRENT governance settings: the overall
+ * score, category, bands and component weights are recomputed from the saved
+ * component scores whenever the result was scored with other settings (older
+ * band-based results, results from before the minimum-cases rule was removed).
+ * Read-only: nothing is saved. Fields of older results that no longer apply
+ * (band basis, work-experience points) are dropped.
+ */
+export function withCurrentScoring(
+  risk: RiskAssessmentResult,
+  config: RiskScoringConfig = RISK_SCORING_CONFIG,
+): RiskAssessmentResult {
+  const {
+    riskBasis: _riskBasis,
+    baseRiskLevel: _baseRiskLevel,
+    historicalModifierApplied: _historicalModifierApplied,
+    stepThreeDetermination: _stepThreeDetermination,
+    overallPctBeforeWork: _overallPctBeforeWork,
+    workExperienceDelta: _workExperienceDelta,
+    ...rest
+  } = risk as RiskAssessmentResult & { overallPctBeforeWork?: unknown; workExperienceDelta?: unknown };
+  if (risk.scoring && risk.scoring.configVersion === config.version) return rest;
+  const flow = risk.assessmentFlow ?? "academic";
+  const savedFundamental = risk.scoring?.components?.find((c) => c.key === "fundamental");
+  const fundamentalPct = savedFundamental
+    ? savedFundamental.pct
+    : flow === "vocational_units"
+      ? null
+      : risk.fundamentalPct;
+  const historical: HistoricalStats = risk.historical ?? {
+    totalCases: 0,
+    positive: 0,
+    negative: 0,
+    banned: 0,
+    positivePct: 0,
+  };
+  const scoring = computeAlignmentScore(
+    { fundamentalPct, corePct: risk.corePct ?? 0, historical, assessmentFlow: flow },
+    config,
+  );
+  const otherNotes = (risk.riskNotes ?? []).filter((n) => !SCORING_NOTE_RE.test(n));
+  return {
+    ...rest,
+    historical,
+    overallPct: scoring.overallPct,
+    riskLevel: scoring.riskLevel,
+    scoring,
+    riskNotes: [...scoring.notes, ...otherNotes],
   };
 }
 
@@ -339,9 +388,7 @@ export function computeRiskScores(input: {
     historicalPct,
     historical: input.historical,
     precedent: input.precedent ?? emptyPrecedentCheck(),
-    overallPctBeforeWork: scoring.overallPct,
     workExperienceBoost: input.workExperienceBoost,
-    workExperienceDelta: 0,
     overallPct: scoring.overallPct,
     riskLevel: scoring.riskLevel,
     scoring,

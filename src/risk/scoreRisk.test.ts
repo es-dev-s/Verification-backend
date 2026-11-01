@@ -6,10 +6,11 @@ import {
   computeRiskScores,
   riskLevelFromScore,
   vocationalElectivePct,
+  withCurrentScoring,
 } from "./scoreRisk.js";
 import { RISK_SCORING_CONFIG } from "./riskBands.config.js";
 import { buildRiskInsightFallback, withCompetence } from "./analyzeRisk.js";
-import type { HistoricalStats } from "./schemas.js";
+import type { HistoricalStats, RiskAssessmentResult } from "./schemas.js";
 
 function hist(totalCases: number, positivePct: number): HistoricalStats {
   const positive = Math.round((totalCases * positivePct) / 100);
@@ -89,38 +90,43 @@ describe("computeAlignmentScore", () => {
     );
   });
 
-  it("too few historical cases: historical left out, weights re-normalised, note added", () => {
-    const min = RISK_SCORING_CONFIG.historicalMinCases;
-    const s = computeAlignmentScore({ fundamentalPct: 80, corePct: 90, historical: hist(min - 1, 0) });
+  it("a single past case counts (no minimum): historical used at full weight", () => {
+    const s = computeAlignmentScore({ fundamentalPct: 80, corePct: 90, historical: hist(1, 0) });
+    // 0.3×80 + 0.5×90 + 0.2×0 = 69
+    assert.equal(s.overallPct, 69);
+    assert.equal(s.renormalised, false);
+    const h = s.components.find((c) => c.key === "historical")!;
+    assert.equal(h.used, true);
+    assert.equal(h.pct, 0);
+    assert.equal(h.appliedWeight, 0.2);
+    assert.equal(h.reason, undefined);
+    assert.equal("historicalMinCases" in s, false);
+    assert.equal("historicalMinCases" in RISK_SCORING_CONFIG, false);
+  });
+
+  it("few past cases (3, 2 positive) use the datasheet positive %", () => {
+    const s = computeAlignmentScore({ fundamentalPct: 100, corePct: 100, historical: hist(3, 66.7) });
+    // 30 + 50 + 0.2×66.7 = 93.34 → 93.3
+    assert.equal(s.overallPct, 93.3);
+    assert.equal(s.components.find((c) => c.key === "historical")!.used, true);
+  });
+
+  it("no historical cases: no neutral 50 — left out, weights re-normalised 37.5 / 62.5", () => {
+    const s = computeAlignmentScore({ fundamentalPct: 80, corePct: 90, historical: hist(0, 50) });
     // (0.3×80 + 0.5×90) / 0.8 = 86.25 → 86.3
     assert.equal(s.overallPct, 86.3);
     assert.equal(s.riskLevel, "no_risk");
     assert.equal(s.renormalised, true);
     const h = s.components.find((c) => c.key === "historical")!;
+    assert.equal(h.pct, null);
     assert.equal(h.used, false);
     assert.equal(h.appliedWeight, 0);
-    assert.match(h.reason ?? "", /minimum/);
+    assert.match(h.reason ?? "", /No past cases/);
     assert.equal(s.components.find((c) => c.key === "fundamental")!.appliedWeight, 0.375);
     assert.equal(s.components.find((c) => c.key === "core")!.appliedWeight, 0.625);
     assert.ok(s.notes.some((n) => /re-normalised/.test(n)));
   });
-
-  it("no historical cases: no neutral 50 — left out", () => {
-    const s = computeAlignmentScore({ fundamentalPct: 60, corePct: 60, historical: hist(0, 50) });
-    assert.equal(s.overallPct, 60);
-    const h = s.components.find((c) => c.key === "historical")!;
-    assert.equal(h.pct, null);
-    assert.equal(h.used, false);
-  });
-
-  it("exactly the minimum cases counts", () => {
-    const min = RISK_SCORING_CONFIG.historicalMinCases;
-    const s = computeAlignmentScore({ fundamentalPct: 100, corePct: 100, historical: hist(min, 0) });
-    assert.equal(s.overallPct, 80);
-    assert.equal(s.renormalised, false);
-  });
 });
-
 describe("computeRiskScores", () => {
   it("level comes from the weighted score", () => {
     const r = scoreWith(90, 90, hist(50, 80));
@@ -143,7 +149,8 @@ describe("computeRiskScores", () => {
     const a = scoreWith(70, 70, hist(50, 70), false);
     const b = scoreWith(70, 70, hist(50, 70), true);
     assert.equal(a.overallPct, b.overallPct);
-    assert.equal(b.workExperienceDelta, 0);
+    assert.equal("workExperienceDelta" in b, false);
+    assert.equal("overallPctBeforeWork" in b, false);
     assert.ok(b.riskNotes?.some((n) => /work experience/i.test(n)));
   });
 
@@ -212,6 +219,84 @@ describe("competence", () => {
     assert.ok(r.riskNotes?.some((n) => /assessor to review/.test(n)));
     const ok = withCompetence(med, { competent: false, insight: "x" });
     assert.equal(ok.competenceConflict, false);
+  });
+});
+
+describe("withCurrentScoring (saved results shown with the current bands)", () => {
+  const full = (r: ReturnType<typeof scoreWith>): RiskAssessmentResult => ({
+    ...r,
+    competence: "competent",
+    competenceSource: "ai",
+    insight: "x",
+  });
+
+  it("current results are returned unchanged", () => {
+    const r = full(scoreWith(90, 90, hist(50, 80)));
+    const v = withCurrentScoring(r);
+    assert.equal(v.overallPct, r.overallPct);
+    assert.equal(v.riskLevel, r.riskLevel);
+    assert.equal(v.scoring?.configVersion, RISK_SCORING_CONFIG.version);
+  });
+
+  it("older band-based result: re-scored with the weights and config bands, band fields and work points dropped", () => {
+    const r = full(scoreWith(80, 90, hist(3, 100)));
+    const legacy = {
+      ...r,
+      scoring: undefined,
+      riskLevel: "high" as const,
+      overallPct: 40,
+      riskBasis: "Step 3 determination: not verified",
+      historicalModifierApplied: true,
+      overallPctBeforeWork: 36,
+      workExperienceDelta: 4,
+    } as RiskAssessmentResult;
+    const v = withCurrentScoring(legacy);
+    // 0.3×80 + 0.5×90 + 0.2×100 = 89
+    assert.equal(v.overallPct, 89);
+    assert.equal(v.riskLevel, riskLevelFromScore(89, RISK_SCORING_CONFIG.bands));
+    assert.deepEqual(v.scoring?.bands, RISK_SCORING_CONFIG.bands);
+    assert.equal(v.riskBasis, undefined);
+    assert.equal(v.historicalModifierApplied, undefined);
+    assert.equal("workExperienceDelta" in v, false);
+    assert.equal("overallPctBeforeWork" in v, false);
+  });
+
+  it("result saved under the old minimum-cases rule now counts the few past cases", () => {
+    const r = full(scoreWith(80, 90, hist(3, 100)));
+    const old = {
+      ...r,
+      overallPct: 86.3,
+      scoring: {
+        ...r.scoring!,
+        configVersion: "2026-10-29-default",
+        overallPct: 86.3,
+        historicalMinCases: 10,
+      },
+      riskNotes: ["Historical outcomes not used: Only 3 past cases (minimum 10).", "Weights re-normalised: x.", "Keep me."],
+    } as RiskAssessmentResult;
+    const v = withCurrentScoring(old);
+    assert.equal(v.overallPct, 89);
+    assert.equal(v.scoring?.renormalised, false);
+    assert.deepEqual(v.riskNotes, ["Keep me."]);
+  });
+
+  it("vocational without electives keeps the fundamental slot empty", () => {
+    const r = full(
+      computeRiskScores({
+        anzscoCode: "312311",
+        title: "Electrical Engineering Draftsperson",
+        fundamentalPct: 0,
+        corePct: 80,
+        historical: hist(0, 0),
+        workExperienceBoost: false,
+        missingCore: [],
+        assessmentFlow: "vocational_units",
+        vocational: null,
+      }),
+    );
+    const v = withCurrentScoring({ ...r, scoring: { ...r.scoring!, configVersion: "old" } });
+    assert.equal(v.overallPct, 80);
+    assert.equal(v.scoring?.components.find((c) => c.key === "fundamental")?.used, false);
   });
 });
 

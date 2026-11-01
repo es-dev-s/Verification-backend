@@ -35,6 +35,40 @@ export const evidenceConfig = {
     minTermCoverage: 0.5,
     /** Fewer rows with term info than this → not counted. */
     minTermRows: 3,
+    /**
+     * Credits → years, used only when the transcript prints no usable years /
+     * semesters but does give credits (counted years = total credits ÷ credits
+     * per year, rounded to the half year). Precedence: printed years /
+     * semesters → credits → stated duration. A counted duration entered by the
+     * assessor still wins over all of them.
+     */
+    credits: {
+      /** Credits per full-time year when the credit system is not detected. */
+      defaultPerYear: 30,
+      /** Per-system credits per year, used when the system is detectable. */
+      perYear: {
+        /** European Credit Transfer System. */
+        ects: 60,
+        /** US semester credit hours. */
+        usSemester: 30,
+        /** Australian credit points. */
+        australianCreditPoints: 48,
+      },
+      /** Countries whose degrees use ECTS (when the transcript does not name the system). */
+      ectsCountries: [
+        "austria", "belgium", "bulgaria", "croatia", "cyprus", "czech", "denmark", "estonia",
+        "finland", "france", "germany", "greece", "hungary", "iceland", "ireland", "italy",
+        "latvia", "lithuania", "luxembourg", "malta", "netherlands", "norway", "poland",
+        "portugal", "romania", "slovakia", "slovenia", "spain", "sweden", "switzerland",
+      ] as string[],
+      /**
+       * A conversion outside this range (years) is ignored as implausible (e.g. a
+       * partial credit total); the stated duration is used instead. The minimum
+       * matches gate.notEligibleBelowYears so credits alone never fail a case.
+       */
+      minYears: 2,
+      maxYears: 7,
+    },
   },
   engineering: {
     /** Share of subjects that look like engineering at or above which the evidence is strong. */

@@ -13,6 +13,8 @@ import { deleteBlob } from "../lib/blob.js";
 import { CLIENT_NAME_FIELD } from "../lib/clientName.js";
 import { prisma } from "../lib/prisma.js";
 import { getExtractQueue } from "../lib/queues.js";
+import { withCurrentScoring } from "../risk/scoreRisk.js";
+import type { RiskAssessmentResult } from "../risk/schemas.js";
 
 /**
  * Clients list (one row per case for this browser's client id). Read-only:
@@ -23,6 +25,20 @@ import { getExtractQueue } from "../lib/queues.js";
 
 const MAX_CLIENTS = 300;
 
+/**
+ * Saved risk with the current overall score and category (same bands as Step 5;
+ * read-only). Rows too incomplete to re-score are shown as saved.
+ */
+function currentRisk(risk: StoredRisk | null): StoredRisk | null {
+  if (!risk || typeof (risk as { corePct?: unknown }).corePct !== "number") return risk;
+  try {
+    const r = withCurrentScoring(risk as unknown as RiskAssessmentResult);
+    return { ...risk, riskLevel: r.riskLevel, overallPct: r.overallPct };
+  } catch {
+    return risk;
+  }
+}
+
 const clientsQuery = z.object({
   // "verified" is kept as an alias for "approved" (older links).
   status: z
@@ -31,14 +47,16 @@ const clientsQuery = z.object({
     .transform((v): ClientFilter => (v === "verified" ? "approved" : v)),
 });
 
+type StoredRisk = {
+  anzscoCode?: string | null;
+  title?: string | null;
+  riskLevel?: string | null;
+  overallPct?: number | null;
+};
+
 type StoredAssessmentJson = {
   title?: string | null;
-  risk?: {
-    anzscoCode?: string | null;
-    title?: string | null;
-    riskLevel?: string | null;
-    overallPct?: number | null;
-  } | null;
+  risk?: StoredRisk | null;
 } | null;
 
 type ReviewRow = {
@@ -117,7 +135,7 @@ export const clientRoutes: FastifyPluginAsync = async (app) => {
 
     const rows = cases.map((c) => {
       const json = (c.assessment?.resultJson ?? null) as StoredAssessmentJson;
-      const risk = json?.risk ?? null;
+      const risk = currentRisk(json?.risk ?? null);
       const occupation = resolveOccupation({
         riskCode: risk?.anzscoCode,
         riskTitle: risk?.title,

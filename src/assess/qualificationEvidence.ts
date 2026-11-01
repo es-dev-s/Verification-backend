@@ -1,7 +1,8 @@
 /**
  * Qualification evidence read from the transcript rows (no DB, no LLM):
  *  - term parsing ("Year 3 Semester 2" → term 6) and counted programme length
- *    (used by Gate 1, see gate1.ts),
+ *    (used by Gate 1, see gate1.ts); with no usable years / semesters the
+ *    length is converted from the credit total when there is one,
  *  - an explicit "is this an engineering qualification?" decision,
  *  - the final-year project pick for the Tier 3 gate.
  * Policy numbers live in evidenceConfig.ts.
@@ -195,6 +196,30 @@ export type DurationCount = {
   finalYear: number | null;
   rowsWithTerm: number;
   rowCount: number;
+  /** Where countedYears came from (null when nothing could be counted). */
+  source: "terms" | "credits" | null;
+  /** Set when countedYears was converted from the credit total. */
+  creditConversion: CreditConversion | null;
+};
+
+export type CreditSystem = "default" | "ects" | "usSemester" | "australianCreditPoints";
+
+export type CreditConversion = {
+  credits: number;
+  perYear: number;
+  system: CreditSystem;
+  years: number;
+  /** Flag text, e.g. "Converted from credits (240 credits ÷ 60 per year)". */
+  label: string;
+};
+
+/** Extra context for the credit conversion (all optional). */
+export type CreditContext = {
+  country?: string | null;
+  /** Transcript texts at this level (to spot "ECTS", "credit points", "semester hours"). */
+  texts?: readonly string[] | null;
+  /** Credit total entered by the assessor (replaces the transcript total). */
+  creditTotalOverride?: number | null;
 };
 
 function parseCredits(raw: string | null | undefined): number | null {
@@ -205,9 +230,81 @@ function parseCredits(raw: string | null | undefined): number | null {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const roundHalf = (n: number) => Math.round(n * 2) / 2;
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
-/** Count programme length from the rows of one qualification. */
-export function countDuration(rows: readonly ExtractedSubjectRow[]): DurationCount {
+const ECTS_RE = /\bects\b|european credit transfer/i;
+const AU_CP_RE = /\bcredit\s*points?\b|\bunits? of credit\b|\buoc\b/i;
+const US_SCH_RE = /\b(?:semester|credit)\s*(?:credit\s*)?hours?\b|\bsch\b/i;
+
+/** Credit system of a transcript, when detectable (else "default"). */
+export function detectCreditSystem(
+  rows: readonly Pick<ExtractedSubjectRow, "credits">[],
+  ctx: CreditContext = {},
+): CreditSystem {
+  const cfg = evidenceConfig.duration.credits;
+  const text = [...rows.map((r) => r.credits ?? ""), ...(ctx.texts ?? [])].join("\n");
+  const country = (ctx.country ?? "").toLowerCase();
+  if (ECTS_RE.test(text)) return "ects";
+  if (/\baustralia/.test(country)) return "australianCreditPoints";
+  if (/\b(united states|usa|u\.s\.a?\.?)\b|^us$/.test(country)) return "usSemester";
+  if (country && cfg.ectsCountries.some((c) => country.includes(c))) return "ects";
+  if (US_SCH_RE.test(text)) return "usSemester";
+  if (AU_CP_RE.test(text) && /\baustralia/i.test(text)) return "australianCreditPoints";
+  return "default";
+}
+
+/** Credits per full-time year for a credit system (evidenceConfig.duration.credits). */
+export function creditsPerYear(system: CreditSystem): number {
+  const cfg = evidenceConfig.duration.credits;
+  return system === "default" ? cfg.defaultPerYear : cfg.perYear[system];
+}
+
+/** Convert a credit total to years; null when there are no credits or the result is implausible. */
+export function creditsToYears(
+  credits: number | null | undefined,
+  system: CreditSystem,
+): CreditConversion | null {
+  const cfg = evidenceConfig.duration.credits;
+  if (credits == null || !Number.isFinite(credits) || credits <= 0) return null;
+  const perYear = creditsPerYear(system);
+  const years = roundHalf(credits / perYear);
+  if (years < cfg.minYears || years > cfg.maxYears) return null;
+  return {
+    credits: round2(credits),
+    perYear,
+    system,
+    years,
+    label: `Converted from credits (${round1(credits)} credits ÷ ${perYear} per year)`,
+  };
+}
+
+/**
+ * Count programme length from the rows of one qualification: printed years /
+ * semesters first; when they cannot be counted reliably, the credit total
+ * (assessor value first) converted to years.
+ */
+export function countDuration(
+  rows: readonly ExtractedSubjectRow[],
+  ctx: CreditContext = {},
+): DurationCount {
+  const byTerms = countFromTerms(rows);
+  if (isReliableCount(byTerms)) return byTerms;
+  const credits = ctx.creditTotalOverride ?? byTerms.creditTotal;
+  const conversion = creditsToYears(credits, detectCreditSystem(rows, ctx));
+  if (!conversion) return byTerms;
+  return {
+    ...byTerms,
+    countedYears: conversion.years,
+    unit: null,
+    confidence: "medium",
+    method: `${conversion.label.charAt(0).toLowerCase()}${conversion.label.slice(1)}; ${byTerms.method}`,
+    source: "credits",
+    creditConversion: conversion,
+  };
+}
+
+/** Count programme length from the printed years / semesters only. */
+function countFromTerms(rows: readonly ExtractedSubjectRow[]): DurationCount {
   const cfg = evidenceConfig.duration;
   const credits = rows
     .filter((r) => !r.isRepeat)
@@ -215,7 +312,12 @@ export function countDuration(rows: readonly ExtractedSubjectRow[]): DurationCou
     .filter((n): n is number => n != null);
   const creditTotal = credits.length ? round2(credits.reduce((a, b) => a + b, 0)) : null;
   const terms = rows.map((r) => parseTerm(r.yearOrSemester)).filter((t): t is TermInfo => !!t);
-  const base = { creditTotal, rowsWithTerm: terms.length, rowCount: rows.length };
+  const base = {
+    creditTotal,
+    rowsWithTerm: terms.length,
+    rowCount: rows.length,
+    creditConversion: null,
+  };
 
   if (
     !rows.length ||
@@ -228,6 +330,7 @@ export function countDuration(rows: readonly ExtractedSubjectRow[]): DurationCou
       unit: null,
       confidence: "low",
       finalYear: null,
+      source: null,
       method: terms.length
         ? `only ${terms.length} of ${rows.length} subjects show a year or semester`
         : "no year or semester printed next to the subjects",
@@ -298,11 +401,22 @@ export function countDuration(rows: readonly ExtractedSubjectRow[]): DurationCou
     confidence,
     method,
     finalYear,
+    source: "terms",
   };
 }
 
 export function isReliableCount(c: DurationCount): boolean {
   return c.countedYears != null && c.confidence !== "low";
+}
+
+/** Credit context of one qualification (country, transcript texts, assessor credit total). */
+export function creditContextOf(q: QualificationInfo | null | undefined): CreditContext {
+  if (!q) return {};
+  return {
+    country: q.country ?? null,
+    texts: q.texts ?? null,
+    creditTotalOverride: q.creditTotalOverride ?? null,
+  };
 }
 
 /** Rows and stated duration for each qualification level on the case. */
@@ -337,7 +451,7 @@ export function durationBasisFor(
       level,
       title: q?.title ?? null,
       statedYears: q?.durationYears ?? null,
-      count: countDuration(atLevel),
+      count: countDuration(atLevel, creditContextOf(q)),
     });
   }
   return out;

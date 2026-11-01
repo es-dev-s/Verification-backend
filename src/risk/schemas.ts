@@ -82,7 +82,8 @@ export type RiskScoringBreakdown = {
   overallPct: number;
   riskLevel: RiskLevel;
   bands: { noRisk: number; low: number; medium: number };
-  historicalMinCases: number;
+  /** Older saved results only (the minimum-cases rule was removed). */
+  historicalMinCases?: number;
   renormalised: boolean;
   notes: string[];
 };
@@ -100,11 +101,8 @@ export type RiskAssessmentResult = {
    * Separate from subject-weighted scoring.
    */
   precedent: PrecedentCheck;
-  /** Same as overallPct (work experience no longer adds points; kept for old saved results). */
-  overallPctBeforeWork: number;
+  /** Related work experience (a note only; it does not change the score). */
   workExperienceBoost: boolean;
-  /** Always 0 now: work experience is a note only (kept for old saved results). */
-  workExperienceDelta: number;
   /** Overall academic alignment score (0–100). */
   overallPct: number;
   /** Risk category from the overall score and the governance thresholds. */

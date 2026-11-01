@@ -256,13 +256,24 @@ export async function assessCase(
       cached.extractedSubjects = persistedRows;
     }
     // Saved results where ET took a top-N slot: fill the matched slot(s) from
-    // a deterministic re-score of the saved subjects (no LLM, not saved).
-    const backfilled = backfillCachedCandidates(cached, {
+    // a deterministic re-score of the saved subjects. The filled card gets the
+    // saved work-experience judgement, else a check for that occupation only
+    // (AI allowed). Nothing is saved on this read-only load.
+    const backfilled = await backfillCachedCandidates(cached, {
       rows: persistedRows.length ? persistedRows : cached.extractedSubjects ?? [],
       qualifications: qualificationInfos,
       transcriptTexts,
       engineeringTitledDegree: caseRow.engineeringTitledDegree,
       manualSelection,
+      judge:
+        useLlm && assessConfig.llmWorkExperience
+          ? (occs) =>
+              analyzeWorkExperienceForCandidates(
+                caseRow.experienceRows,
+                occs.map((s) => ({ anzscoCode: s.rubric.anzscoCode, title: s.rubric.title })),
+                { useLlm: true, deadlineMs },
+              )
+          : null,
     });
     // Results saved before the family rules: derive them from the saved candidates.
     if ((backfilled || !cached.familyAdjustment) && cached.candidates?.length) {
@@ -356,35 +367,44 @@ export async function assessCase(
     shortlist.sort(compareScoredOccupations);
   }
 
-  // Groq judges confirmed DB jobs vs every shortlisted occupation.
-  if (shortlist.length && useLlm && assessConfig.llmWorkExperience) {
-    const judgements = await analyzeWorkExperienceForCandidates(
-      caseRow.experienceRows,
-      shortlist.map((s) => ({
-        anzscoCode: s.rubric.anzscoCode,
-        title: s.rubric.title,
-      })),
-      { useLlm: true, deadlineMs },
-    );
+  // Groq judges confirmed DB jobs vs every shortlisted occupation (up to
+  // boostShortlist); all judgements are saved so a cached load can reuse them.
+  const judge: WorkJudge | null =
+    useLlm && assessConfig.llmWorkExperience
+      ? (occs) =>
+          analyzeWorkExperienceForCandidates(
+            caseRow.experienceRows,
+            occs.map((s) => ({ anzscoCode: s.rubric.anzscoCode, title: s.rubric.title })),
+            { useLlm: true, deadlineMs },
+          )
+      : null;
+  const workJudgements: OccupationWorkJudgement[] = [];
+  if (shortlist.length && judge) {
+    const judgements = await judge(shortlist);
+    workJudgements.push(...judgements);
     shortlist = applyBoostAndCut(shortlist, judgements, shortlist.length);
   }
   const top = cutWithTracks(shortlist, assessConfig.maxCandidates);
 
-  const winner = top[0];
-  if (!winner) {
+  if (!top[0]) {
     return emptyNoMatch("No academic ANZSCO rubrics available to assess.");
   }
   // ET moved to Maybe Suitable: keep primary + (N − 1) matched alternatives.
-  const shown = [
-    ...top,
-    ...matchedBackfill(
-      top.map(rankedView),
-      [...shortlist, ...scoredAll],
-      assessConfig.maxCandidates,
-      rankedView,
-      assessorSelected?.anzscoCode,
-    ),
-  ];
+  const fills = matchedBackfill(
+    top.map(rankedView),
+    [...shortlist, ...scoredAll],
+    assessConfig.maxCandidates,
+    rankedView,
+    assessorSelected?.anzscoCode,
+  );
+  // A backfilled card gets the same work-experience judgement and boost as the
+  // shortlist (judged above; one from outside the shortlist is judged now).
+  if (judge) {
+    workJudgements.push(...(await judgeBackfill(fills, { saved: workJudgements, judge })));
+  }
+  // Re-rank after the boost; the family rules run on this order afterwards.
+  const shown = [...top, ...fills].sort(compareScoredOccupations);
+  const winner = shown[0]!;
 
   const unmatched = winner.unmatched.map((u) => ({
     name: u.name,
@@ -450,6 +470,7 @@ export async function assessCase(
     qualificationEvidence: buildQualificationEvidence(winner, gate),
     finalProjectTitle: winner.finalProject?.title ?? null,
     ...(assessorSelected ? { assessorSelected } : {}),
+    ...(workJudgements.length ? { workExperienceJudgements: workJudgements } : {}),
   };
   result.familyAdjustment = familyAdjustmentForResult(
     result,
@@ -838,6 +859,41 @@ export function scoreAllOccupations(
  * Apply work-experience judgements to the whole shortlist, re-rank, then cut.
  * Cutting after the boost lets a related job lift a lower academic candidate.
  */
+export type WorkJudge = (occs: ScoredOccupation[]) => Promise<OccupationWorkJudgement[]>;
+
+/**
+ * Give backfilled cards the same work-experience judgement (+4 boost when
+ * related) as the judged shortlist: reuse a saved judgement for the
+ * occupation, else ask `judge` for the occupations still missing one (only
+ * those). Mutates `fills`; returns only the new judgements (callers decide
+ * whether to save them).
+ */
+export async function judgeBackfill(
+  fills: ScoredOccupation[],
+  opts: { saved?: OccupationWorkJudgement[] | null; judge?: WorkJudge | null },
+): Promise<OccupationWorkJudgement[]> {
+  if (!fills.length) return [];
+  const key = (code: string) => code.replace(/\s+/g, "").toLowerCase();
+  const savedByCode = new Map((opts.saved ?? []).map((j) => [key(j.anzscoCode), j]));
+  // Already judged in this run (shared object from the shortlist).
+  const pending = fills.filter((f) => !f.workExperienceAnalysis);
+  const missing = pending.filter((f) => !savedByCode.has(key(f.rubric.anzscoCode)));
+  let fresh: OccupationWorkJudgement[] = [];
+  if (missing.length && opts.judge) {
+    try {
+      fresh = await opts.judge(missing);
+    } catch {
+      fresh = [];
+    }
+  }
+  const all = [...savedByCode.values(), ...fresh];
+  const judged = new Set(all.map((j) => key(j.anzscoCode)));
+  // No judgement available (no AI, no saved one): leave the card as it was.
+  const apply = pending.filter((f) => judged.has(key(f.rubric.anzscoCode)));
+  if (apply.length) applyWorkExperienceJudgements(apply, all);
+  return fresh;
+}
+
 export function applyBoostAndCut(
   shortlist: ScoredOccupation[],
   judgements: OccupationWorkJudgement[],
@@ -907,10 +963,12 @@ function rankedView(s: ScoredOccupation): RankedCandidate {
 /**
  * Saved results that stored only the top-N, where ET took one of those slots
  * and moved to Maybe Suitable: append the next-best matched occupation(s)
- * from a deterministic re-score of the saved subjects (no LLM, nothing saved).
- * Returns true when candidates were added.
+ * from a deterministic re-score of the saved subjects (nothing saved). Each
+ * fill gets the same work-experience judgement and boost as a fresh run: the
+ * saved judgement when there is one, else `judge` for that occupation only.
+ * Candidates are then re-ranked. Returns true when candidates were added.
  */
-export function backfillCachedCandidates(
+export async function backfillCachedCandidates(
   cached: AssessmentResult,
   input: {
     rows: ExtractedSubjectRow[];
@@ -918,8 +976,9 @@ export function backfillCachedCandidates(
     transcriptTexts?: string[];
     engineeringTitledDegree?: boolean | null;
     manualSelection?: ManualSelection | null;
+    judge?: WorkJudge | null;
   },
-): boolean {
+): Promise<boolean> {
   const saved = cached.candidates ?? [];
   const n = assessConfig.maxCandidates;
   const assessorCode = cached.assessorSelected?.anzscoCode;
@@ -942,14 +1001,55 @@ export function backfillCachedCandidates(
     );
     const fills = matchedBackfill(saved, [...ranked, ...scored], n, rankedView, assessorCode);
     if (!fills.length) return false;
-    cached.candidates = [...saved, ...fills.map(candidateFromScored)];
+    await judgeBackfill(fills, {
+      saved: cached.workExperienceJudgements ?? savedCandidateJudgements(saved),
+      judge: input.judge,
+    });
+    const priority = new Map(
+      scored.map((s) => [normalizeCode(s.rubric.anzscoCode), s.trackPriority ?? 99]),
+    );
+    cached.candidates = rankCandidates(
+      [...saved, ...fills.map(candidateFromScored)],
+      (code) => priority.get(normalizeCode(code)) ?? 99,
+    );
     return true;
   } catch {
     return false;
   }
 }
 
-/** Step 4 card for a scored occupation (no work-experience judgement). */
+/** Work judgements carried on saved cards (results saved before workExperienceJudgements). */
+function savedCandidateJudgements(cands: AnzscoCandidate[]): OccupationWorkJudgement[] {
+  return cands
+    .filter((c) => c.workExperienceAnalysis)
+    .map((c) => ({
+      anzscoCode: c.anzscoCode,
+      related: Boolean(c.workExperienceAnalysis!.related),
+      matchedJobs: c.workExperienceAnalysis!.matchedJobs ?? [],
+      analysis: c.workExperienceAnalysis!.analysis ?? "",
+    }));
+}
+
+/**
+ * Re-rank Step 4 cards after a boost, with the same keys as the scoring
+ * order (recommended, Gate 1 track priority, confidence, core, foundation).
+ * Stable: ties keep their saved order.
+ */
+export function rankCandidates(
+  cands: AnzscoCandidate[],
+  priorityOf: (anzscoCode: string) => number = () => 99,
+): AnzscoCandidate[] {
+  return [...cands].sort((a, b) => {
+    if (a.recommended !== b.recommended) return a.recommended ? -1 : 1;
+    const p = priorityOf(a.anzscoCode) - priorityOf(b.anzscoCode);
+    if (p !== 0) return p;
+    if (a.confidenceScore !== b.confidenceScore) return b.confidenceScore - a.confidenceScore;
+    if (a.coreMatched !== b.coreMatched) return b.coreMatched - a.coreMatched;
+    return b.foundationalMatched - a.foundationalMatched;
+  });
+}
+
+/** Step 4 card for a scored occupation (carries its work judgement when it has one). */
 function candidateFromScored(s: ScoredOccupation): AnzscoCandidate {
   const m = dedupeMatchRows(s.matches);
   return buildCandidate(
@@ -1320,7 +1420,7 @@ export function assessExtractedSubjects(
     manualSelection?: ManualSelection | null;
   },
 ): AssessmentResult {
-  // Boost (test path) is already applied to every occupation before the cut.
+  // Work-experience boost (opts, tests) is applied in scoring, before the cut.
   const { scored: scoredAll, gate, assessorSelected } = scoreWithManualSelection(
     extracted.map(withTermIndex),
     {
@@ -1362,44 +1462,9 @@ export function assessExtractedSubjects(
   const transcriptSource = winner.vocational
     ? VOCATIONAL_SOURCE
     : buildTranscriptSource(winner.qualificationsUsed, winner.poolKind, extracted);
-  const candidates = shown.map((s) => {
-    const m = dedupeMatchRows(s.matches);
-    const boosted = opts?.workExperienceBoost ?? false;
-    const before = boosted
-      ? Math.max(0, s.scored.confidenceScore - 4)
-      : s.scored.confidenceScore;
-    const analysis: WorkExperienceCandidateAnalysis | null = boosted
-      ? {
-          related: true,
-          matchedJobs: [],
-          analysis: "Work experience boost applied (test path).",
-          confidenceScoreBefore: before,
-          confidenceScoreAfter: s.scored.confidenceScore,
-        }
-      : {
-          related: false,
-          matchedJobs: [],
-          analysis: "",
-          confidenceScoreBefore: s.scored.confidenceScore,
-          confidenceScoreAfter: s.scored.confidenceScore,
-        };
-    return buildCandidate(
-      s.rubric,
-      s.scored,
-      m,
-      computeMissingSubjects(m, s.rubric),
-      s.unmatched.map((u) => ({
-        name: u.name,
-        code: u.code ?? null,
-        qualification: u.qualification as QualificationType,
-      })),
-      {
-        workExperienceBoost: boosted,
-        workExperienceAnalysis: analysis,
-      },
-      s,
-    );
-  });
+  // Test / injected path: the boost (when asked) is already in the scores;
+  // no work judgement is made here.
+  const candidates = shown.map(candidateFromScored);
 
   const result: AssessmentResult = {
     anzscoCode: winner.scored.anzscoCode,

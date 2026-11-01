@@ -8,8 +8,9 @@
  *     3-year degree from a programme / country that may be recognised higher
  *     (config hook); a combined degree (3+2); a non-engineering bachelor
  *     followed by an engineering master; an engineering master (or doctorate)
- *     with no bachelor on file; part-time, bridging or credit-transfer study;
- *     stated vs counted duration differing by more than the tolerance.
+ *     with no bachelor on file; a 3-year engineering bachelor with a separate
+ *     master qualification on file; part-time, bridging or credit-transfer
+ *     study; stated vs counted duration differing by more than the tolerance.
  *  3. Engineering Bachelor / Honours / Master counted ≥ 4 years → Professional
  *     Engineer (priority 1) + Engineering Technologist (priority 2).
  *  4. Engineering Bachelor counted 3 to < 4 years → Engineering Technologist only.
@@ -17,8 +18,9 @@
  *
  * With several qualifications the highest-level engineering qualification is
  * used (durations are never added together). The counted duration comes from
- * the printed years / semesters; when the transcript does not print them, the
- * stated duration is used and the result carries a fallback flag.
+ * the printed years / semesters; when the transcript does not print them it is
+ * converted from the credit total (flagged, see evidenceConfig.duration.credits);
+ * with neither, the stated duration is used and the result carries a fallback flag.
  *
  * Detection is heuristic (titles, training-package codes, transcript text):
  * no schema change, no LLM call.
@@ -30,7 +32,12 @@ import { evidenceConfig } from "./evidenceConfig.js";
 import { degreeLevelFromTitle } from "./extractSubjects.js";
 import type { VocationalOccupation } from "./loadRubric.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
-import { countDuration, decideEngineering, isReliableCount } from "./qualificationEvidence.js";
+import {
+  countDuration,
+  creditContextOf,
+  decideEngineering,
+  isReliableCount,
+} from "./qualificationEvidence.js";
 import { classifyQualification, findQualificationCodes } from "./route.js";
 import type {
   EngineeringDecision,
@@ -185,6 +192,7 @@ export const FLAG = {
   bridging: "bridging / lateral-entry study",
   creditTransfer: "credit transfer / advanced standing",
   recognisedHigher: "3-year degree that may be recognised at a higher level",
+  bachelorPlusMaster: "3-year bachelor with a separate master – needs assessor review",
 } as const;
 
 const COMBINED_TITLE_RE =
@@ -274,6 +282,8 @@ type QualEval = {
   source: "counted" | "stated" | "none";
   /** True when the counted duration was entered by the assessor. */
   manualCount: boolean;
+  /** Flag text when the counted duration was converted from credits. */
+  creditConversion: string | null;
   method: string;
   mismatch: boolean;
   flags: string[];
@@ -310,9 +320,10 @@ export const RULE_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
   5: "Rule 5: Advanced Diploma / Associate Degree, 2 years or more",
 };
 
-function basisLabel(e: Pick<QualEval, "source" | "manualCount">): string {
+function basisLabel(e: Pick<QualEval, "source" | "manualCount" | "creditConversion">): string {
   if (e.source !== "counted") return "stated duration";
-  return e.manualCount ? "counted duration entered manually" : "counted from the transcript";
+  if (e.manualCount) return "counted duration entered manually";
+  return e.creditConversion ? "converted from credits" : "counted from the transcript";
 }
 
 /** Title used for the engineering title signal: degree title plus field of study. */
@@ -360,7 +371,7 @@ function evaluateQualification(
     engineeringTitledDegree: tickApplies ? true : null,
     subjectShareOverride: q.engineeringShareOverride ?? null,
   });
-  const count = countDuration(rows);
+  const count = countDuration(rows, creditContextOf(q));
   // A counted duration entered by the assessor (Transcript data / Verify
   // details) replaces the transcript count.
   const manualCount = q.countedYearsOverride ?? null;
@@ -380,6 +391,8 @@ function evaluateQualification(
     used,
     source,
     manualCount: manualCount != null,
+    creditConversion:
+      manualCount == null && counted != null ? count.creditConversion?.label ?? null : null,
     method:
       manualCount != null
         ? `entered manually (transcript count: ${count.countedYears != null ? yrs(count.countedYears) : "none"})`
@@ -552,6 +565,7 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
         durationYears: e.used,
         durationSource: e.source,
         durationMethod: e.method,
+        creditConversion: e.creditConversion,
         flags: [...e.flags, ...(e.mismatch ? ["stated and counted duration differ"] : [])],
         used: e === usedEval,
         outcome: outcomeText(e, outcomes.get(e)),
@@ -560,6 +574,7 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
       fallbackNote: fallback
         ? `Duration taken from the stated programme length (${yrs(usedEval!.stated!)}): the transcript does not print years or semesters that could be counted. Confirm before relying on it.`
         : null,
+      creditConversionNote: usedEval?.creditConversion ?? null,
       engineering: usedEval ? usedEval.engineering : null,
       notes,
     };
@@ -630,6 +645,21 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
   for (const e of candidates) {
     const o = outcomeFor(e, evals);
     outcomes.set(e, o);
+    if (o.kind === "open" && o.rule === 4) {
+      // A 3-year engineering bachelor plus a SEPARATE master qualification
+      // (two qualifications on file, not one combined 3+2 title, which the
+      // combined flag above already handles) → manual review, not Technologist.
+      const master = separateMasterFor(e, evals);
+      if (master) {
+        outcomes.set(e, { kind: "manual", reason: FLAG.bachelorPlusMaster });
+        return finish(
+          "manual_review",
+          2,
+          `Manual review needed: ${FLAG.bachelorPlusMaster} ("${label(e)}" and "${label(master)}").`,
+          e,
+        );
+      }
+    }
     if (o.kind === "open") {
       const reason =
         o.rule === 3
@@ -659,6 +689,21 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
     );
   }
   return finish("manual_review", 2, "Manual review needed: no rule matched this qualification set.", null);
+}
+
+/**
+ * A master / doctorate held as a separate qualification next to a bachelor
+ * (not clearly non-engineering), or null.
+ */
+function separateMasterFor(bachelor: QualEval, all: readonly QualEval[]): QualEval | null {
+  return (
+    all.find(
+      (o) =>
+        o !== bachelor &&
+        (o.award === "master" || o.award === "doctorate") &&
+        o.engineering.decision !== "no",
+    ) ?? null
+  );
 }
 
 function outcomeText(e: QualEval, o: Outcome | undefined): string {

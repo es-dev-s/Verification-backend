@@ -143,17 +143,6 @@ export const llmMatchDecisionSchema = z.object({
 
 export type LlmMatchDecision = z.infer<typeof llmMatchDecisionSchema>;
 
-/** Legacy single-occupation shape (kept for older callers/tests). */
-export const workExperienceRelevanceSchema = z.object({
-  related: z.boolean(),
-  confidence: z.number().min(0).max(1),
-  reason: z.string(),
-});
-
-export type WorkExperienceRelevance = z.infer<
-  typeof workExperienceRelevanceSchema
->;
-
 export const workExperienceMatchedJobSchema = z.object({
   title: z.string(),
   employer: z.string().nullable().optional().default(null),
@@ -420,6 +409,20 @@ export type AssessmentResult = {
   assessorSelected?: AssessorSelected;
   /** Family rules on the suggested ANZSCOs (primary, alternatives, ET Maybe Suitable). */
   familyAdjustment?: FamilyAdjustment;
+  /**
+   * Work-experience judgements made on the last full run (whole shortlist,
+   * up to boostShortlist occupations), reused on cached loads for an
+   * occupation that is backfilled into the shown cards. Absent on older results.
+   */
+  workExperienceJudgements?: SavedWorkJudgement[];
+};
+
+/** One saved work-experience judgement (same shape as experienceBoost.ts). */
+export type SavedWorkJudgement = {
+  anzscoCode: string;
+  related: boolean;
+  matchedJobs: MatchedJob[];
+  analysis: string;
 };
 
 /** One occupation after the family rules (Step 4 ANZSCO cards). */
@@ -581,6 +584,11 @@ export type Gate1Qualification = {
   durationSource: "counted" | "stated" | "none";
   /** How the count was made (or why it could not be). */
   durationMethod: string;
+  /**
+   * Flag text when the counted duration was converted from the credit total,
+   * e.g. "Converted from credits (240 credits ÷ 60 per year)". Absent on older results.
+   */
+  creditConversion?: string | null;
   /** Unusual-case flags (combined degree, part-time, credit transfer …). */
   flags: string[];
   /** True for the qualification that decided the gate. */
@@ -603,6 +611,8 @@ export type Gate1Decision = {
   /** True when the duration used was the stated one (transcript had no years / semesters). */
   durationFallback: boolean;
   fallbackNote: string | null;
+  /** Credit-conversion flag of the qualification that decided the gate (absent on older results). */
+  creditConversionNote?: string | null;
   /** Engineering decision for the qualification that decided the gate (null when none). */
   engineering: EngineeringDecision | null;
   notes: string[];

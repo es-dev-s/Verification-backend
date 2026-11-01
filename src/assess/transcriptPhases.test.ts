@@ -165,6 +165,32 @@ describe("Phase 3: duration check (0.5-year tolerance)", () => {
     assert.equal(s!.durationCheck.status, "missing");
     assert.equal(s!.durationCheck.ok, false);
   });
+
+  it("no terms but a credit total: years converted from credits, with a flag", () => {
+    const sources = [fs(TRANSCRIPT_FIELDS.creditTotal, "120")];
+    const [s] = buildQualificationSummaries([bachelor(4)], noTerms(), sources);
+    assert.equal(s!.basis, "counted");
+    assert.equal(s!.fallback, false);
+    assert.equal(s!.effective.countedYears, 4);
+    assert.equal(s!.creditConversion, "Converted from credits (120 credits ÷ 30 per year)");
+    assert.equal(s!.basisLabel, s!.creditConversion);
+    assert.equal(s!.durationCheck.status, "match");
+  });
+
+  it("a manual counted duration wins over the credit conversion", () => {
+    const sources = [fs(TRANSCRIPT_FIELDS.creditTotal, "120"), fs(TRANSCRIPT_FIELDS.countedYears, "3.5")];
+    const [s] = buildQualificationSummaries([bachelor(4)], noTerms(), sources);
+    assert.equal(s!.basis, "manual");
+    assert.equal(s!.effective.countedYears, 3.5);
+    assert.equal(s!.creditConversion, null);
+  });
+
+  it("printed semesters win over the credit total", () => {
+    const sources = [fs(TRANSCRIPT_FIELDS.creditTotal, "240")];
+    const [s] = buildQualificationSummaries([bachelor(4)], withSemesters(8), sources);
+    assert.equal(s!.effective.countedYears, 4);
+    assert.equal(s!.creditConversion, null);
+  });
 });
 
 describe("Assessor values reach Gate 1", () => {

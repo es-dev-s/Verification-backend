@@ -33,6 +33,7 @@ import { awardLevelOf, rowsFor } from "./gate1.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
 import {
   countDuration,
+  creditContextOf,
   decideEngineering,
   isReliableCount,
   parseTerm,
@@ -277,6 +278,7 @@ export function qualificationInfosFor(
       ...(fieldOfStudy ? { fieldOfStudy } : {}),
       ...(awardOverride ? { awardOverride } : {}),
       ...(overrides.countedYears != null ? { countedYearsOverride: overrides.countedYears } : {}),
+      ...(overrides.creditTotal != null ? { creditTotalOverride: overrides.creditTotal } : {}),
       ...(overrides.engineeringShare != null ? { engineeringShareOverride: overrides.engineeringShare } : {}),
     };
   });
@@ -295,13 +297,16 @@ export function gateOverridesOf(infos: readonly QualificationInfo[]) {
       awardOverride: q.awardOverride ?? null,
       countedYearsOverride: q.countedYearsOverride ?? null,
       engineeringShareOverride: q.engineeringShareOverride ?? null,
+      // A credit total only changes the gate through the credits → years conversion.
+      ...(q.creditTotalOverride != null ? { creditTotalOverride: q.creditTotalOverride } : {}),
     }))
     .filter(
       (p) =>
         p.fieldOfStudy != null ||
         p.awardOverride != null ||
         p.countedYearsOverride != null ||
-        p.engineeringShareOverride != null,
+        p.engineeringShareOverride != null ||
+        p.creditTotalOverride != null,
     );
   return parts.length ? parts : null;
 }
@@ -505,6 +510,11 @@ export type QualificationTranscriptSummary = {
   /** Duration the gate uses and where it comes from. */
   basis: "counted" | "manual" | "stated" | "none";
   basisLabel: string;
+  /**
+   * Flag text when the counted duration was converted from the credit total
+   * (no usable years / semesters), e.g. "Converted from credits (240 credits ÷ 60 per year)".
+   */
+  creditConversion: string | null;
   /** True when the stated duration is used because the transcript could not be counted. */
   fallback: boolean;
   showEngineeringShare: boolean;
@@ -637,7 +647,12 @@ export function buildQualificationSummaries(
   return infos.map((q) => {
     const raw = q.rawLevel ?? q.level;
     const levelRows = rowsFor(q, rows, single);
-    const count = countDuration(levelRows);
+    const overrides = overridesFor(fieldSources, raw);
+    // Printed years / semesters → credits (assessor total first) → stated.
+    const count = countDuration(levelRows, {
+      ...creditContextOf(q),
+      creditTotalOverride: overrides.creditTotal,
+    });
     const reliable = isReliableCount(count);
     const countedAuto = reliable ? count.countedYears : null;
     const tpy = count.unit ? TERMS_PER_YEAR[count.unit] : undefined;
@@ -645,7 +660,6 @@ export function buildQualificationSummaries(
     const share = levelRows.length
       ? decideEngineering({ qualifications: [q], rows: levelRows }).subjectShare
       : null;
-    const overrides = overridesFor(fieldSources, raw);
     const { award, aqfLevel } = awardLevelOf(q);
     const detected = awardLevelOf({ ...q, awardOverride: null });
     const counted = overrides.countedYears ?? countedAuto;
@@ -662,7 +676,9 @@ export function buildQualificationSummaries(
       basis === "manual"
         ? "Counted duration entered manually"
         : basis === "counted"
-          ? `Counted from the transcript (${count.method})`
+          ? count.creditConversion
+            ? count.creditConversion.label
+            : `Counted from the transcript (${count.method})`
           : basis === "stated"
             ? `Stated duration used: ${count.method}`
             : "No duration available";
@@ -701,6 +717,7 @@ export function buildQualificationSummaries(
       },
       basis,
       basisLabel,
+      creditConversion: basis === "counted" ? count.creditConversion?.label ?? null : null,
       fallback: basis === "stated",
       showEngineeringShare: award !== "certificate",
       durationCheck: durationCheckFor(stated, counted, manual, tol),
