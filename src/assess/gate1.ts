@@ -223,7 +223,6 @@ function flagsFor(
   const flags: string[] = [];
   if (COMBINED_TITLE_RE.test(title) || anyText(COMBINED_TEXT_RE)) flags.push(FLAG.combined);
   if (PART_TIME_TITLE_RE.test(title) || anyText(PART_TIME_TEXT_RE)) flags.push(FLAG.partTime);
-  if (BRIDGING_TITLE_RE.test(title) || anyText(BRIDGING_TEXT_RE)) flags.push(FLAG.bridging);
   const creditRows = rows.filter(
     (r) => CREDIT_GRADE_RE.test((r.grade ?? "").trim()) || CREDIT_NAME_RE.test(r.name ?? ""),
   ).length;

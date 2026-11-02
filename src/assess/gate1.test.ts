@@ -194,8 +194,9 @@ describe("Rule 2: manual review", () => {
     // Under 2 years is checked first (rule 1); a longer top-up is manual review.
     assert.equal(br.result, "not_eligible");
     const br2 = gate([{ level: "bachelor", title: "Bachelor of Engineering (Lateral Entry)", countedYearsOverride: 3 }], engRows());
-    assert.equal(br2.result, "manual_review");
-    assert.ok(br2.reason.includes(FLAG.bridging));
+    assert.equal(br2.result, "open");
+    assert.equal(br2.rule, 4);
+    assert.ok(!br2.reason.includes(FLAG.bridging));
     const ct = gate(
       [{ level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: 4 }],
       [...engRows(), sub("Calculus I", "bachelor", null, "CT"), sub("Physics I", "bachelor", null, "Exempt")],

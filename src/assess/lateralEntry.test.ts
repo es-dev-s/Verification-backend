@@ -362,13 +362,12 @@ describe("lateral entry: prior-study subject reads", () => {
 describe("lateral entry: Gate 1 flags", () => {
   const q = (title: string, durationYears = 3): QualificationInfo[] => [{ level: "bachelor", rawLevel: "bachelor", title, countedYearsOverride: durationYears }];
 
-  it("decided routes skip the bridging flag; undecided keeps manual review", () => {
+  it("words such as lateral entry in the title do not force a bridging review", () => {
     const title = "Bachelor of Engineering (Lateral Entry)";
     const open = evaluateGate1({ qualifications: q(title), rows: engRows(), vocational: voc });
-    assert.equal(open.result, "manual_review");
-    assert.ok(open.reason.includes(FLAG.bridging));
-    const decided = evaluateGate1({ qualifications: q(title), rows: engRows(), vocational: voc, lateralEntryDecided: true });
-    assert.ok(!decided.reason.includes(FLAG.bridging));
+    assert.equal(open.result, "open");
+    assert.equal(open.rule, 4);
+    assert.ok(!open.reason.includes(FLAG.bridging));
   });
 
   it("decided routes skip the credit-transfer flag", () => {
