@@ -181,9 +181,13 @@ export function withTermIndex<T extends ExtractedSubjectRow>(row: T): T {
 
 const H_TERM = "(?:semester|sem|trimester|term|quarter|qtr)";
 const H_YEAR = "(?:year|yr|level|part)";
-/** One period token at the start of a heading ("SEM : 3", "Semester III", "3rd Semester", "Second Year"). */
+/** One period token ("SEM : 3", "Semester III", "3rd Semester", "Second Year"). */
 const H_ONE = `(?:${H_TERM}\\.?\\s*[-:#.]?\\s*${NUM}|${NUM}\\s*-?\\s*${H_TERM}|${H_YEAR}\\.?\\s*[-:#.]?\\s*${NUM}|${NUM}\\s*-?\\s*${H_YEAR})`;
-const HEADING_RE = new RegExp(`^${H_ONE}\\b(?:[\\s,;:/–—-]*${H_ONE}\\b)?`, "i");
+const ONE_RE = new RegExp(`^${H_ONE}\\b`, "i");
+/** A year and its semester printed in one heading ("Year 2 Semester 1"). */
+const FOLLOW_RE = new RegExp(`^[\\s,;:/–—-]+${H_ONE}\\b`, "i");
+/** Another period heading later on the same line (the other column). */
+const NEXT_RE = new RegExp(`^[\\s|]*${H_ONE}\\b`, "i");
 /** Words allowed after a heading on the same line (session / result columns, not a subject title). */
 const HEADING_TAIL_WORDS = new Set([
   "trial", "attempt", "spi", "cpi", "sgpa", "cgpa", "gpa", "credits", "credit", "hrs", "hours", "week",
@@ -196,34 +200,165 @@ const HEADING_TAIL_WORDS = new Set([
 export type TextPeriodHeading = {
   /** Character offset of the heading in the text. */
   offset: number;
-  /** Heading as printed (cleaned), e.g. "SEM :3". */
+  /** Heading as printed (cleaned), e.g. "SEM :3" or "Year 2, First Semester". */
   label: string;
   term: TermInfo;
 };
 
+const PAGE_MARK_RE = /^---\s*page\s+\d+\s*---$/i;
+const EXPLICIT_YEAR_RE = new RegExp(
+  `\\b(?:${H_YEAR})\\b|\\by\\s?\\d\\s*[-/ ]?\\s*[stq]\\s?\\d`,
+  "i",
+);
+const YEAR_TOKEN_RE = new RegExp(
+  `\\b(?:${H_YEAR}\\.?\\s*[-:#.]?\\s*${NUM}|${NUM}\\s*-?\\s*${H_YEAR})\\b`,
+  "i",
+);
+
+/** The printed text names a year of study ("Year 2", "Second Year", "Y2S1"). */
+function mentionsYear(raw: string | null | undefined): boolean {
+  return !!raw && EXPLICIT_YEAR_RE.test(raw);
+}
+
+/** Year words from a heading, for prefixing a later semester on the same page. */
+function yearToken(raw: string, yearOfStudy: number): string {
+  const m = raw.match(YEAR_TOKEN_RE);
+  return m ? m[0].replace(/\s+/g, " ").trim() : `Year ${yearOfStudy}`;
+}
+
+/**
+ * "First Semester" / "Sem 2": the printed number is the term inside one year.
+ * "Semester 5" / "SEM : 7" is a running count and must not be renumbered.
+ */
+function withinYearTerm(term: TermInfo): boolean {
+  return term.unit !== "year" && term.termIndex != null && term.termIndex <= term.termsPerYear;
+}
+
+type YearCarry = { label: string; yearOfStudy: number };
+
+/**
+ * Join a within-year semester ("I Semester", "First Semester") to the year it
+ * belongs to, so the printed 1 / 2 becomes the programme semester
+ * (Year 3 + I Semester → semester 5). The year carries across pages. When the
+ * semester number goes backwards and no new year heading was printed, the next
+ * year is used. A running number ("SEM : 7") is left as printed.
+ */
+function placeHeading(
+  rawLabel: string,
+  term: TermInfo,
+  state: { carry: YearCarry | null; lastSem: number | null },
+): { label: string; term: TermInfo } {
+  const label = rawLabel.replace(/\s+/g, " ").trim();
+  if (term.unit === "year" && term.yearOfStudy != null) {
+    state.carry = { label, yearOfStudy: term.yearOfStudy };
+    state.lastSem = null;
+    return { label, term };
+  }
+  if (mentionsYear(label) && term.yearOfStudy != null) {
+    state.carry = { label: yearToken(label, term.yearOfStudy), yearOfStudy: term.yearOfStudy };
+    state.lastSem = term.termInYear;
+    return { label, term };
+  }
+  if (!withinYearTerm(term) || term.termIndex == null) {
+    state.lastSem = null;
+    return { label, term };
+  }
+  const semNo = term.termIndex;
+  if (!state.carry) state.carry = { label: "Year 1", yearOfStudy: 1 };
+  if (state.lastSem != null && semNo < state.lastSem) {
+    const next = state.carry.yearOfStudy + 1;
+    state.carry = { label: `Year ${next}`, yearOfStudy: next };
+  }
+  state.lastSem = semNo;
+  // "II YEAR, I SEMESTER" is misread (the "I" becomes the year). Keep the
+  // printed wording when it parses to this year and semester; otherwise use
+  // "Year 2 semester 1", which cannot be read the other way.
+  const expected = (state.carry.yearOfStudy - 1) * term.termsPerYear + semNo;
+  const printed = `${state.carry.label}, ${label}`;
+  const printedTerm = parseTerm(printed);
+  if (printedTerm?.yearOfStudy === state.carry.yearOfStudy && printedTerm.termIndex === expected) {
+    return { label: printed, term: printedTerm };
+  }
+  const canonical = `Year ${state.carry.yearOfStudy} ${term.unit} ${semNo}`;
+  const canonicalTerm = parseTerm(canonical);
+  if (canonicalTerm?.termIndex === expected) return { label: canonical, term: canonicalTerm };
+  return { label, term };
+}
+
+/** Period headings in one "|"-separated cell, including a second column ("I SEMESTER    II SEMESTER"). */
+function headingsInCell(
+  cell: string,
+  cellOffset: number,
+  state: { carry: YearCarry | null; lastSem: number | null },
+  out: TextPeriodHeading[],
+): void {
+  let pos = 0;
+  for (let n = 0; n < 8 && pos < cell.length; n++) {
+    const slice = cell.slice(pos);
+    const lead = slice.match(/^[\s*•·>#\-–—]*/)![0].length;
+    if (lead >= slice.length) break;
+    const head = slice.slice(lead);
+    const m = head.match(ONE_RE);
+    if (!m) break;
+    let raw = m[0];
+    let consumed = lead + m[0].length;
+    const follow = head.slice(m[0].length).match(FOLLOW_RE);
+    if (follow) {
+      const second = follow[0].replace(/^[\s,;:/–—-]+/, "");
+      const t1 = parseTerm(raw);
+      const t2 = parseTerm(second);
+      const complement =
+        !!t1 &&
+        !!t2 &&
+        t1.unit !== "calendar" &&
+        t2.unit !== "calendar" &&
+        (t1.unit === "year") !== (t2.unit === "year");
+      if (complement) {
+        raw = `${raw} ${second}`.replace(/\s+/g, " ").trim();
+        consumed += follow[0].length;
+      }
+    }
+    const tail = head.slice(consumed - lead);
+    const another = NEXT_RE.test(tail);
+    if (!another) {
+      const words = tail.toLowerCase().match(/[a-z]{3,}/g) ?? [];
+      if (!words.every((w) => HEADING_TAIL_WORDS.has(w))) break;
+    }
+    const term = parseTerm(raw);
+    if (term && term.unit !== "calendar") {
+      const placed = placeHeading(raw, term, state);
+      out.push({ offset: cellOffset + pos + lead, label: placed.label, term: placed.term });
+    } else {
+      break;
+    }
+    if (!another) break;
+    pos += consumed;
+  }
+}
+
 /**
  * Year / semester headings printed in a transcript's text, in order. A heading
  * starts a line (or a "|"-separated cell) and may share the line with
- * session columns ("SEM : 3 | TRIAL : 2 | SPI: 3.61"), but not with a subject title.
+ * session columns ("SEM : 3 | TRIAL : 2 | SPI: 3.61") or a second semester
+ * column ("I SEMESTER    II SEMESTER"), but not with a subject title.
+ * A year heading is joined to the following within-year semesters and kept
+ * across page breaks ("Year 3" then "I Semester" → "Year 3, I Semester",
+ * semester 5). Repeating "I / II Semester" with no year heading is numbered
+ * in reading order.
  */
 export function periodHeadingsOf(text: string | null | undefined): TextPeriodHeading[] {
   if (!text) return [];
   const out: TextPeriodHeading[] = [];
+  const state: { carry: YearCarry | null; lastSem: number | null } = { carry: null, lastSem: null };
   let lineStart = 0;
   for (const line of text.split("\n")) {
+    if (PAGE_MARK_RE.test(line.trim())) {
+      lineStart += line.length + 1;
+      continue;
+    }
     let cellStart = 0;
     for (const cell of line.split("|")) {
-      const lead = cell.match(/^[\s*•·>#\-–—]*/)![0].length;
-      const body = cell.slice(lead);
-      const m = body.match(HEADING_RE);
-      if (m) {
-        const tail = body.slice(m[0].length);
-        const words = tail.toLowerCase().match(/[a-z]{3,}/g) ?? [];
-        const term = parseTerm(m[0]);
-        if (term && term.unit !== "calendar" && words.every((w) => HEADING_TAIL_WORDS.has(w))) {
-          out.push({ offset: lineStart + cellStart + lead, label: m[0].replace(/\s+/g, " ").trim(), term });
-        }
-      }
+      headingsInCell(cell, lineStart + cellStart, state, out);
       cellStart += cell.length + 1;
     }
     lineStart += line.length + 1;
@@ -250,12 +385,35 @@ function rowOffsetIn(text: string, row: Pick<ExtractedSubjectRow, "name" | "code
   return -1;
 }
 
+/** Heading above this character: on a two-column line, the one in the subject's column. */
+function headingAbove(text: string, headings: readonly TextPeriodHeading[], at: number): TextPeriodHeading | null {
+  const lineStart = text.lastIndexOf("\n", Math.max(0, at - 1)) + 1;
+  const col = at - lineStart;
+  let best: TextPeriodHeading | null = null;
+  let bestLine = -1;
+  for (const h of headings) {
+    if (h.offset > at) break;
+    const hLine = text.lastIndexOf("\n", Math.max(0, h.offset - 1)) + 1;
+    const hCol = h.offset - hLine;
+    if (hLine !== bestLine) {
+      bestLine = hLine;
+      best = h;
+    } else if (hCol <= col) {
+      best = h;
+    }
+  }
+  return best;
+}
+
 /**
  * Fill each row's year / semester from the heading it is printed under in its
- * transcript's text, when the row has no usable study period of its own
- * (empty, or something that is not a year / semester such as an exam session
- * "W2019"). Rows whose label already reads as a year / semester are kept. Used
- * on every read, so saved subjects benefit without being extracted again.
+ * transcript's text. Used on every read, so saved subjects benefit without
+ * being extracted again.
+ *
+ * A row keeps a label that already names its year. A bare semester ("First
+ * Semester") is replaced when the heading joined that semester to the page
+ * year ("Year 2, First Semester"). An empty label, or an exam session such as
+ * "W2019", is filled from the heading.
  */
 export function applyTextPeriods<T extends ExtractedSubjectRow>(
   rows: readonly T[],
@@ -274,19 +432,24 @@ export function applyTextPeriods<T extends ExtractedSubjectRow>(
   if (!headings.size) return [...rows];
   const only = documents.length === 1 ? documents[0]!.id : null;
   return rows.map((r) => {
-    const own = parseTerm(r.yearOrSemester);
-    if (own && own.unit !== "calendar") return r;
     const docId = r.documentId ?? only;
     const h = docId ? headings.get(docId) : undefined;
     if (!h) return r;
-    const at = rowOffsetIn(texts.get(docId!)!, r);
+    const text = texts.get(docId!)!;
+    const at = rowOffsetIn(text, r);
     if (at < 0) return r;
-    let under: TextPeriodHeading | null = null;
-    for (const x of h) {
-      if (x.offset > at) break;
-      under = x;
+    const under = headingAbove(text, h, at);
+    if (!under) return r;
+    const own = parseTerm(r.yearOrSemester);
+    // A heading that adds the page year is more specific than "First Semester".
+    if (own && own.unit !== "calendar") {
+      const richer =
+        under.term.unit !== "year" &&
+        mentionsYear(under.label) &&
+        !mentionsYear(r.yearOrSemester);
+      if (!richer) return r;
     }
-    return under ? { ...r, yearOrSemester: under.label } : r;
+    return { ...r, yearOrSemester: under.label };
   });
 }
 
@@ -395,16 +558,118 @@ export function creditsToYears(
   };
 }
 
+const HEAD_NUM =
+  "\\d{1,2}(?:st|nd|rd|th)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|viii|vii|iii|ii|iv|vi|ix|i|v|x";
+/** Semester word with a number beside it ("I SEMESTER", "Semester 3", "2nd Semester"). */
+const SEM_HEAD_RE = new RegExp(
+  `^(?:sem(?:ester)?\\.?\\s*[-:#.]?\\s*(${HEAD_NUM})|(${HEAD_NUM})\\s*[-:#.]?\\s*sem(?:ester)?)\\b`,
+  "i",
+);
+/** Year of study with a number beside it ("IV YEAR", "Year 4"). Not a calendar year. */
+const YEAR_HEAD_RE = new RegExp(
+  `^(?:(?:year|yr)(?:\\s+of\\s+study)?\\.?\\s*[-:#.]?\\s*(${HEAD_NUM})|(${HEAD_NUM})\\s*[-:#.]?\\s*(?:year|yr))\\b`,
+  "i",
+);
+const YEAR_OF_STUDY_RE = new RegExp(`\\byear\\s+of\\s+study\\s*[-:#.]?\\s*(${HEAD_NUM})\\b`, "gi");
+
+function studyYearToken(raw: string | undefined): number | null {
+  const n = toNum(raw);
+  return n != null && n >= 1 && n <= 7 ? n : null;
+}
+
+/** Highest year-of-study number printed as a heading ("IV YEAR" → 4). */
+function maxStudyYear(text: string): number | null {
+  const found: number[] = [];
+  for (const line of text.split("\n")) {
+    for (const cell of line.split("|")) {
+      const lead = cell.match(/^[\s*•·>#\-–—]*/)![0].length;
+      const m = cell.slice(lead).match(YEAR_HEAD_RE);
+      const n = studyYearToken(m?.[1] ?? m?.[2]);
+      if (n != null) found.push(n);
+    }
+  }
+  for (const m of text.matchAll(YEAR_OF_STUDY_RE)) {
+    const n = studyYearToken(m[1]);
+    if (n != null) found.push(n);
+  }
+  return found.length ? Math.max(...found) : null;
+}
+
 /**
- * Count programme length from the rows of one qualification: printed years /
- * semesters first; when they cannot be counted reliably, the credit total
- * (assessor value first) converted to years.
+ * Numbered semester headings in reading order. Each one counts as 1, whatever
+ * number is printed beside it. "Semester Project" has no number, so it is skipped.
+ */
+function semesterHeadingCount(text: string): number {
+  let n = 0;
+  for (const line of text.split("\n")) {
+    for (const cell of line.split("|")) {
+      let rest = cell;
+      for (let i = 0; i < 6 && rest.trim(); i++) {
+        const lead = rest.match(/^[\s*•·>#\-–—]*/)![0].length;
+        const m = rest.slice(lead).match(SEM_HEAD_RE);
+        const num = studyYearToken(m?.[1] ?? m?.[2]) ?? toNum(m?.[1] ?? m?.[2]);
+        if (!m || num == null || num < 1 || num > 16) break;
+        n++;
+        rest = rest.slice(lead + m[0].length);
+      }
+    }
+  }
+  return n;
+}
+
+/**
+ * Duration from the transcript text. A year-of-study number wins. Otherwise
+ * each numbered semester heading counts as one semester (8 headings → 4 years).
+ * Null when the text has neither.
+ */
+function durationFromHeadings(texts: readonly string[] | null | undefined): Pick<
+  DurationCount,
+  "countedYears" | "unit" | "method" | "finalYear" | "span"
+> | null {
+  if (!texts?.some((t) => t?.trim())) return null;
+  const blob = texts.filter(Boolean).join("\n");
+  const year = maxStudyYear(blob);
+  if (year != null) {
+    return {
+      countedYears: year,
+      unit: "year",
+      method: `year ${year} printed on the transcript`,
+      finalYear: year,
+      span: { unit: "year", first: year, last: year },
+    };
+  }
+  const headings = semesterHeadingCount(blob);
+  if (headings < 2) return null;
+  return {
+    countedYears: roundHalf(headings / 2),
+    unit: "semester",
+    method: `${headings} semester headings on the transcript`,
+    finalYear: Math.ceil(headings / 2),
+    span: { unit: "semester", first: 1, last: headings },
+  };
+}
+
+/**
+ * Count programme length from the rows of one qualification: a year number
+ * printed on the transcript, otherwise the number of semester headings, then
+ * the years / semesters on the subject rows; when those cannot be counted
+ * reliably, the credit total (assessor value first) converted to years.
  */
 export function countDuration(
   rows: readonly ExtractedSubjectRow[],
   ctx: CreditContext = {},
 ): DurationCount {
   const byTerms = countFromTerms(rows);
+  const headed = durationFromHeadings(ctx.texts);
+  if (headed) {
+    return {
+      ...byTerms,
+      ...headed,
+      confidence: "high",
+      source: "terms",
+      creditConversion: null,
+    };
+  }
   if (isReliableCount(byTerms)) return byTerms;
   const credits = ctx.creditTotalOverride ?? byTerms.creditTotal;
   const conversion = creditsToYears(credits, detectCreditSystem(rows, ctx));

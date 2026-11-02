@@ -103,6 +103,160 @@ describe("semester headings", () => {
     assert.equal(parseTerm("S2020"), null);
     assert.equal(parseTerm("W2019"), null);
   });
+
+  it("joins the page year onto a following semester heading", () => {
+    const text = [
+      "--- page 1 ---",
+      "Year 1",
+      "First Semester",
+      "MA101 Engineering Mathematics 3 AA",
+      "PH101 Engineering Physics 3 AA",
+      "Second Semester",
+      "CH101 Engineering Chemistry 3 AA",
+      "ME101 Engineering Drawing 3 AA",
+      "--- page 2 ---",
+      "Year 2",
+      "First Semester",
+      "ME201 Fluid Mechanics 3 AA",
+      "ME202 Thermodynamics 3 AA",
+      "Second Semester",
+      "ME203 Machine Design 3 AA",
+      "ME204 Heat Transfer 3 AA",
+    ].join("\n");
+    const labels = periodHeadingsOf(text).map((h) => h.label);
+    assert.ok(labels.includes("Year 2, First Semester"));
+    assert.ok(labels.includes("Year 2, Second Semester"));
+    const rows = applyTextPeriods(
+      [
+        sub("Engineering Mathematics", "First Semester", "MA101", "t1"),
+        sub("Engineering Physics", "First Semester", "PH101", "t1"),
+        sub("Engineering Chemistry", "Second Semester", "CH101", "t1"),
+        sub("Engineering Drawing", "Second Semester", "ME101", "t1"),
+        sub("Fluid Mechanics", "First Semester", "ME201", "t1"),
+        sub("Thermodynamics", null, "ME202", "t1"),
+        sub("Machine Design", "Second Semester", "ME203", "t1"),
+        sub("Heat Transfer", "Second Semester", "ME204", "t1"),
+      ],
+      [{ id: "t1", text }],
+    );
+    assert.equal(rows.find((r) => r.code === "ME201")!.yearOrSemester, "Year 2, First Semester");
+    assert.equal(rows.find((r) => r.code === "ME202")!.yearOrSemester, "Year 2, First Semester");
+    assert.equal(parseTerm(rows.find((r) => r.code === "ME201")!.yearOrSemester)?.termIndex, 3);
+    assert.equal(parseTerm(rows.find((r) => r.code === "ME203")!.yearOrSemester)?.termIndex, 4);
+    const c = countDuration(rows.map(withTermIndex));
+    assert.equal(c.countedYears, 2);
+    assert.equal(c.span?.first, 1);
+    assert.equal(c.span?.last, 4);
+  });
+
+  it("keeps the year for a semester printed on the next page", () => {
+    const text = [
+      "--- page 1 ---",
+      "Year 2",
+      "First Semester",
+      "ME201 Fluid Mechanics 3 AA",
+      "ME202 Thermodynamics 3 AA",
+      "--- page 2 ---",
+      "Second Semester",
+      "ME203 Machine Design 3 AA",
+      "ME204 Heat Transfer 3 AA",
+    ].join("\n");
+    const rows = applyTextPeriods(
+      [
+        sub("Fluid Mechanics", "First Semester", "ME201", "t1"),
+        sub("Thermodynamics", "First Semester", "ME202", "t1"),
+        sub("Machine Design", "Second Semester", "ME203", "t1"),
+        sub("Heat Transfer", null, "ME204", "t1"),
+      ],
+      [{ id: "t1", text }],
+    );
+    assert.equal(rows.find((r) => r.code === "ME203")!.yearOrSemester, "Year 2, Second Semester");
+    assert.equal(parseTerm(rows.find((r) => r.code === "ME204")!.yearOrSemester)?.termIndex, 4);
+  });
+
+  it("numbers a restarted I / II semester as the next year", () => {
+    const lines = ["I YEAR", "I SEMESTER", "II SEMESTER", "II YEAR", "I SEMESTER", "II SEMESTER", "III YEAR", "I SEMESTER", "II SEMESTER", "IV YEAR", "I SEMESTER", "II SEMESTER"];
+    const labels = periodHeadingsOf(lines.join("\n")).map((h) => h.term.label);
+    assert.deepEqual(
+      labels.filter((l) => l.startsWith("semester")),
+      ["semester 1", "semester 2", "semester 3", "semester 4", "semester 5", "semester 6", "semester 7", "semester 8"],
+    );
+  });
+
+  it("four years of repeating I / II semesters count as 4 years, including both columns", () => {
+    const gap = " ".repeat(24);
+    const pair = (a: string, b: string) => `${a}${gap}${b}`;
+    const text = [
+      "I YEAR",
+      pair("I SEMESTER", "II SEMESTER"),
+      pair("MA101 Engineering Mathematics", "ME101 Engineering Drawing"),
+      "II YEAR",
+      pair("I SEMESTER", "II SEMESTER"),
+      pair("ME201 Fluid Mechanics", "ME202 Thermodynamics"),
+      "III YEAR",
+      pair("I SEMESTER", "II SEMESTER"),
+      pair("ME301 Dynamics Of Machinery", "ME302 Refrigeration Engineering"),
+      "IV YEAR",
+      pair("I SEMESTER", "II SEMESTER"),
+      pair("ME401 Switchgear Protection", "ME402 Project Work Phase"),
+    ].join("\n");
+    const rows = applyTextPeriods(
+      [
+        sub("Engineering Mathematics", "I Semester", "MA101", "t1"),
+        sub("Engineering Drawing", "II Semester", "ME101", "t1"),
+        sub("Fluid Mechanics", "I Semester", "ME201", "t1"),
+        sub("Thermodynamics", "I Semester", "ME202", "t1"),
+        sub("Dynamics Of Machinery", "I Semester", "ME301", "t1"),
+        sub("Refrigeration Engineering", "II Semester", "ME302", "t1"),
+        sub("Switchgear Protection", "I Semester", "ME401", "t1"),
+        sub("Project Work Phase", "II Semester", "ME402", "t1"),
+      ],
+      [{ id: "t1", text }],
+    );
+    assert.equal(parseTerm(rows.find((r) => r.code === "MA101")!.yearOrSemester)?.termIndex, 1);
+    assert.equal(parseTerm(rows.find((r) => r.code === "ME101")!.yearOrSemester)?.termIndex, 2);
+    assert.equal(parseTerm(rows.find((r) => r.code === "ME301")!.yearOrSemester)?.termIndex, 5);
+    assert.equal(parseTerm(rows.find((r) => r.code === "ME402")!.yearOrSemester)?.termIndex, 8);
+    const c = countDuration(rows);
+    assert.equal(c.countedYears, 4);
+    assert.equal(c.span?.first, 1);
+    assert.equal(c.span?.last, 8);
+  });
+
+  it("counts each numbered semester heading once and skips semester project", () => {
+    const halves = [
+      ["I SEMESTER", "MA101 Engineering Mathematics", "Semester Project 4 AA", "II SEMESTER", "ME101 Engineering Drawing"].join("\n"),
+      ["SEM : 3", "ME201 Fluid Mechanics", "NOTE: A Semester is a period of 16 Weeks", "4th Semester", "ME202 Thermodynamics"].join("\n"),
+    ];
+    const rows = [sub("Engineering Mathematics"), sub("Engineering Drawing"), sub("Fluid Mechanics"), sub("Thermodynamics")];
+    const c = countDuration(rows, { texts: halves });
+    assert.equal(c.countedYears, 2);
+    assert.equal(c.span?.last, 4);
+    assert.match(c.method, /4 semester headings/);
+  });
+
+  it("eight numbered semester headings are 4 years", () => {
+    const lines: string[] = [];
+    for (let y = 1; y <= 4; y++) {
+      lines.push("I SEMESTER", `MA${y}01 Engineering Mathematics`, "II SEMESTER", `ME${y}01 Engineering Drawing`);
+    }
+    const c = countDuration([sub("Engineering Mathematics"), sub("Engineering Drawing")], { texts: [lines.join("\n")] });
+    assert.equal(c.countedYears, 4);
+    assert.equal(c.span?.last, 8);
+  });
+
+  it("a printed year number is the duration", () => {
+    const text = ["IV YEAR", "I SEMESTER", "Semester Project", "II SEMESTER"].join("\n");
+    const c = countDuration([sub("Engineering Mathematics"), sub("Engineering Drawing")], { texts: [text] });
+    assert.equal(c.countedYears, 4);
+    assert.equal(c.unit, "year");
+  });
+
+  it("leaves a running semester number as printed", () => {
+    const text = ["Year 2", "SEM : 3", "3130001 Heat Transfer 3 AA", "SEM : 4", "3140001 Fluid Mechanics 3 AA"].join("\n");
+    const labels = periodHeadingsOf(text).map((h) => h.label);
+    assert.deepEqual(labels, ["Year 2", "SEM : 3", "SEM : 4"]);
+  });
 });
 
 describe("duration counts the span studied", () => {
