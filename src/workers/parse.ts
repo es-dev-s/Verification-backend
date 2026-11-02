@@ -1,11 +1,15 @@
 import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 import { LATERAL_FIELD, priorStudyDocumentIds } from "../assess/lateralEntry.js";
+import { generateJsonGroq, loadGroqKeys } from "../lib/groqClient.js";
 import { acquireParseSlot } from "../lib/rateLimit.js";
+import {
+  degreeReaderWindow,
+  fillEmptyEducationFields,
+} from "../parse/degreeReaderText.js";
 import {
   generateJsonGroqSplit,
   mergeCvEducationParts,
-  mergeEducationMultiParts,
   mergeExperienceParts,
 } from "../parse/groqFormParse.js";
 import {
@@ -196,7 +200,7 @@ export async function parseEducation(
       return {
         documentId: doc.id,
         documentType: doc.type as DocumentTypeLabel,
-        text: text.slice(0, 8_000),
+        text,
       };
     })
     .filter((d): d is NonNullable<typeof d> => d != null);
@@ -207,26 +211,37 @@ export async function parseEducation(
   let geminiMeta: { keyUsed?: string; modelUsed?: string } = {};
   let cvGeminiRaw: unknown = null;
 
-  // Transcript / certificate for this level — Groq split across keys
+  // Transcript / certificate — one Groq call on the opening and closing pages.
+  // Subject lines stay on the parallel multi-key extract.
   if (labeled.length) {
     await acquireParseSlot(config.parseRpm);
     const bodyText = labeled
       .map(
         (d) =>
-          `=== SOURCE documentId=${d.documentId} documentType=${d.documentType} ===\n${d.text}`,
+          `=== SOURCE documentId=${d.documentId} documentType=${d.documentType} ===\n${degreeReaderWindow(d.text)}`,
       )
       .join("\n\n");
-    const header = `Target degreeLevel=${degreeLevel}. Extract only fields for this level.`;
+    const header =
+      `Target degreeLevel=${degreeLevel}. Extract only fields for this level. ` +
+      `Priority fields: degreeTitle and institution, copied from the printed award and the issuing body. ` +
+      `Each source below is the opening and the closing of that file. ` +
+      `The unit list in the middle is omitted. A unit line is not a degree title.`;
 
     try {
-      const out = await generateJsonGroqSplit({
-        bodyText,
-        header,
-        systemPrompt: educationMultiSystemPrompt(),
-        responseSchema: educationMultiExtractSchema,
-        mergeParts: mergeEducationMultiParts,
-        maxTokens: 2048,
-      });
+      const keys = loadGroqKeys();
+      const apiKey = keys[0];
+      if (!apiKey) {
+        throw new Error("Groq is not configured (set GROQ_API_KEY / GROQ_API_KEY_1..N)");
+      }
+      const out = await generateJsonGroq(
+        `${header}\n\n${bodyText}`,
+        educationMultiSystemPrompt(),
+        {
+          apiKey,
+          maxTokens: 2048,
+          responseSchema: educationMultiExtractSchema,
+        },
+      );
       data = out.data;
       geminiMeta = { keyUsed: out.keyUsed, modelUsed: out.modelUsed };
     } catch (err) {
@@ -248,20 +263,12 @@ export async function parseEducation(
 
     sources = labeled.map((d) => {
       const raw = byId.get(d.documentId);
-      if (!raw) {
-        return {
-          documentId: d.documentId,
-          documentType: d.documentType,
-          extract: emptyExtract(),
-          degreeLevel,
-        };
-      }
-      const parsed = educationExtractSchema.safeParse(raw);
-      const extract = parsed.success ? parsed.data : emptyExtract();
+      const parsed = raw ? educationExtractSchema.safeParse(raw) : null;
+      const extract = parsed?.success ? parsed.data : emptyExtract();
       return {
         documentId: d.documentId,
         documentType: d.documentType,
-        extract: sanitizeEducationExtract(extract),
+        extract: fillEmptyEducationFields(sanitizeEducationExtract(extract), d.text),
         degreeLevel,
       };
     });

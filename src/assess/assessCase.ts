@@ -88,6 +88,12 @@ import {
   type QualificationCheckResult,
   type ScoreResult,
 } from "./score.js";
+import {
+  hasIct60220,
+  isTelecomAnzsco,
+  scoreTelecomGroup,
+  type TelecomSuggestionStatus,
+} from "./telecomGroup.js";
 import { hasUnitCodes, scoreVocational, type VocationalScore } from "./vocational.js";
 
 export type AssessCaseOpts = {
@@ -145,6 +151,15 @@ export type ScoredOccupation = {
   excludeDiplomaRows?: boolean;
   /** Earlier-study rows (lateral entry Route 3) added as Foundational matches. */
   priorStudyRows?: ExtractedSubjectRow[];
+  /**
+   * Telecommunications group rank. Lower sorts first. Equal values stay
+   * joint: nothing after this key (confidence, title) is allowed to split them.
+   */
+  telecomOrder?: number;
+  /** Card label for the telecommunications group (Recommended / Eligible / Rejected / Review). */
+  suggestionStatus?: TelecomSuggestionStatus;
+  /** Keep the telecommunications score when a work-experience judgement is applied. */
+  lockScore?: boolean;
 };
 
 /** Inputs shared by every occupation scored for one case. */
@@ -832,6 +847,16 @@ export function scoreRoutedOccupations(
 
   const target = ctx.occupationId?.trim();
   if (target) {
+    if (isTelecomAnzsco(target) && hasIct60220(ctx.qualifications, ctx.transcriptTexts)) {
+      const wanted = target === "telecommunications-network-planner" ? "313213" : target.replace(/\s+/g, "");
+      const card = scoreTelecomGroup(extracted, ctx.transcriptTexts ?? []).find(
+        (c) => c.rubric.anzscoCode === wanted,
+      );
+      if (card) {
+        out.push({ ...telecomOccupation(card, ctx), track: "engineering_associate" });
+      }
+      return { scored: out, gate };
+    }
     const vocTarget = vocational.find((o) => o.id === target || o.anzsco === target);
     if (vocTarget) {
       if (vocTarget.coreUnits.units.some((u) => u.code)) {
@@ -872,6 +897,15 @@ export function scoreRoutedOccupations(
     });
   }
   if (priority.has("engineering_associate")) {
+    if (hasIct60220(ctx.qualifications, ctx.transcriptTexts)) {
+      for (const card of scoreTelecomGroup(extracted, ctx.transcriptTexts ?? [])) {
+        out.push({
+          ...telecomOccupation(card, ctx),
+          track: "engineering_associate",
+          trackPriority: priority.get("engineering_associate"),
+        });
+      }
+    }
     const transcriptHasUnitCodes = hasUnitCodes(extracted, ctx.transcriptTexts);
     for (const occ of vocational) {
       if (!occ.scoringEnabled) continue;
@@ -1163,6 +1197,19 @@ function applyWorkExperienceJudgements(
     );
     const related = Boolean(judgement?.related);
 
+    if (occ.lockScore) {
+      occ.workExperienceBoost = false;
+      occ.confidenceScoreBefore = before;
+      occ.workExperienceAnalysis = {
+        related,
+        matchedJobs: related ? judgement?.matchedJobs ?? [] : [],
+        analysis: related ? judgement?.analysis ?? "" : "",
+        confidenceScoreBefore: before,
+        confidenceScoreAfter: before,
+      };
+      continue;
+    }
+
     if (occ.rescoreVocational) {
       occ.workExperienceBoost = related;
       const v = occ.rescoreVocational(related);
@@ -1331,6 +1378,12 @@ function etOwnScore(...lists: ScoredOccupation[][]): number | null {
 
 /** Prefer recommended occupations, then Gate 1 track priority, then higher numeric confidence, then coverage. */
 function compareScoredOccupations(a: ScoredOccupation, b: ScoredOccupation): number {
+  if (a.telecomOrder != null || b.telecomOrder != null) {
+    if (a.telecomOrder == null) return 1;
+    if (b.telecomOrder == null) return -1;
+    if (a.telecomOrder !== b.telecomOrder) return a.telecomOrder - b.telecomOrder;
+    return 0;
+  }
   if (a.scored.recommended !== b.scored.recommended) {
     return a.scored.recommended ? -1 : 1;
   }
@@ -1615,6 +1668,7 @@ function buildCandidate(
     vocational?: VocationalAssessmentDetail | null;
     finalProject?: FinalProjectEvidence | null;
     track?: Gate1TrackId;
+    suggestionStatus?: TelecomSuggestionStatus;
   },
 ): AnzscoCandidate {
   const vocational = occ?.vocational ?? null;
@@ -1649,6 +1703,30 @@ function buildCandidate(
     vocational,
     finalProjectTitle: occ?.finalProject?.title ?? null,
     ...(occ?.track ? { track: occ.track } : {}),
+    ...(occ?.suggestionStatus ? { suggestionStatus: occ.suggestionStatus } : {}),
+  };
+}
+
+function telecomOccupation(
+  card: ReturnType<typeof scoreTelecomGroup>[number],
+  ctx: ScoringContext,
+): ScoredOccupation {
+  return {
+    rubric: card.rubric,
+    scored: card.scored,
+    matches: card.matches,
+    unmatched: card.unmatched,
+    qualificationsUsed: ["advanced_diploma"],
+    mastersFallbackUsed: false,
+    poolKind: "diploma",
+    qualificationCheck: { capAtConditional: false, notes: card.scored.qualificationNotes },
+    poolRows: [],
+    workExperienceBoost: ctx.workExperienceBoost,
+    confidenceScoreBefore: card.scored.confidenceScore,
+    workExperienceAnalysis: null,
+    telecomOrder: card.order,
+    suggestionStatus: card.status,
+    lockScore: true,
   };
 }
 

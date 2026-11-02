@@ -268,28 +268,28 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
     assert.equal(g.qualificationUsed, "Bachelor of Engineering (Civil)");
   });
 
-  it("3-year engineering bachelor + separate master → manual review (not Technologist)", () => {
+  it("3-year engineering bachelor + separate master opens Technologist", () => {
     const q: QualificationInfo[] = [
       { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", countedYearsOverride: 3 },
       { level: "master", title: "Master of Engineering (Mechanical)", countedYearsOverride: 2 },
     ];
     const g = gate(q, [...engRows(), ...engRows("master")]);
-    assert.equal(g.result, "manual_review");
-    assert.equal(g.rule, 2);
-    assert.ok(g.reason.includes(FLAG.bachelorPlusMaster), g.reason);
+    assert.equal(g.result, "open");
+    assert.equal(g.rule, 4);
+    assert.deepEqual(openIds(g), ["engineering_technologist:1"]);
     assert.equal(g.qualificationUsed, "Bachelor of Engineering (Mechanical)");
-    assertBlocked(g);
-    // Order of the qualifications on file does not matter.
     const r = gate([...q].reverse(), [...engRows(), ...engRows("master")]);
-    assert.equal(r.result, "manual_review");
-    assert.ok(r.reason.includes(FLAG.bachelorPlusMaster));
-    // Nothing is scored.
+    assert.equal(r.rule, 4);
     const res = assessExtractedSubjects([...engRows(), ...engRows("master")], { qualifications: q });
-    assert.equal(res.gate1?.result, "manual_review");
-    assert.deepEqual(res.candidates, []);
+    assert.equal(res.gate1?.result, "open");
+    assert.equal(res.gate1?.rule, 4);
+    assert.ok((res.candidates ?? []).length > 0);
+    for (const c of res.candidates ?? []) {
+      assert.equal(c.track, "engineering_technologist", c.anzscoCode);
+    }
   });
 
-  it("3-year bachelor + separate master: counted (not only stated) 3 years also goes to manual review", () => {
+  it("3-year bachelor + separate master: counted 3 years also opens Technologist", () => {
     const g = gate(
       [
         { level: "bachelor", title: "Bachelor of Engineering (Civil)" },
@@ -297,8 +297,9 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
       ],
       [...engWithSemesters(6), ...engRows("master")],
     );
-    assert.equal(g.result, "manual_review");
-    assert.ok(g.reason.includes(FLAG.bachelorPlusMaster), g.reason);
+    assert.equal(g.result, "open");
+    assert.equal(g.rule, 4);
+    assert.deepEqual(openIds(g), ["engineering_technologist:1"]);
   });
 
   it("3-year bachelor alone stays Technologist; 4-year bachelor + master stays rule 3", () => {
@@ -321,7 +322,17 @@ describe("Rule 3: engineering Bachelor / Honours / Master ≥ 4 years", () => {
     );
     assert.equal(g.result, "manual_review");
     assert.ok(g.reason.includes(FLAG.combined));
-    assert.ok(!g.reason.includes(FLAG.bachelorPlusMaster));
+  });
+
+  it("a title that is not clearly engineering still follows the level rules", () => {
+    const g = gate(
+      [{ level: "bachelor", title: "Bachelor of Science", countedYearsOverride: 4 }],
+      engRows(),
+    );
+    assert.equal(g.qualifications[0]!.engineering, "unclear");
+    assert.equal(g.result, "open");
+    assert.equal(g.rule, 3);
+    assert.deepEqual(openIds(g), ["professional_engineer:1", "engineering_technologist:2"]);
   });
 
   it("3-year bachelor + a clearly non-engineering master stays Technologist", () => {

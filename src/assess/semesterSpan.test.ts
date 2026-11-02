@@ -252,6 +252,20 @@ describe("semester headings", () => {
     assert.equal(c.unit, "year");
   });
 
+  it("a year printed past the start of the line beats a shorter semester count", () => {
+    const texts = [
+      "B.E. Mechanical 3rd Year | I SEMESTER\nMaths",
+      "B.E. Mechanical 3rd Year | II SEMESTER\nPhysics",
+      "B.E. Mechanical Year 3 | Semester 1\nThermo\nB.E. Mechanical Year 3 | Semester 2\nDesign",
+    ];
+    const c = countDuration(
+      [sub("Maths"), sub("Physics"), sub("Thermo"), sub("Design")],
+      { texts },
+    );
+    assert.equal(c.countedYears, 3);
+    assert.equal(c.unit, "year");
+  });
+
   it("leaves a running semester number as printed", () => {
     const text = ["Year 2", "SEM : 3", "3130001 Heat Transfer 3 AA", "SEM : 4", "3140001 Fluid Mechanics 3 AA"].join("\n");
     const labels = periodHeadingsOf(text).map((h) => h.label);

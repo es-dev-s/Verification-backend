@@ -565,11 +565,6 @@ const SEM_HEAD_RE = new RegExp(
   `^(?:sem(?:ester)?\\.?\\s*[-:#.]?\\s*(${HEAD_NUM})|(${HEAD_NUM})\\s*[-:#.]?\\s*sem(?:ester)?)\\b`,
   "i",
 );
-/** Year of study with a number beside it ("IV YEAR", "Year 4"). Not a calendar year. */
-const YEAR_HEAD_RE = new RegExp(
-  `^(?:(?:year|yr)(?:\\s+of\\s+study)?\\.?\\s*[-:#.]?\\s*(${HEAD_NUM})|(${HEAD_NUM})\\s*[-:#.]?\\s*(?:year|yr))\\b`,
-  "i",
-);
 const YEAR_OF_STUDY_RE = new RegExp(`\\byear\\s+of\\s+study\\s*[-:#.]?\\s*(${HEAD_NUM})\\b`, "gi");
 
 function studyYearToken(raw: string | undefined): number | null {
@@ -577,22 +572,35 @@ function studyYearToken(raw: string | undefined): number | null {
   return n != null && n >= 1 && n <= 7 ? n : null;
 }
 
-/** Highest year-of-study number printed as a heading ("IV YEAR" → 4). */
+/** Year of study anywhere in the text ("IV YEAR", "3rd Year", "Year of study: 3"). Not a calendar year. */
+const YEAR_ANY_RE = new RegExp(
+  `\\b(?:(?:year|yr)(?:\\s+of\\s+study)?\\.?\\s*[-:#.]?\\s*(${HEAD_NUM})|(${HEAD_NUM})\\s*[-:#.]?\\s*(?:year|yr))\\b`,
+  "gi",
+);
+
+/** Highest year-of-study number printed on the transcript ("IV YEAR" → 4, "3rd Year" mid-line → 3). */
 function maxStudyYear(text: string): number | null {
   const found: number[] = [];
-  for (const line of text.split("\n")) {
-    for (const cell of line.split("|")) {
-      const lead = cell.match(/^[\s*•·>#\-–—]*/)![0].length;
-      const m = cell.slice(lead).match(YEAR_HEAD_RE);
-      const n = studyYearToken(m?.[1] ?? m?.[2]);
-      if (n != null) found.push(n);
-    }
-  }
-  for (const m of text.matchAll(YEAR_OF_STUDY_RE)) {
-    const n = studyYearToken(m[1]);
+  const push = (raw: string | undefined) => {
+    const n = studyYearToken(raw);
     if (n != null) found.push(n);
-  }
+  };
+  YEAR_ANY_RE.lastIndex = 0;
+  for (const m of text.matchAll(YEAR_ANY_RE)) push(m[1] ?? m[2]);
+  YEAR_OF_STUDY_RE.lastIndex = 0;
+  for (const m of text.matchAll(YEAR_OF_STUDY_RE)) push(m[1]);
   return found.length ? Math.max(...found) : null;
+}
+
+/** Highest year of study printed on a subject row. A bare "Semester 5" does not count. */
+function maxRowStudyYear(rows: readonly ExtractedSubjectRow[]): number | null {
+  let max: number | null = null;
+  for (const row of rows) {
+    if (!mentionsYear(row.yearOrSemester)) continue;
+    const year = parseTerm(row.yearOrSemester)?.yearOfStudy ?? null;
+    if (year != null && (max == null || year > max)) max = year;
+  }
+  return max;
 }
 
 /**
@@ -617,10 +625,25 @@ function semesterHeadingCount(text: string): number {
   return n;
 }
 
+function yearDuration(year: number): Pick<
+  DurationCount,
+  "countedYears" | "unit" | "method" | "finalYear" | "span"
+> {
+  return {
+    countedYears: year,
+    unit: "year",
+    method: `year ${year} printed on the transcript`,
+    finalYear: year,
+    span: { unit: "year", first: year, last: year },
+  };
+}
+
 /**
- * Duration from the transcript text. A year-of-study number wins. Otherwise
- * each numbered semester heading counts as one semester (8 headings → 4 years).
- * Null when the text has neither.
+ * Duration from the transcript text. Numbered semester headings are one
+ * semester each (8 headings → 4 years). A printed year of study replaces that
+ * count when it is higher: three Year 3 transcripts whose semesters restart
+ * at 1 and 2 are 3 years, not 2. A lower year mention does not shorten a
+ * longer semester span. Null when the text has neither.
  */
 function durationFromHeadings(texts: readonly string[] | null | undefined): Pick<
   DurationCount,
@@ -629,23 +652,34 @@ function durationFromHeadings(texts: readonly string[] | null | undefined): Pick
   if (!texts?.some((t) => t?.trim())) return null;
   const blob = texts.filter(Boolean).join("\n");
   const year = maxStudyYear(blob);
-  if (year != null) {
-    return {
-      countedYears: year,
-      unit: "year",
-      method: `year ${year} printed on the transcript`,
-      finalYear: year,
-      span: { unit: "year", first: year, last: year },
-    };
-  }
   const headings = semesterHeadingCount(blob);
-  if (headings < 2) return null;
+  if (headings >= 2) {
+    const finalYear = Math.ceil(headings / 2);
+    if (year == null || year <= finalYear) {
+      return {
+        countedYears: roundHalf(headings / 2),
+        unit: "semester",
+        method: `${headings} semester headings on the transcript`,
+        finalYear,
+        span: { unit: "semester", first: 1, last: headings },
+      };
+    }
+  }
+  if (year != null) return yearDuration(year);
+  return null;
+}
+
+/** A printed year of study replaces a shorter semester count. A year span is left as counted. */
+function withHigherPrintedYear(count: DurationCount, printedYear: number | null): DurationCount {
+  if (printedYear == null || count.unit === "year") return count;
+  const ceiling = count.finalYear ?? count.countedYears ?? 0;
+  if (count.countedYears != null && printedYear <= ceiling) return count;
   return {
-    countedYears: roundHalf(headings / 2),
-    unit: "semester",
-    method: `${headings} semester headings on the transcript`,
-    finalYear: Math.ceil(headings / 2),
-    span: { unit: "semester", first: 1, last: headings },
+    ...count,
+    ...yearDuration(printedYear),
+    confidence: "high",
+    source: "terms",
+    creditConversion: null,
   };
 }
 
@@ -661,16 +695,24 @@ export function countDuration(
 ): DurationCount {
   const byTerms = countFromTerms(rows);
   const headed = durationFromHeadings(ctx.texts);
+  const printedYear = Math.max(
+    maxStudyYear((ctx.texts ?? []).filter(Boolean).join("\n")) ?? 0,
+    maxRowStudyYear(rows) ?? 0,
+  ) || null;
   if (headed) {
-    return {
-      ...byTerms,
-      ...headed,
-      confidence: "high",
-      source: "terms",
-      creditConversion: null,
-    };
+    const counted = withHigherPrintedYear(
+      {
+        ...byTerms,
+        ...headed,
+        confidence: "high",
+        source: "terms",
+        creditConversion: null,
+      },
+      printedYear,
+    );
+    return counted;
   }
-  if (isReliableCount(byTerms)) return byTerms;
+  if (isReliableCount(byTerms)) return withHigherPrintedYear(byTerms, printedYear);
   const credits = ctx.creditTotalOverride ?? byTerms.creditTotal;
   const conversion = creditsToYears(credits, detectCreditSystem(rows, ctx));
   if (!conversion) return byTerms;
@@ -981,7 +1023,7 @@ export function decideEngineering(input: {
     decision: "unclear",
     reason,
     capped: false,
-    note: `Engineering or not: unclear (${reason}), assessor to review`,
+    note: null,
   };
 }
 

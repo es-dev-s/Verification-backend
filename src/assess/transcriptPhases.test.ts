@@ -86,6 +86,16 @@ describe("Phase 1: award level and field of study", () => {
     assert.equal(fieldOfStudyFromTitle(null), null);
   });
 
+  it("reads the field from a branch line when the title has no specialisation", () => {
+    const d = deriveAwardDetails({
+      degreeLevel: "bachelor",
+      title: "Bachelor of Science",
+      texts: ["Name: A. Student\nBranch: Mechanical Engineering\nSemester 1"],
+    });
+    assert.equal(d.awardLevel, "bachelor");
+    assert.equal(d.fieldOfStudy, "Mechanical Engineering");
+  });
+
   it("parses stored award values", () => {
     assert.equal(parseAwardLevel("diploma"), "diploma");
     assert.equal(parseAwardLevel("unknown"), null);

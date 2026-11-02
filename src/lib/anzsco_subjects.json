@@ -6793,8 +6793,8 @@
     "title": "Telecommunications Network Planner",
     "sourceSheet": "Telecom Network Planner",
     "groups": {
-      "units_core": {
-        "categoryLabel": "CORE UNITS (fixed unit codes - expected on every genuine transcript)",
+      "units_foundational": {
+        "categoryLabel": "Foundational Units (Mandatory)",
         "subjects": [
           {
             "name": "BSBCRT611 - Apply critical thinking for complex problem solving",
@@ -6817,6 +6817,15 @@
             "variants": []
           },
           {
+            "name": "ICTSAD609 - Plan and monitor business analysis activities in an ICT environment",
+            "variants": []
+          }
+        ]
+      },
+      "units_core": {
+        "categoryLabel": "Core Units - Telecommunications network engineering specialisation",
+        "subjects": [
+          {
             "name": "ICTNPL413 - Evaluate networking regulations and legislation for the telecommunications industry",
             "variants": []
           },
@@ -6826,10 +6835,6 @@
           },
           {
             "name": "ICTPMG613 - Manage ICT project planning",
-            "variants": []
-          },
-          {
-            "name": "ICTSAD609 - Plan and monitor business analysis activities in an ICT environment",
             "variants": []
           },
           {
@@ -6898,6 +6903,406 @@
               "ICTNPL412 Apply business acumen to network planning"
             ]
           },
+          {
+            "name": "Others",
+            "variants": []
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "313214",
+    "title": "Telecommunications Technical Officer or Technologist",
+    "sourceSheet": "Telecom Technical Officer",
+    "groups": {
+      "units_foundational": {
+        "categoryLabel": "Foundational Units (Mandatory)",
+        "subjects": [
+          {
+            "name": "BSBCRT611 - Apply critical thinking for complex problem solving",
+            "variants": []
+          },
+          {
+            "name": "BSBTWK502 - Manage team effectiveness",
+            "variants": []
+          },
+          {
+            "name": "BSBXCS402 - Promote workplace cyber security awareness and best practices",
+            "variants": []
+          },
+          {
+            "name": "ICTICT608 - Interact with clients on a business level",
+            "variants": []
+          },
+          {
+            "name": "ICTICT618 - Manage IP, ethics and privacy in ICT environments",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD609 - Plan and monitor business analysis activities in an ICT environment",
+            "variants": []
+          }
+        ]
+      },
+      "group_a": {
+        "categoryLabel": "Advanced data management information specialisation",
+        "subjects": [
+          {
+            "name": "ICTDBS604 - Build data warehouses",
+            "variants": []
+          },
+          {
+            "name": "ICTDBS605 - Develop knowledge management strategies",
+            "variants": []
+          },
+          {
+            "name": "ICTDBS606 - Determine database functionality and scalability",
+            "variants": []
+          },
+          {
+            "name": "ICTICT523 - Gather data to identify business requirements",
+            "variants": []
+          }
+        ]
+      },
+      "group_b": {
+        "categoryLabel": "Cyber security specialisation",
+        "subjects": [
+          {
+            "name": "ICTNWK546 - Manage network security",
+            "variants": []
+          },
+          {
+            "name": "ICTNWK537 - Implement secure encryption technologies",
+            "variants": []
+          },
+          {
+            "name": "ICTCYS608 - Perform cyber security risk assessments",
+            "variants": []
+          },
+          {
+            "name": "ICTCYS604 - Implement best practices for identity management",
+            "variants": []
+          },
+          {
+            "name": "ICTCYS612 - Design and implement virtualised cyber security infrastructure for organisations",
+            "variants": []
+          },
+          {
+            "name": "ICTCYS606 - Evaluate an organisation's compliance with cyber security standards and law",
+            "variants": []
+          }
+        ]
+      },
+      "group_c": {
+        "categoryLabel": "Full stack web development specialisation",
+        "subjects": [
+          {
+            "name": "ICTICT530 - Design user experience solutions",
+            "variants": []
+          },
+          {
+            "name": "ICTPRG535 - Build advanced user interfaces",
+            "variants": []
+          },
+          {
+            "name": "ICTPRG553 - Create and develop REST APIs",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD612 - Implement and maintain uses of containerisation",
+            "variants": []
+          }
+        ]
+      },
+      "group_d": {
+        "categoryLabel": "Further programming specialisation",
+        "subjects": [
+          {
+            "name": "ICTPRG537 - Implement security for applications",
+            "variants": []
+          },
+          {
+            "name": "ICTPRG547 - Apply advanced programming skills in another language",
+            "variants": []
+          },
+          {
+            "name": "ICTPRG554 - Manage data persistence using noSQL data stores",
+            "variants": []
+          }
+        ]
+      },
+      "group_e": {
+        "categoryLabel": "IT Strategy and organisational development specialisation",
+        "subjects": [
+          {
+            "name": "ICTICT611 - Develop ICT strategic business plans",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD604 - Manage and communicate ICT solutions",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD608 - Perform ICT-focused enterprise analysis",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD611 - Manage assessment and validation of ICT solutions",
+            "variants": []
+          }
+        ]
+      },
+      "group_f": {
+        "categoryLabel": "Systems development and analysis specialisation",
+        "subjects": [
+          {
+            "name": "ICTPRG605 - Manage development of technical solutions from business specifications",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD610 - Analyse stakeholder requirements",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD612 - Implement and maintain uses of containerisation",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD613 - Install and configure container orchestration services",
+            "variants": []
+          }
+        ]
+      },
+      "group_g": {
+        "categoryLabel": "Telecommunications network engineering specialisation",
+        "subjects": [
+          {
+            "name": "ICTNPL413 - Evaluate networking regulations and legislation for the telecommunications industry",
+            "variants": []
+          },
+          {
+            "name": "ICTNWK612 - Plan and manage troubleshooting advanced integrated IP networks",
+            "variants": []
+          },
+          {
+            "name": "ICTPMG613 - Manage ICT project planning",
+            "variants": []
+          },
+          {
+            "name": "ICTTEN615 - Manage network traffic",
+            "variants": []
+          },
+          {
+            "name": "ICTTEN622 - Produce ICT network architecture designs",
+            "variants": []
+          }
+        ]
+      },
+      "units_optional": {
+        "categoryLabel": "OTHERS",
+        "subjects": [
+          {
+            "name": "Others",
+            "variants": []
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "313212",
+    "title": "Telecommunication Field Engineer",
+    "sourceSheet": "Telecom Field Engineer",
+    "groups": {
+      "units_foundational": {
+        "categoryLabel": "Foundational Units (Mandatory)",
+        "subjects": [
+          {
+            "name": "BSBCRT611 - Apply critical thinking for complex problem solving",
+            "variants": []
+          },
+          {
+            "name": "BSBTWK502 - Manage team effectiveness",
+            "variants": []
+          },
+          {
+            "name": "BSBXCS402 - Promote workplace cyber security awareness and best practices",
+            "variants": []
+          },
+          {
+            "name": "ICTICT608 - Interact with clients on a business level",
+            "variants": []
+          },
+          {
+            "name": "ICTICT618 - Manage IP, ethics and privacy in ICT environments",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD609 - Plan and monitor business analysis activities in an ICT environment",
+            "variants": []
+          }
+        ]
+      },
+      "group_a": {
+        "categoryLabel": "Advanced data management information specialisation",
+        "subjects": [
+          {
+            "name": "ICTDBS604 - Build data warehouses",
+            "variants": []
+          },
+          {
+            "name": "ICTDBS605 - Develop knowledge management strategies",
+            "variants": []
+          },
+          {
+            "name": "ICTDBS606 - Determine database functionality and scalability",
+            "variants": []
+          },
+          {
+            "name": "ICTICT523 - Gather data to identify business requirements",
+            "variants": []
+          }
+        ]
+      },
+      "group_b": {
+        "categoryLabel": "Cyber security specialisation",
+        "subjects": [
+          {
+            "name": "ICTNWK546 - Manage network security",
+            "variants": []
+          },
+          {
+            "name": "ICTNWK537 - Implement secure encryption technologies",
+            "variants": []
+          },
+          {
+            "name": "ICTCYS608 - Perform cyber security risk assessments",
+            "variants": []
+          },
+          {
+            "name": "ICTCYS604 - Implement best practices for identity management",
+            "variants": []
+          },
+          {
+            "name": "ICTCYS612 - Design and implement virtualised cyber security infrastructure for organisations",
+            "variants": []
+          },
+          {
+            "name": "ICTCYS606 - Evaluate an organisation's compliance with cyber security standards and law",
+            "variants": []
+          }
+        ]
+      },
+      "group_c": {
+        "categoryLabel": "Full stack web development specialisation",
+        "subjects": [
+          {
+            "name": "ICTICT530 - Design user experience solutions",
+            "variants": []
+          },
+          {
+            "name": "ICTPRG535 - Build advanced user interfaces",
+            "variants": []
+          },
+          {
+            "name": "ICTPRG553 - Create and develop REST APIs",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD612 - Implement and maintain uses of containerisation",
+            "variants": []
+          }
+        ]
+      },
+      "group_d": {
+        "categoryLabel": "Further programming specialisation",
+        "subjects": [
+          {
+            "name": "ICTPRG537 - Implement security for applications",
+            "variants": []
+          },
+          {
+            "name": "ICTPRG547 - Apply advanced programming skills in another language",
+            "variants": []
+          },
+          {
+            "name": "ICTPRG554 - Manage data persistence using noSQL data stores",
+            "variants": []
+          }
+        ]
+      },
+      "group_e": {
+        "categoryLabel": "IT Strategy and organisational development specialisation",
+        "subjects": [
+          {
+            "name": "ICTICT611 - Develop ICT strategic business plans",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD604 - Manage and communicate ICT solutions",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD608 - Perform ICT-focused enterprise analysis",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD611 - Manage assessment and validation of ICT solutions",
+            "variants": []
+          }
+        ]
+      },
+      "group_f": {
+        "categoryLabel": "Systems development and analysis specialisation",
+        "subjects": [
+          {
+            "name": "ICTPRG605 - Manage development of technical solutions from business specifications",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD610 - Analyse stakeholder requirements",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD612 - Implement and maintain uses of containerisation",
+            "variants": []
+          },
+          {
+            "name": "ICTSAD613 - Install and configure container orchestration services",
+            "variants": []
+          }
+        ]
+      },
+      "group_g": {
+        "categoryLabel": "Telecommunications network engineering specialisation",
+        "subjects": [
+          {
+            "name": "ICTNPL413 - Evaluate networking regulations and legislation for the telecommunications industry",
+            "variants": []
+          },
+          {
+            "name": "ICTNWK612 - Plan and manage troubleshooting advanced integrated IP networks",
+            "variants": []
+          },
+          {
+            "name": "ICTPMG613 - Manage ICT project planning",
+            "variants": []
+          },
+          {
+            "name": "ICTTEN615 - Manage network traffic",
+            "variants": []
+          },
+          {
+            "name": "ICTTEN622 - Produce ICT network architecture designs",
+            "variants": []
+          }
+        ]
+      },
+      "units_optional": {
+        "categoryLabel": "OTHERS",
+        "subjects": [
           {
             "name": "Others",
             "variants": []

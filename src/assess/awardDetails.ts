@@ -1,8 +1,9 @@
 /**
  * Award details for Upload & details (Phase 1): award level (with AQF level)
- * and field of study, derived from the extracted degree title, the DB degree
- * level and any qualification code in the documents. Deterministic: no extra
- * LLM call, so the education read prompt and its cache are unchanged.
+ * and field of study. Award level comes from the extracted degree title.
+ * Field of study comes from that title, or from a Branch / Major /
+ * Specialisation / Stream line when the title has no specialisation.
+ * Deterministic: no extra LLM call.
  */
 import { prisma } from "../lib/prisma.js";
 import { AQF, AWARD_LABELS, detectAwardLevel } from "./gate1.js";
@@ -47,8 +48,33 @@ export function deriveAwardDetails(input: {
     awardLevel: award,
     aqfLevel,
     awardLabel: AWARD_LABELS[award],
-    fieldOfStudy: fieldOfStudyFromTitle(input.title),
+    fieldOfStudy:
+      fieldOfStudyFromTitle(input.title) ?? fieldOfStudyFromTexts(input.texts ?? []),
   };
+}
+
+const FIELD_LINE =
+  /(?:^|\n)\s*(?:Branch|Major|Specialisation|Specialization|Stream)\s*[:\-]\s*([^\n\r]+)/i;
+
+/** Field printed beside the award, when the degree title itself has no specialisation. */
+export function fieldOfStudyFromTexts(texts: string[]): string | null {
+  for (const text of texts) {
+    const match = text.match(FIELD_LINE);
+    const value = cleanFieldLine(match?.[1]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function cleanFieldLine(raw: string | undefined): string | null {
+  const value = (raw ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/[.,;:]+$/g, "")
+    .trim();
+  if (value.length < 3 || value.length > 80) return null;
+  if (AWARD_WORDS.test(value)) return null;
+  if (/\b(?:bachelor|master|diploma|certificate|doctorate|doctor)\b/i.test(value)) return null;
+  return value;
 }
 
 const AWARD_WORDS =

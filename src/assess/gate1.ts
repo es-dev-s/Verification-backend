@@ -8,9 +8,11 @@
  *     3-year degree from a programme / country that may be recognised higher
  *     (config hook); a combined degree (3+2); a non-engineering bachelor
  *     followed by an engineering master; an engineering master (or doctorate)
- *     with no bachelor on file; a 3-year engineering bachelor with a separate
- *     master qualification on file; part-time, bridging or credit-transfer
+ *     with no bachelor on file; part-time, bridging or credit-transfer
  *     study; no duration available (nothing counted and nothing entered).
+ *     A qualification that is not clearly engineering still follows these
+ *     level and duration rules. A 3-year bachelor with a separate master
+ *     opens Engineering Technologist.
  *  3. Engineering Bachelor / Honours / Master counted ≥ 4 years → Professional
  *     Engineer (priority 1) + Engineering Technologist (priority 2).
  *  4. Engineering Bachelor counted 3 to < 4 years → Engineering Technologist only.
@@ -39,6 +41,7 @@ import {
   isReliableCount,
 } from "./qualificationEvidence.js";
 import { classifyQualification, findQualificationCodes } from "./route.js";
+import { hasIct60220, TELECOM_ANZSCO_CODES } from "./telecomGroup.js";
 import type {
   EngineeringDecision,
   ExtractedSubjectRow,
@@ -192,7 +195,6 @@ export const FLAG = {
   bridging: "bridging / lateral-entry study",
   creditTransfer: "credit transfer / advanced standing",
   recognisedHigher: "3-year degree that may be recognised at a higher level",
-  bachelorPlusMaster: "3-year bachelor with a separate master – needs assessor review",
 } as const;
 
 const COMBINED_TITLE_RE =
@@ -483,7 +485,9 @@ function trackNotes(track: Gate1TrackId, input: Gate1Input): string[] {
   const notes: string[] = [];
   const rubricCodes = new Set(input.rubricCodes ?? []);
   const vocational = input.vocational ?? [];
+  const telecomApplies = hasIct60220(input.qualifications);
   for (const o of trackOccupations(track)) {
+    if (telecomApplies && (TELECOM_ANZSCO_CODES as readonly string[]).includes(o.anzscoCode)) continue;
     const voc = vocational.find((v) => v.anzsco === o.anzscoCode);
     if (rubricCodes.has(o.anzscoCode)) continue;
     if (voc?.scoringEnabled) continue;
@@ -598,7 +602,6 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
   }
 
   // ---- Rule 1: not eligible ----------------------------------------------
-  const engYes = evals.filter((e) => e.engineering.decision === "yes");
   if (evals.every((e) => e.engineering.decision === "no")) {
     const e = evals[0];
     return finish(
@@ -617,14 +620,17 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
       knownAwards[0],
     );
   }
+  // Not a clear "no": level and duration still decide, including when the
+  // title and subjects are not clear enough to call it engineering.
+  const proceeding = evals.filter((e) => e.engineering.decision !== "no");
   // Postgraduate awards are never failed on length here (decision b handles them).
   if (
-    engYes.length &&
-    engYes.every(
+    proceeding.length &&
+    proceeding.every(
       (e) => !isPostgraduate(e.award) && e.used != null && e.used < evidenceConfig.gate.notEligibleBelowYears - EPS,
     )
   ) {
-    const top = [...engYes].sort((a, b) => (b.used ?? 0) - (a.used ?? 0))[0];
+    const top = [...proceeding].sort((a, b) => (b.used ?? 0) - (a.used ?? 0))[0];
     return finish(
       "not_eligible",
       1,
@@ -634,7 +640,6 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
   }
 
   // ---- Rule 2 (case-level): unusual study patterns -------------------------
-  const considered = evals.filter((e) => e.engineering.decision !== "no");
   const engMaster = evals.find((e) => (e.award === "master" || e.award === "doctorate") && e.engineering.decision === "yes");
   const nonEngBachelor = evals.find((e) => (e.award === "bachelor" || e.award === "honours") && e.engineering.decision === "no");
   if (engMaster && nonEngBachelor) {
@@ -646,7 +651,7 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
     );
   }
   for (const flag of [FLAG.combined, FLAG.partTime, FLAG.bridging, FLAG.creditTransfer]) {
-    const hit = considered.find(
+    const hit = proceeding.find(
       (e) =>
         e.flags.includes(flag) &&
         !(
@@ -660,26 +665,11 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
     }
   }
 
-  // ---- Highest-level engineering qualification decides ---------------------
-  const candidates = [...engYes].sort((a, b) => (b.aqf ?? 0) - (a.aqf ?? 0));
+  // ---- Highest-level qualification that is not clearly non-engineering -----
+  const candidates = [...proceeding].sort((a, b) => (b.aqf ?? 0) - (a.aqf ?? 0));
   for (const e of candidates) {
     const o = outcomeFor(e, evals, Boolean(input.lateralEntryConfirmed));
     outcomes.set(e, o);
-    if (o.kind === "open" && o.rule === 4) {
-      // A 3-year engineering bachelor plus a SEPARATE master qualification
-      // (two qualifications on file, not one combined 3+2 title, which the
-      // combined flag above already handles) → manual review, not Technologist.
-      const master = separateMasterFor(e, evals);
-      if (master) {
-        outcomes.set(e, { kind: "manual", reason: FLAG.bachelorPlusMaster });
-        return finish(
-          "manual_review",
-          2,
-          `Manual review needed: ${FLAG.bachelorPlusMaster} ("${label(e)}" and "${label(master)}").`,
-          e,
-        );
-      }
-    }
     if (o.kind === "open") {
       const reason =
         o.rule === 3
@@ -698,32 +688,7 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
     return finish("not_eligible", 1, `Not eligible: ${outcomes.get(failed)!.reason}`, failed);
   }
 
-  // Only unclear (or skipped) qualifications left.
-  const unclear = evals.find((e) => e.engineering.decision === "unclear");
-  if (unclear) {
-    return finish(
-      "manual_review",
-      2,
-      `Manual review needed: could not confirm that "${label(unclear)}" is an engineering qualification (${unclear.engineering.reason}).`,
-      unclear,
-    );
-  }
   return finish("manual_review", 2, "Manual review needed: no rule matched this qualification set.", null);
-}
-
-/**
- * A master / doctorate held as a separate qualification next to a bachelor
- * (not clearly non-engineering), or null.
- */
-function separateMasterFor(bachelor: QualEval, all: readonly QualEval[]): QualEval | null {
-  return (
-    all.find(
-      (o) =>
-        o !== bachelor &&
-        (o.award === "master" || o.award === "doctorate") &&
-        o.engineering.decision !== "no",
-    ) ?? null
-  );
 }
 
 function outcomeText(e: QualEval, o: Outcome | undefined): string {

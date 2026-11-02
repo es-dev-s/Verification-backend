@@ -366,7 +366,22 @@ function scoreDegree(s: string): number {
   return score;
 }
 
+/** "Institution:" / "Issued by:" style lines, including providers that are not a University. */
+function extractLabeledInstitution(text: string): string | null {
+  const labeled = text.match(
+    /(?:^|\n)\s*(?:Name\s+of\s+(?:the\s+)?(?:institution|provider|college|university)|Institution|University|College|Institute|Issued\s+by|Awarded\s+by|Provider|RTO|Registered\s+Training\s+Organi[sz]ation|Training\s+Organi[sz]ation)\s*[:\-]\s*([^\n\r]+)/i,
+  );
+  const value = cleanProgramField(labeled?.[1]);
+  if (!value || value.length < 4 || value.length > 100) return null;
+  if (JUNK_INSTITUTION.test(value)) return null;
+  if (/high\s+school|secondary|livestock|research\s+institute/i.test(value)) return null;
+  return value;
+}
+
 function extractInstitution(text: string): string | null {
+  const labeled = extractLabeledInstitution(text);
+  if (labeled) return labeled;
+
   const space = educationSearchText(text);
   const patterns: RegExp[] = [
     /\b((?:APJ|A\.P\.J\.)\s+Abdul\s+Kalam\s+Technological\s+University)/i,
