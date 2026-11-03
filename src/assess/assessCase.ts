@@ -282,7 +282,7 @@ export async function assessCase(
     ...(manualSelection ? { manualOccupation: manualSelection.occupationId } : {}),
     // lateralGate: bumped when the Gate 1 lateral-entry rules change, so saved
     // lateral cases re-score once (other cases keep their cache key).
-    ...(hasLateralState(lateralState) ? { lateralEntry: lateralHashOf(lateralState), lateralGate: 2 } : {}),
+    ...(hasLateralState(lateralState) ? { lateralEntry: lateralHashOf(lateralState), lateralGate: 3 } : {}),
     rubric: rubricFingerprint(),
     config: scoringConfigFingerprint(),
   });

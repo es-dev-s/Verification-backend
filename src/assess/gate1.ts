@@ -278,9 +278,11 @@ export type Gate1Input = {
    */
   lateralEntryDecided?: boolean;
   /**
-   * Lateral entry confirmed (Route 3: the applicant entered the bachelor after
-   * earlier study). A 2 to under 3-year engineering bachelor then opens the
-   * Technologist track instead of the top-up / bridging manual review.
+   * Lateral entry confirmed (Route 3: Yes, and the earlier-study transcript
+   * has been read). A 3 to under 4-year engineering bachelor then uses the
+   * 4-year gate (Professional Engineer first, Technologist second). A 2 to
+   * under 3-year bachelor opens the Technologist track instead of the
+   * top-up / bridging manual review.
    */
   lateralEntryConfirmed?: boolean;
 };
@@ -292,7 +294,8 @@ type QualEval = {
   engineering: EngineeringDecision;
   counted: number | null;
   used: number | null;
-  source: "counted" | "none";
+  /** "default": no duration found, Advanced Diploma default used (gate.advancedDiplomaDefaultYears). */
+  source: "counted" | "none" | "default";
   /** True when the counted duration was entered by the assessor. */
   manualCount: boolean;
   /** Flag text when the counted duration was converted from credits. */
@@ -333,6 +336,7 @@ export const RULE_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
 };
 
 function basisLabel(e: Pick<QualEval, "source" | "manualCount" | "creditConversion">): string {
+  if (e.source === "default") return "default: no duration found on the transcript";
   if (e.source !== "counted") return "no duration";
   if (e.manualCount) return "counted duration entered manually";
   return e.creditConversion ? "converted from credits" : "counted from the transcript";
@@ -388,21 +392,26 @@ function evaluateQualification(
   // details) replaces the transcript count.
   const manualCount = q.countedYearsOverride ?? null;
   const counted = manualCount ?? (isReliableCount(count) ? count.countedYears : null);
+  // Advanced Diploma with no duration at all: use the configured default.
+  const defaultYears =
+    counted == null && award === "advanced_diploma" ? evidenceConfig.gate.advancedDiplomaDefaultYears : null;
   return {
     q,
     award,
     aqf: aqfLevel,
     engineering,
     counted,
-    used: counted,
-    source: counted != null ? "counted" : "none",
+    used: counted ?? defaultYears,
+    source: counted != null ? "counted" : defaultYears != null ? "default" : "none",
     manualCount: manualCount != null,
     creditConversion:
       manualCount == null && counted != null ? count.creditConversion?.label ?? null : null,
     method:
       manualCount != null
         ? `entered manually (transcript count: ${count.countedYears != null ? yrs(count.countedYears) : "none"})`
-        : count.method,
+        : defaultYears != null
+          ? `${yrs(defaultYears)} (default: no duration found on the transcript)`
+          : count.method,
     flags: flagsFor(q, rows),
   };
 }
@@ -466,6 +475,22 @@ function outcomeFor(e: QualEval, all: readonly QualEval[], lateralEntryConfirmed
     };
   }
   if (e.award === "bachelor" || e.award === "honours") {
+    const confirmedBachelor =
+      lateralEntryConfirmed && (e.q.rawLevel ?? e.q.level) === "bachelor";
+    // A 3-year transcript after confirmed lateral entry (diploma uploaded and
+    // read) is the shortened part of a 4-year programme, so it uses that gate.
+    if (
+      confirmedBachelor &&
+      d >= g.technologistMinYears - EPS &&
+      d < g.professionalMinYears - EPS
+    ) {
+      return {
+        kind: "open",
+        rule: 3,
+        lateral: true,
+        reason: `"${name}" is an engineering ${AWARD_LABELS[e.award]} of ${yrs(d)} (${basis}) entered by confirmed lateral entry, so it is assessed on the 4-year gate.`,
+      };
+    }
     if (d >= g.technologistMinYears - EPS) {
       return {
         kind: "open",
@@ -473,7 +498,7 @@ function outcomeFor(e: QualEval, all: readonly QualEval[], lateralEntryConfirmed
         reason: `"${name}" is an engineering ${AWARD_LABELS[e.award]} of ${yrs(d)} (${basis}).`,
       };
     }
-    if (lateralEntryConfirmed && (e.q.rawLevel ?? e.q.level) === "bachelor") {
+    if (confirmedBachelor) {
       return {
         kind: "open",
         rule: 4,

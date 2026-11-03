@@ -618,7 +618,8 @@ export type Gate1Qualification = {
   countedYears: number | null;
   /** Duration Gate 1 used (same as countedYears). */
   durationYears: number | null;
-  durationSource: "counted" | "none";
+  /** "default": Advanced Diploma with no duration found, configured default used. */
+  durationSource: "counted" | "none" | "default";
   /** How the count was made (or why it could not be). */
   durationMethod: string;
   /**

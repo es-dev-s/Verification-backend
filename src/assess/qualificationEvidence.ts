@@ -73,10 +73,21 @@ function unitFor(word: string): TermUnit {
   return "semester";
 }
 
-/** Parse a printed year / semester ("Year 3 Sem 2", "Semester V", "Fall 2019"). Null when unknown. */
+/**
+ * "SE3" / "SE 3" is semester 3 (e.g. "Semester : SE3" grade sheets). A
+ * semester word before it is kept once ("Semester : SE3" → "semester : 3").
+ * Bare "S3" is not a semester. Input is lower-case.
+ */
+function withSeSemester(s: string): string {
+  return s
+    .replace(/\b(sem(?:ester)?\.?\s*[-:#.]?\s*)se\s?(\d{1,2})\b/g, "$1$2")
+    .replace(/\bse\s?(\d{1,2})\b/g, "semester $1");
+}
+
+/** Parse a printed year / semester ("Year 3 Sem 2", "Semester V", "SE3", "Fall 2019"). Null when unknown. */
 export function parseTerm(raw: string | null | undefined): TermInfo | null {
   if (!raw) return null;
-  const s = ` ${raw.toLowerCase().replace(/[_,;()]/g, " ").replace(/\s+/g, " ")} `;
+  const s = withSeSemester(` ${raw.toLowerCase().replace(/[_,;()]/g, " ").replace(/\s+/g, " ")} `);
 
   let yearOfStudy: number | null = null;
   let termNum: number | null = null;
@@ -182,7 +193,7 @@ export function withTermIndex<T extends ExtractedSubjectRow>(row: T): T {
 const H_TERM = "(?:semester|sem|trimester|term|quarter|qtr)";
 const H_YEAR = "(?:year|yr|level|part)";
 /** One period token ("SEM : 3", "Semester III", "3rd Semester", "Second Year"). */
-const H_ONE = `(?:${H_TERM}\\.?\\s*[-:#.]?\\s*${NUM}|${NUM}\\s*-?\\s*${H_TERM}|${H_YEAR}\\.?\\s*[-:#.]?\\s*${NUM}|${NUM}\\s*-?\\s*${H_YEAR})`;
+const H_ONE = `(?:${H_TERM}\\.?\\s*[-:#.]?\\s*se\\s?\\d{1,2}|${H_TERM}\\.?\\s*[-:#.]?\\s*${NUM}|${NUM}\\s*-?\\s*${H_TERM}|${H_YEAR}\\.?\\s*[-:#.]?\\s*${NUM}|${NUM}\\s*-?\\s*${H_YEAR})`;
 const ONE_RE = new RegExp(`^${H_ONE}\\b`, "i");
 /** A year and its semester printed in one heading ("Year 2 Semester 1"). */
 const FOLLOW_RE = new RegExp(`^[\\s,;:/–—-]+${H_ONE}\\b`, "i");
@@ -562,7 +573,7 @@ const HEAD_NUM =
   "\\d{1,2}(?:st|nd|rd|th)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|viii|vii|iii|ii|iv|vi|ix|i|v|x";
 /** Semester word with a number beside it ("I SEMESTER", "Semester 3", "2nd Semester"). */
 const SEM_HEAD_RE = new RegExp(
-  `^(?:sem(?:ester)?\\.?\\s*[-:#.]?\\s*(${HEAD_NUM})|(${HEAD_NUM})\\s*[-:#.]?\\s*sem(?:ester)?)\\b`,
+  `^(?:sem(?:ester)?\\.?\\s*[-:#.]?\\s*(?:se\\s?(?=\\d))?(${HEAD_NUM})|(${HEAD_NUM})\\s*[-:#.]?\\s*sem(?:ester)?)\\b`,
   "i",
 );
 const YEAR_OF_STUDY_RE = new RegExp(`\\byear\\s+of\\s+study\\s*[-:#.]?\\s*(${HEAD_NUM})\\b`, "gi");
@@ -688,10 +699,36 @@ function withHigherPrintedYear(count: DurationCount, printedYear: number | null)
  * printed on the transcript, otherwise the number of semester headings, then
  * the years / semesters on the subject rows; when those cannot be counted
  * reliably, the credit total (assessor value first) converted to years.
+ * A half year is then rounded up to the whole year (duration.roundHalfUp).
  */
 export function countDuration(
   rows: readonly ExtractedSubjectRow[],
   ctx: CreditContext = {},
+): DurationCount {
+  return roundedUpCount(countDurationUnrounded(rows, ctx));
+}
+
+/**
+ * Final step: a counted half year (3.5) becomes the next whole year (4) when
+ * evidenceConfig.duration.roundHalfUp is on. The raw count stays in the
+ * method text. Assessor entries never pass through here.
+ */
+export function roundedUpCount(count: DurationCount): DurationCount {
+  const raw = count.countedYears;
+  if (!evidenceConfig.duration.roundHalfUp || raw == null || Number.isInteger(raw)) return count;
+  const years = Math.ceil(raw);
+  const note = `${raw} years counted, rounded up to ${years}`;
+  return {
+    ...count,
+    countedYears: years,
+    method: count.method ? `${count.method}; ${note}` : note,
+    creditConversion: count.creditConversion ? { ...count.creditConversion, years } : count.creditConversion,
+  };
+}
+
+function countDurationUnrounded(
+  rows: readonly ExtractedSubjectRow[],
+  ctx: CreditContext,
 ): DurationCount {
   const byTerms = countFromTerms(rows);
   const headed = durationFromHeadings(ctx.texts);

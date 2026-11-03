@@ -21,6 +21,7 @@ import {
   parseAwardLevel,
 } from "./awardDetails.js";
 import { assessConfig } from "./config.js";
+import { evidenceConfig } from "./evidenceConfig.js";
 import {
   degreeLevelToQualification,
   extractSubjectsDetailed,
@@ -572,6 +573,8 @@ export type DurationCheckStatus =
   | "transcript"
   /** Converted from the credit total (no usable years / semesters). */
   | "credits"
+  /** Advanced Diploma with no duration found: the configured default (Gate 1 uses it too). */
+  | "default"
   /** Nothing counted or entered: the case goes to manual review. */
   | "missing";
 
@@ -615,8 +618,8 @@ export type QualificationTranscriptSummary = {
     finalProject: TranscriptFinalProject | null;
     engineeringShare: number | null;
   };
-  /** Duration the gate uses and where it comes from. */
-  basis: "counted" | "manual" | "none";
+  /** Duration the gate uses and where it comes from ("default": Advanced Diploma default). */
+  basis: "counted" | "manual" | "none" | "default";
   basisLabel: string;
   /**
    * Flag text when the counted duration was converted from the credit total
@@ -708,6 +711,9 @@ function durationCheckFor(
   if (basis === "manual") {
     return { status: "edited", ok: true, message: `${fmtYears(counted)}, entered by the assessor.` };
   }
+  if (basis === "default") {
+    return { status: "default", ok: true, message: `${fmtYears(counted)} (default: no duration found on the transcript).` };
+  }
   if (creditConversion) {
     return { status: "credits", ok: true, message: creditConversion };
   }
@@ -740,13 +746,20 @@ export function buildQualificationSummaries(
     const { award, aqfLevel } = awardLevelOf(q);
     const detected = awardLevelOf({ ...q, awardOverride: null });
     const entered = overrides.countedYears ?? q.countedYearsOverride ?? null;
-    const counted = entered ?? countedAuto;
+    // Advanced Diploma with no duration at all: the Gate 1 default (gate1.ts).
+    const defaultYears =
+      entered == null && countedAuto == null && award === "advanced_diploma"
+        ? evidenceConfig.gate.advancedDiplomaDefaultYears
+        : null;
+    const counted = entered ?? countedAuto ?? defaultYears;
     const manual = entered != null;
     const basis: QualificationTranscriptSummary["basis"] = manual
       ? "manual"
       : countedAuto != null
         ? "counted"
-        : "none";
+        : defaultYears != null
+          ? "default"
+          : "none";
     const creditConversion = basis === "counted" ? count.creditConversion?.label ?? null : null;
     const basisLabel =
       basis === "manual"
@@ -755,7 +768,9 @@ export function buildQualificationSummaries(
           ? count.creditConversion
             ? count.creditConversion.label
             : `Counted from the transcript (${count.method})`
-          : `No duration available: ${count.method}`;
+          : basis === "default"
+            ? `${fmtYears(counted!)} (default: no duration found on the transcript)`
+            : `No duration available: ${count.method}`;
     const finalProject: TranscriptFinalProject | null = overrides.finalProject
       ? { title: overrides.finalProject, term: null, inFinalYear: null }
       : project;

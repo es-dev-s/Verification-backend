@@ -18,6 +18,12 @@ export const evidenceConfig = {
      * associateMinYears and notEligibleBelowYears for advanced diplomas.
      */
     advancedDiplomaMinYears: 1,
+    /**
+     * Advanced Diploma only: duration (years) used when none is found (no
+     * assessor entry, no printed years / semesters, no credits), so it opens
+     * Engineering Associate (Rule 5) instead of manual review.
+     */
+    advancedDiplomaDefaultYears: 1,
     /** Below this (any other engineering qualification) → not eligible. */
     notEligibleBelowYears: 2,
     /**
@@ -39,6 +45,13 @@ export const evidenceConfig = {
     minTermCoverage: 0.5,
     /** Fewer rows with term info than this → not counted. */
     minTermRows: 3,
+    /**
+     * A counted half year (from periods, headings or credits) is rounded up to
+     * the next whole year: 2.5 → 3, 3.5 → 4. Applied once to the final count,
+     * so Gate 1, the tiles and lateral entry all see the whole number. A
+     * duration entered by the assessor is used as typed (not rounded).
+     */
+    roundHalfUp: true,
     /**
      * Credits → years, used only when the transcript prints no usable years /
      * semesters but does give credits (counted years = total credits ÷ credits

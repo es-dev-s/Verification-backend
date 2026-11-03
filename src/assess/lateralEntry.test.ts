@@ -416,11 +416,30 @@ describe("lateral entry: confirmed lateral entry in Gate 1", () => {
     assert.equal(track(g, "engineering_associate").open, false);
   });
 
+  it("a 3-year bachelor with confirmed lateral entry uses the 4-year gate", () => {
+    const plain = gate(3);
+    assert.equal(plain.rule, 4);
+    assert.equal(track(plain, "professional_engineer").open, false);
+    assert.equal(track(plain, "engineering_technologist").open, true);
+
+    for (const years of [3, 3.5]) {
+      const g = gate(years, { decided: true, confirmed: true });
+      assert.equal(g.result, "open");
+      assert.equal(g.rule, 3, String(years));
+      assert.ok(g.reason.includes("confirmed lateral entry"));
+      assert.equal(track(g, "professional_engineer").open, true);
+      assert.equal(track(g, "professional_engineer").priority, 1);
+      assert.equal(track(g, "engineering_technologist").open, true);
+      assert.equal(track(g, "engineering_technologist").priority, 2);
+      assert.equal(track(g, "engineering_associate").open, false);
+    }
+    // Yes without the earlier-study transcript is not Route 3, so it stays Technologist.
+    const decidedOnly = gate(3, { decided: true });
+    assert.equal(decidedOnly.rule, 4);
+  });
+
   it("other durations are unchanged by a confirmed lateral entry", () => {
     assert.equal(gate(1.5, { decided: true, confirmed: true }).result, "not_eligible");
-    const three = gate(3.5, { decided: true, confirmed: true });
-    assert.equal(three.result, "open");
-    assert.equal(track(three, "engineering_technologist").reason, "3-year engineering bachelor.");
     assert.equal(gate(4, { decided: true, confirmed: true }).rule, 3);
   });
 

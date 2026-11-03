@@ -481,7 +481,7 @@ type SummaryLike = {
   degreeLevel: string;
   award: Gate1AwardLevel;
   effective: { countedYears: number | null };
-  basis: "counted" | "manual" | "none";
+  basis: "counted" | "manual" | "none" | "default";
   basisLabel: string;
 };
 
@@ -627,7 +627,7 @@ export function lateralEntryDecided(view: LateralEntryView | null): boolean {
   return view?.route === 2 || view?.route === 3;
 }
 
-/** Lateral entry confirmed (Route 3): Gate 1 opens a 2 to under 3-year bachelor. */
+/** Lateral entry confirmed (Route 3): Gate 1 treats a 3-year bachelor as the 4-year gate, and opens a 2 to under 3-year bachelor on the Technologist track. */
 export function lateralEntryConfirmed(view: LateralEntryView | null): boolean {
   return view?.route === 3;
 }
