@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { EtTierDetail } from "./etTiers.js";
+import type { SpecialisationResult } from "./specialisation.js";
 import type { LateralEntryView } from "./lateralEntry.js";
 
 export const qualificationTypeSchema = z.enum([
@@ -443,6 +445,12 @@ export type AssessmentResult = {
    * occupation that is backfilled into the shown cards. Absent on older results.
    */
   workExperienceJudgements?: SavedWorkJudgement[];
+  /**
+   * Civil specialisation check (Structural / Geotechnical / Transport, doc 12):
+   * Civil core, Pathway A (Master's) or B (5 yrs work), risk tier and audit.
+   * Set only when a Civil-family occupation or a civil bachelor is on the case.
+   */
+  specialisation?: SpecialisationResult | null;
 };
 
 /** One saved work-experience judgement (same shape as experienceBoost.ts). */
@@ -488,6 +496,8 @@ export type MaybeSuitableEntry = {
   capped: boolean;
   /** True when ET was one of the suggested candidates (detail view available). */
   inCandidates: boolean;
+  /** ET's own Tier 1 / Tier 2 / Tier 3 detail (sheet parts A / B / C) when it was scored. */
+  tiers?: EtTierDetail;
 };
 
 /** Family rules applied to the suggested ANZSCOs (confidence = matching %). */
@@ -648,4 +658,19 @@ export type ExtractionReport = {
   subjectHash: string;
   /** "llm" = freshly extracted, "persisted" = reused saved subjects, "injected" = tests. */
   source: "llm" | "persisted" | "injected";
+  /**
+   * Set when some transcript chunks could not be read after every retry: the
+   * subjects are incomplete and are not saved as current (the next run reads
+   * the transcripts again). subjectHash is then "" so it never matches.
+   */
+  partial?: ExtractionPartial;
+};
+
+export type ExtractionPartial = {
+  /** Chunks that failed after all retries. */
+  failedChunks: number;
+  /** Transcript pages in those chunks (empty when the text has no page markers). */
+  pages: number[];
+  /** Failure reasons, e.g. rate_limited, cut_off, empty, invalid_json, timeout. */
+  reasons: string[];
 };

@@ -55,6 +55,12 @@ export async function processExtractJob(documentId: string): Promise<void> {
       return;
     }
 
+    // Per-page OCR warnings from the extractor (e.g. a page read with low
+    // confidence or skipped) are kept in the worker log.
+    for (const w of result.warnings ?? []) {
+      console.warn(`[extract] doc=${documentId} warning: ${w}`);
+    }
+
     const { text: cleaned } = correctOcrEducationText(
       result.raw_text ?? "",
       documentId,

@@ -129,11 +129,20 @@ describe("Rule 1: not eligible", () => {
     assertBlocked(g);
   });
 
-  it("under 2 years counted / stated", () => {
-    const g = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering", countedYearsOverride: 1.5 }], engRows("advanced_diploma"));
+  it("under 2 years counted / stated (Associate Degree, 1.5 years)", () => {
+    const g = gate([{ level: "associate_degree", title: "Associate Degree in Engineering", countedYearsOverride: 1.5 }], engRows("associate_degree"));
     assert.equal(g.result, "not_eligible");
     assert.equal(g.rule, 1);
     assert.match(g.reason, /under 2 years/);
+    assertBlocked(g);
+  });
+
+  it("Advanced Diploma under 1 year (0.5 years) → not eligible", () => {
+    const g = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering", countedYearsOverride: 0.5 }], engRows("advanced_diploma"));
+    assert.equal(g.result, "not_eligible");
+    assert.equal(g.rule, 1);
+    assert.match(g.reason, /under 1 year\b/);
+    assertBlocked(g);
   });
 });
 
@@ -394,7 +403,26 @@ describe("Rule 4: engineering bachelor 3 to under 4 years → Technologist only"
   });
 });
 
-describe("Rule 5: Advanced Diploma / Associate Degree ≥ 2 years → Associate only", () => {
+describe("Rule 5: Advanced Diploma ≥ 1 year / Associate Degree ≥ 2 years → Associate only", () => {
+  it("config: Advanced Diploma minimum is 1 year, everything else keeps 2", () => {
+    assert.equal(evidenceConfig.gate.advancedDiplomaMinYears, 1);
+    assert.equal(evidenceConfig.gate.associateMinYears, 2);
+    assert.equal(evidenceConfig.gate.notEligibleBelowYears, 2);
+  });
+
+  it("Advanced Diploma of Engineering, 1 year → Engineering Associate", () => {
+    const g = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering (Mechanical)", countedYearsOverride: 1 }], engRows("advanced_diploma"));
+    assert.equal(g.result, "open");
+    assert.equal(g.rule, 5);
+    assert.deepEqual(openIds(g), ["engineering_associate:1"]);
+  });
+
+  it("Advanced Diploma of Engineering, 1.5 years → Engineering Associate", () => {
+    const g = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering", countedYearsOverride: 1.5 }], engRows("advanced_diploma"));
+    assert.equal(g.result, "open");
+    assert.equal(g.rule, 5);
+  });
+
   it("Advanced Diploma of Engineering, 2 years", () => {
     const g = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering (Mechanical)", countedYearsOverride: 2 }], engRows("advanced_diploma"));
     assert.equal(g.result, "open");

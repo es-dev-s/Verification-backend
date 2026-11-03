@@ -46,7 +46,7 @@ export type RiskScoringConfig = {
 };
 
 export const RISK_SCORING_CONFIG: RiskScoringConfig = {
-  version: "2026-10-30-default",
+  version: "2026-11-03-major-supporting",
   weights: { fundamental: 0.3, core: 0.5, historical: 0.2 },
   bands: { noRisk: 85, low: 75, medium: 50 },
 };

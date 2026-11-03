@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { EtTierDetail } from "./etTiers.js";
 import type {
   AnzscoCandidate,
   AssessmentResult,
@@ -83,6 +84,8 @@ export type FamilyAdjustOptions = {
   etOwnConfidence?: number | null;
   /** Title for the ET card (defaults to the families file name). */
   etTitle?: string;
+  /** ET's own tier detail for the card (when ET was scored). */
+  etTiers?: EtTierDetail | null;
 };
 
 /**
@@ -199,6 +202,7 @@ export function adjustByFamily(
       source: own != null && own > formula ? "own_score" : "formula",
       capped,
       inCandidates: Boolean(etInput),
+      ...(opts.etTiers ? { tiers: opts.etTiers } : {}),
     };
   }
 
@@ -306,6 +310,7 @@ export function pickPrimary<T extends RankedCandidate>(
 export function familyAdjustmentForResult(
   result: Pick<AssessmentResult, "candidates" | "assessorSelected">,
   etOwnConfidence?: number | null,
+  etTiers?: EtTierDetail | null,
 ): FamilyAdjustment | undefined {
   const candidates = result.candidates ?? [];
   const primary = pickPrimary(candidates, result.assessorSelected?.anzscoCode);
@@ -318,6 +323,6 @@ export function familyAdjustmentForResult(
   return adjustByFamily(
     toInput(primary),
     candidates.filter((c) => c !== primary).map(toInput),
-    { etOwnConfidence },
+    { etOwnConfidence, etTiers },
   );
 }

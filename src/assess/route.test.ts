@@ -94,10 +94,15 @@ describe("routeQualifications", () => {
   });
 
   it("a disabled vocational occupation gets a note", () => {
-    const civil = voc.find((o) => !o.scoringEnabled && o.titleMatch.length)!;
-    assert.ok(civil);
+    const planner = voc.find((o) => !o.scoringEnabled && o.titleMatch.length)!;
+    assert.equal(planner.anzsco, "313213");
+    const d = routeQualifications([{ level: "advanced_diploma", title: "Advanced Diploma of Telecommunications Network Planning" }], voc);
+    assert.ok(d.notes.some((n) => n.includes("313213") && n.includes("not switched on")));
+  });
+
+  it("312211 is switched on: no 'not switched on' note for a civil design diploma", () => {
     const d = routeQualifications([{ level: "advanced_diploma", title: "Advanced Diploma of Civil Construction Design" }], voc);
-    assert.ok(d.notes.some((n) => n.includes("not switched on")));
+    assert.ok(!d.notes.some((n) => n.includes("312211") && n.includes("not switched on")));
   });
 });
 

@@ -11,6 +11,7 @@ import {
 import { getTranscriptData, saveTranscriptOverrides } from "./transcriptData.js";
 import {
   answerLateralEntry,
+  recordLateralDecision,
   ensurePriorStudySubjects,
   PriorStudyNotReadyError,
   readPriorStudySubjects,
@@ -140,7 +141,9 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
     const existing = await prisma.case.findFirst({ where: { id, clientId: req.clientId } });
     if (!existing) return reply.code(404).send({ error: "Case not found" });
     try {
-      return await getTranscriptData(id, { mode: "extract", force: body.force });
+      const data = await getTranscriptData(id, { mode: "extract", force: body.force });
+      if (data) await recordLateralDecision(id, data.lateralEntry, "decision");
+      return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       req.log.error({ err }, "transcript data failed");
@@ -167,7 +170,9 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
     const existing = await prisma.case.findFirst({ where: { id, clientId: req.clientId } });
     if (!existing) return reply.code(404).send({ error: "Case not found" });
     await answerLateralEntry(id, parsed.data.question, parsed.data.answer);
-    return getTranscriptData(id, { mode: "read" });
+    const data = await getTranscriptData(id, { mode: "read" });
+    if (data) await recordLateralDecision(id, data.lateralEntry, "decision");
+    return data;
   });
 
   // Lateral entry Route 3: read the earlier study's subjects from its transcript.
@@ -184,7 +189,9 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
       req.log.error({ err }, "prior study read failed");
       return reply.code(500).send({ error: "Could not read the earlier study's subjects" });
     }
-    return getTranscriptData(id, { mode: "read" });
+    const data = await getTranscriptData(id, { mode: "read" });
+    if (data) await recordLateralDecision(id, data.lateralEntry, "decision");
+    return data;
   });
 
   app.get("/cases/:id/assess", async (req, reply) => {

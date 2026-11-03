@@ -2,8 +2,9 @@
  * Gate 1: qualification eligibility, decided BEFORE any scoring.
  *
  * Rules are checked top to bottom and the first match decides:
- *  1. Not engineering, counted duration under 2 years, or certificate-level
- *     only → NOT ELIGIBLE (nothing is scored).
+ *  1. Not engineering, counted duration under 2 years (under 1 year for an
+ *     Advanced Diploma), or certificate-level only → NOT ELIGIBLE (nothing
+ *     is scored).
  *  2. Unusual case → MANUAL REVIEW (nothing is scored): a Diploma (AQF 5); a
  *     3-year degree from a programme / country that may be recognised higher
  *     (config hook); a combined degree (3+2); a non-engineering bachelor
@@ -16,7 +17,8 @@
  *  3. Engineering Bachelor / Honours / Master counted ≥ 4 years → Professional
  *     Engineer (priority 1) + Engineering Technologist (priority 2).
  *  4. Engineering Bachelor counted 3 to < 4 years → Engineering Technologist only.
- *  5. Advanced Diploma / Associate Degree counted ≥ 2 years → Engineering Associate only.
+ *  5. Advanced Diploma counted ≥ 1 year / Associate Degree counted ≥ 2 years
+ *     → Engineering Associate only.
  *
  * With several qualifications the highest-level engineering qualification is
  * used (durations are never added together). The duration is the one entered
@@ -323,11 +325,11 @@ export const AWARD_LABELS: Record<Gate1AwardLevel, string> = {
 };
 
 export const RULE_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
-  1: "Rule 1: not eligible (not engineering, under 2 years, or certificate only)",
+  1: "Rule 1: not eligible (not engineering, under 2 years or under 1 year for an Advanced Diploma, or certificate only)",
   2: "Rule 2: unusual case, manual review",
   3: "Rule 3: engineering Bachelor / Honours / Master, 4 years or more",
   4: "Rule 4: engineering Bachelor, 3 to under 4 years",
-  5: "Rule 5: Advanced Diploma / Associate Degree, 2 years or more",
+  5: "Rule 5: Advanced Diploma 1 year or more / Associate Degree 2 years or more",
 };
 
 function basisLabel(e: Pick<QualEval, "source" | "manualCount" | "creditConversion">): string {
@@ -405,6 +407,20 @@ function evaluateQualification(
   };
 }
 
+/**
+ * Minimum counted years for an award: below it the qualification is not
+ * eligible. An Advanced Diploma uses gate.advancedDiplomaMinYears; every
+ * other award uses gate.notEligibleBelowYears.
+ */
+function notEligibleBelowFor(award: Gate1AwardLevel): number {
+  const g = evidenceConfig.gate;
+  return award === "advanced_diploma" ? g.advancedDiplomaMinYears : g.notEligibleBelowYears;
+}
+
+function yearsWord(n: number): string {
+  return `${n} ${n === 1 ? "year" : "years"}`;
+}
+
 function outcomeFor(e: QualEval, all: readonly QualEval[], lateralEntryConfirmed = false): Outcome {
   const g = evidenceConfig.gate;
   const name = label(e);
@@ -431,8 +447,9 @@ function outcomeFor(e: QualEval, all: readonly QualEval[], lateralEntryConfirmed
       reason: `the duration of "${name}" could not be counted from the transcript and was not entered in Transcript data.`,
     };
   }
-  if (d < g.notEligibleBelowYears - EPS) {
-    return { kind: "fail", reason: `"${name}" is under ${g.notEligibleBelowYears} years (${yrs(d)}, ${basis}).` };
+  const floor = notEligibleBelowFor(e.award);
+  if (d < floor - EPS) {
+    return { kind: "fail", reason: `"${name}" is under ${yearsWord(floor)} (${yrs(d)}, ${basis}).` };
   }
   if (e.award === "diploma") {
     return { kind: "manual", reason: `"${name}" is a Diploma (AQF 5).` };
@@ -470,7 +487,8 @@ function outcomeFor(e: QualEval, all: readonly QualEval[], lateralEntryConfirmed
     };
   }
   if (e.award === "advanced_diploma" || e.award === "associate_degree") {
-    if (d >= g.associateMinYears - EPS) {
+    const associateMin = e.award === "advanced_diploma" ? g.advancedDiplomaMinYears : g.associateMinYears;
+    if (d >= associateMin - EPS) {
       return {
         kind: "open",
         rule: 5,
@@ -528,7 +546,7 @@ function buildTracks(
     closed.professional_engineer = BELOW_PE;
     closed.engineering_associate = "Not assessed: the qualification meets the Engineering Technologist level.";
   } else if (rule === 5) {
-    open.engineering_associate = { priority: 1, reason: "Engineering Advanced Diploma / Associate Degree of 2 years or more." };
+    open.engineering_associate = { priority: 1, reason: "Engineering Advanced Diploma of 1 year or more / Associate Degree of 2 years or more." };
     closed.professional_engineer = BELOW_PE;
     closed.engineering_technologist = BELOW_TECH;
   }
@@ -627,14 +645,14 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
   if (
     proceeding.length &&
     proceeding.every(
-      (e) => !isPostgraduate(e.award) && e.used != null && e.used < evidenceConfig.gate.notEligibleBelowYears - EPS,
+      (e) => !isPostgraduate(e.award) && e.used != null && e.used < notEligibleBelowFor(e.award) - EPS,
     )
   ) {
     const top = [...proceeding].sort((a, b) => (b.used ?? 0) - (a.used ?? 0))[0];
     return finish(
       "not_eligible",
       1,
-      `Not eligible: the engineering qualification is under ${evidenceConfig.gate.notEligibleBelowYears} years (${yrs(top.used!)}, ${basisLabel(top)}).`,
+      `Not eligible: the engineering qualification is under ${yearsWord(notEligibleBelowFor(top.award))} (${yrs(top.used!)}, ${basisLabel(top)}).`,
       top,
     );
   }

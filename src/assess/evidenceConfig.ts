@@ -12,7 +12,13 @@ export const evidenceConfig = {
     professionalMinYears: 4,
     technologistMinYears: 3,
     associateMinYears: 2,
-    /** Below this (any engineering qualification) → not eligible. */
+    /**
+     * Advanced Diploma only: minimum counted years to open Engineering
+     * Associate (Rule 5); below this it is not eligible. Replaces both
+     * associateMinYears and notEligibleBelowYears for advanced diplomas.
+     */
+    advancedDiplomaMinYears: 1,
+    /** Below this (any other engineering qualification) → not eligible. */
     notEligibleBelowYears: 2,
     /**
      * Config hook: 3-year degrees from these programmes / countries / institutions

@@ -27,7 +27,7 @@ export type TranscriptSource = {
  * Split transcript text into `parts` roughly equal slices for parallel Groq keys.
  * Prefers page markers, then newlines, falling back to hard char cuts.
  */
-function splitForParallelKeys(text: string, parts: number): string[] {
+export function splitForParallelKeys(text: string, parts: number): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
   if (parts <= 1) return [trimmed];
@@ -107,96 +107,241 @@ function applyDegreeHint(
   return row;
 }
 
-async function extractChunkOnKey(
-  chunk: string,
-  apiKey: GroqKey,
-  pipelineDeadlineMs: number,
-): Promise<ExtractedSubjectRow[]> {
-  if (!chunk.trim()) return [];
-  if (Date.now() >= pipelineDeadlineMs - 1500) return [];
+/** Why a chunk could not be read (logged and kept on the extraction record). */
+export type ChunkFailureReason =
+  | "rate_limited"
+  | "cut_off"
+  | "empty"
+  | "invalid_json"
+  | "timeout"
+  | "deadline"
+  | "error";
 
-  const requestMs = Math.min(
-    assessConfig.extractRequestTimeoutMs,
-    Math.max(8_000, pipelineDeadlineMs - Date.now() - 1_000),
+export function classifyExtractError(err: unknown): ChunkFailureReason {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  if (/rate limit|\b429\b|too many requests/.test(msg)) return "rate_limited";
+  if (/truncated|finish_reason=length/.test(msg)) return "cut_off";
+  if (/empty groq response/.test(msg)) return "empty";
+  if (/invalid json|non-json|zod|expected|required/.test(msg)) return "invalid_json";
+  if (/timed out|abort/.test(msg)) return "timeout";
+  return "error";
+}
+
+type ChunkCall = (chunk: string, apiKey: GroqKey, requestTimeoutMs: number) => Promise<unknown>;
+
+const defaultChunkCall: ChunkCall = async (chunk, apiKey, requestTimeoutMs) => {
+  const { data, modelUsed, keyUsed } = await generateJsonGroq(
+    subjectExtractUserPrompt(chunk),
+    subjectExtractSystemPrompt(),
+    {
+      apiKey,
+      maxTokens: 8192,
+      requestTimeoutMs,
+      responseSchema: subjectExtractLlmSchema,
+    },
   );
+  console.log(
+    `[assess] subject extract ok model=${modelUsed} key=${keyUsed} subjects=${
+      (data as { subjects?: unknown[] }).subjects?.length ?? "?"
+    }`,
+  );
+  return data;
+};
 
-  try {
-    const { data, modelUsed, keyUsed } = await generateJsonGroq(
-      subjectExtractUserPrompt(chunk),
-      subjectExtractSystemPrompt(),
-      {
-        apiKey,
-        maxTokens: 8192,
-        requestTimeoutMs: requestMs,
-        responseSchema: subjectExtractLlmSchema,
-      },
+export type ChunkAttempt = { key: string; reason: ChunkFailureReason };
+
+export type ChunkOutcome =
+  | { ok: true; rows: ExtractedSubjectRow[]; attempts: ChunkAttempt[] }
+  | { ok: false; reason: ChunkFailureReason; attempts: ChunkAttempt[] };
+
+/** Backoff before retrying on the same key (rate limits wait longer). */
+export const EXTRACT_RETRY_BACKOFF_MS = { rateLimited: 4_000, other: 1_500 };
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Read one chunk: first on its own key, then on each other key, then once
+ * more on its own key after a backoff. Every failure is logged with its
+ * reason (429 / cut off / empty / invalid JSON / timeout).
+ */
+export async function extractChunkWithRetry(
+  chunk: string,
+  ownKey: GroqKey,
+  keys: GroqKey[],
+  pipelineDeadlineMs: number,
+  opts: { call?: ChunkCall; backoffMs?: typeof EXTRACT_RETRY_BACKOFF_MS; label?: string } = {},
+): Promise<ChunkOutcome> {
+  if (!chunk.trim()) return { ok: true, rows: [], attempts: [] };
+  const call = opts.call ?? defaultChunkCall;
+  const backoff = opts.backoffMs ?? EXTRACT_RETRY_BACKOFF_MS;
+  const others = keys.filter((k) => k.name !== ownKey.name);
+  const plan: Array<{ key: GroqKey; waitFirst: boolean }> = [
+    { key: ownKey, waitFirst: false },
+    ...others.map((key) => ({ key, waitFirst: false })),
+    { key: ownKey, waitFirst: true },
+  ];
+  const attempts: ChunkAttempt[] = [];
+  let last: ChunkFailureReason = "error";
+  for (const step of plan) {
+    if (step.waitFirst) {
+      const wait = last === "rate_limited" ? backoff.rateLimited : backoff.other;
+      if (Date.now() + wait >= pipelineDeadlineMs - 1500) break;
+      await sleep(wait);
+    }
+    if (Date.now() >= pipelineDeadlineMs - 1500) {
+      last = attempts.length ? last : "deadline";
+      break;
+    }
+    const requestMs = Math.min(
+      assessConfig.extractRequestTimeoutMs,
+      Math.max(8_000, pipelineDeadlineMs - Date.now() - 1_000),
     );
-    console.log(
-      `[assess] subject extract ok model=${modelUsed} key=${keyUsed} subjects=${
-        (data as { subjects?: unknown[] }).subjects?.length ?? "?"
-      }`,
-    );
-    return subjectExtractLlmSchema.parse(data).subjects.map((s) =>
-      subjectNameToExtractedRow(s.name, s.code ?? null, {
-        credits: s.credits ?? null,
-        yearOrSemester: s.yearOrSemester ?? null,
-        entryStatus: s.entryStatus ?? null,
-      }),
-    );
-  } catch (err) {
-    console.error(
-      `[assess] subject extract failed key=${apiKey.name}:`,
-      err instanceof Error ? err.message : err,
-    );
-    return [];
+    try {
+      const data = await call(chunk, step.key, requestMs);
+      const parsed = subjectExtractLlmSchema.parse(data);
+      const rows = parsed.subjects.map((s) =>
+        subjectNameToExtractedRow(s.name, s.code ?? null, {
+          credits: s.credits ?? null,
+          yearOrSemester: s.yearOrSemester ?? null,
+          entryStatus: s.entryStatus ?? null,
+        }),
+      );
+      if (attempts.length) {
+        console.log(
+          `[assess] subject extract ${opts.label ?? "chunk"} recovered on key=${step.key.name} after ${attempts.length} failed attempt(s)`,
+        );
+      }
+      return { ok: true, rows, attempts };
+    } catch (err) {
+      last = classifyExtractError(err);
+      attempts.push({ key: step.key.name, reason: last });
+      console.error(
+        `[assess] subject extract ${opts.label ?? "chunk"} failed key=${step.key.name} reason=${last}:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
+  return { ok: false, reason: last, attempts };
+}
+
+/** Pages ("--- page N ---" markers) a chunk covers, when the text has markers. */
+export function pagesInChunk(chunk: string, fullText: string): number[] {
+  const markers = [...fullText.matchAll(/---\s*page\s+(\d+)\s*---/gi)];
+  if (!markers.length) return [];
+  // Page text inside the chunk: find which page bodies it contains.
+  const bodies = fullText
+    .trim()
+    .split(/\n?---\s*page\s+\d+\s*---\n/i)
+    .map((p) => p.trim());
+  const nums = markers.map((m) => Number(m[1]));
+  // When the text starts with a marker the first split piece is empty.
+  const offset = bodies.length > nums.length ? 1 : 0;
+  const out: number[] = [];
+  nums.forEach((n, i) => {
+    const body = bodies[i + offset];
+    if (body && chunk.includes(body.slice(0, Math.min(200, body.length)))) out.push(n);
+  });
+  return out;
+}
+
+export type FailedChunk = {
+  documentId: string;
+  chunk: number;
+  chunks: number;
+  pages: number[];
+  reason: ChunkFailureReason;
+  attempts: number;
+};
+
+export type SubjectExtractResult = {
+  rows: ExtractedSubjectRow[];
+  /** True when at least one chunk could not be read after all retries. */
+  partial: boolean;
+  failedChunks: FailedChunk[];
+};
+
+/** Chunk count for one transcript: one per key, more for long text (also with one key). */
+export function chunkCountFor(textLength: number, keyCount: number, maxChunkChars: number): number {
+  const bySize = maxChunkChars > 0 ? Math.ceil(textLength / maxChunkChars) : 1;
+  return Math.max(1, keyCount, bySize);
 }
 
 /**
  * Extract subjects from transcript text via Groq.
- * Splits each transcript across all configured Groq keys and runs them in parallel
- * (no Gemini/Mistral, no sequential key fallback).
+ * Long transcripts are split (page markers first) into at least one chunk per
+ * key; each key reads its chunks in turn while the keys run in parallel. A
+ * failed chunk is retried on another key, then on its own key after a backoff;
+ * a chunk that still fails makes the result partial (never silently dropped).
  */
-export async function extractSubjectsFromTranscripts(
+export async function extractSubjectsDetailed(
   sources: TranscriptSource[],
-  opts?: { deadlineMs?: number },
-): Promise<ExtractedSubjectRow[]> {
+  opts?: { deadlineMs?: number; keys?: GroqKey[]; call?: ChunkCall; backoffMs?: typeof EXTRACT_RETRY_BACKOFF_MS; maxChunkChars?: number },
+): Promise<SubjectExtractResult> {
   const deadlineMs = opts?.deadlineMs ?? Date.now() + assessConfig.timeoutMs;
   const all: ExtractedSubjectRow[] = [];
+  const failedChunks: FailedChunk[] = [];
 
-  const keys = loadGroqKeys();
-  if (!keys.length || !groqIsConfigured()) {
+  const keys = opts?.keys ?? (groqIsConfigured() ? loadGroqKeys() : []);
+  if (!keys.length) {
     console.error(
       "[assess] subject extract: no GROQ_API_KEY / GROQ_API_KEY_1..N configured",
     );
-    return [];
+    return { rows: [], partial: false, failedChunks: [] };
   }
+  const maxChunkChars = opts?.maxChunkChars ?? assessConfig.extractMaxChunkChars;
 
   for (const source of sources) {
     if (!source.text?.trim()) continue;
-    if (Date.now() >= deadlineMs) break;
 
-    // One chunk per Groq key so all keys work together at once.
-    const chunks = splitForParallelKeys(source.text, keys.length);
-    const paired = chunks.map((chunk, i) => ({
-      chunk,
-      key: keys[Math.min(i, keys.length - 1)]!,
-    }));
+    const parts = chunkCountFor(source.text.trim().length, keys.length, maxChunkChars);
+    const chunks = splitForParallelKeys(source.text, parts);
+    const paired = chunks.map((chunk, i) => ({ chunk, index: i, key: keys[i % keys.length]! }));
 
     console.log(
       `[assess] extract doc=${source.documentId} chars=${source.text.length} ` +
-        `parts=${paired.length} keys=${paired.map((p) => p.key.name).join(",")} ` +
+        `parts=${paired.length} keys=${[...new Set(paired.map((p) => p.key.name))].join(",")} ` +
         `parallel=true requestMs=${assessConfig.extractRequestTimeoutMs}`,
     );
 
-    const chunkResults = await Promise.all(
-      paired.map(({ chunk, key }) =>
-        extractChunkOnKey(chunk, key, deadlineMs),
-      ),
+    // Keys run in parallel; chunks sharing a key are read one after another.
+    const byKey = new Map<string, typeof paired>();
+    for (const p of paired) byKey.set(p.key.name, [...(byKey.get(p.key.name) ?? []), p]);
+    const outcomes: Array<{ index: number; outcome: ChunkOutcome }> = [];
+    await Promise.all(
+      [...byKey.values()].map(async (queue) => {
+        for (const p of queue) {
+          const outcome =
+            Date.now() >= deadlineMs - 1500
+              ? ({ ok: false, reason: "deadline", attempts: [] } as ChunkOutcome)
+              : await extractChunkWithRetry(p.chunk, p.key, keys, deadlineMs, {
+                  call: opts?.call,
+                  backoffMs: opts?.backoffMs,
+                  label: `doc=${source.documentId} part=${p.index + 1}/${paired.length}`,
+                });
+          outcomes.push({ index: p.index, outcome });
+        }
+      }),
     );
+    outcomes.sort((a, b) => a.index - b.index);
 
-    for (const rows of chunkResults) {
-      for (const row of rows) {
+    for (const { index, outcome } of outcomes) {
+      if (!outcome.ok) {
+        const pages = pagesInChunk(paired[index]!.chunk, source.text);
+        failedChunks.push({
+          documentId: source.documentId,
+          chunk: index + 1,
+          chunks: paired.length,
+          pages,
+          reason: outcome.reason,
+          attempts: outcome.attempts.length,
+        });
+        console.error(
+          `[assess] subject extract PARTIAL doc=${source.documentId} part=${index + 1}/${paired.length} ` +
+            `pages=${pages.length ? pages.join(",") : "?"} reason=${outcome.reason} attempts=${outcome.attempts.length}`,
+        );
+        continue;
+      }
+      for (const row of outcome.rows) {
         all.push({
           ...applyDegreeHint(row, source.degreeLevelHint),
           documentId: source.documentId,
@@ -205,7 +350,15 @@ export async function extractSubjectsFromTranscripts(
     }
   }
 
-  return dedupeSubjects(all);
+  return { rows: dedupeSubjects(all), partial: failedChunks.length > 0, failedChunks };
+}
+
+/** Rows only (callers that do not track partial reads). */
+export async function extractSubjectsFromTranscripts(
+  sources: TranscriptSource[],
+  opts?: { deadlineMs?: number },
+): Promise<ExtractedSubjectRow[]> {
+  return (await extractSubjectsDetailed(sources, opts)).rows;
 }
 
 /**

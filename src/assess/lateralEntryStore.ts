@@ -7,18 +7,22 @@
  */
 import { prisma } from "../lib/prisma.js";
 import { assessConfig } from "./config.js";
-import { extractSubjectsFromTranscripts } from "./extractSubjects.js";
+import { extractSubjectsDetailed } from "./extractSubjects.js";
 import {
   answeredLateralYes,
+  lateralAuditOf,
   LATERAL_DEGREE_LEVEL,
   LATERAL_FIELD,
   lateralStateColumns,
   lateralStateOf,
   priorStudyReadPlan,
   withAnswer,
+  withLateralAudit,
   withoutPriorDocument,
   type LateralAnswerValue,
+  type LateralAuditRecord,
   type LateralEntryState,
+  type LateralEntryView,
 } from "./lateralEntry.js";
 
 export async function loadLateralState(caseId: string): Promise<LateralEntryState> {
@@ -68,6 +72,31 @@ export async function answerLateralEntry(
 ): Promise<void> {
   const state = await loadLateralState(caseId);
   await saveLateralState(caseId, withAnswer(state, question, value));
+}
+
+/**
+ * Save the decision record (duration + source, first period, answers with
+ * times, contradiction and why, both subject lists, route + reason) on the
+ * lateral-entry row. Called when a decision is made and on every assessment;
+ * never throws (an audit write must not fail the request).
+ */
+export async function recordLateralDecision(
+  caseId: string,
+  view: LateralEntryView | null,
+  trigger: LateralAuditRecord["trigger"],
+): Promise<LateralAuditRecord | null> {
+  const record = lateralAuditOf(view, trigger);
+  if (!record) return null;
+  try {
+    await withCaseLock(caseId, async () => {
+      const state = await loadLateralState(caseId);
+      const next = withLateralAudit(state, record);
+      if (next) await saveLateralState(caseId, next);
+    });
+  } catch (err) {
+    console.error("[lateral] audit save failed:", err instanceof Error ? err.message : err);
+  }
+  return record;
 }
 
 /** True when the document is a prior-study transcript of this case. */
@@ -150,10 +179,15 @@ async function readMissingPriorSubjects(caseId: string): Promise<number> {
     throw new PriorStudyNotReadyError("The transcript could not be read. Remove it and upload a clearer copy.");
   }
   const read = docs.filter((d) => plan.toRead.includes(d.id));
-  const rows = await extractSubjectsFromTranscripts(
+  const result = await extractSubjectsDetailed(
     read.map((d) => ({ documentId: d.id, text: d.text ?? "", degreeLevelHint: "diploma" as const })),
     { deadlineMs: Date.now() + assessConfig.timeoutMs },
   );
+  // A partial read is not saved: the earlier-study subjects would be incomplete.
+  if (result.partial) {
+    throw new PriorStudyNotReadyError("Some pages couldn't be read. Try again.");
+  }
+  const rows = result.rows;
   if (!rows.length) {
     throw new PriorStudyNotReadyError("No subjects were found in the transcript. Try again or upload a clearer copy.");
   }

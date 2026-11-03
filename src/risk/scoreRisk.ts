@@ -5,6 +5,7 @@ import {
   type RiskScoringConfig,
 } from "./riskBands.config.js";
 import type {
+  ComponentSplit,
   HistoricalStats,
   PrecedentCheck,
   RiskAssessmentResult,
@@ -20,17 +21,24 @@ import type { VocationalAssessmentDetail } from "../assess/schemas.js";
  *
  *   Overall = 0.30 × Fundamental + 0.50 × Core + 0.20 × Historical
  *
- * Academic occupations: Fundamental = Tier 1 (foundational) coverage %,
- * Core = Tier 2 (core) coverage %. Vocational unit-code occupations: Core =
+ * Academic occupations: Fundamental = Tier 1 (foundational) score, Core =
+ * Tier 2 (core) score, each 70% Major + 30% Supporting (doc 05 §5–6, see
+ * componentSplit.ts). Vocational unit-code occupations: Core =
  * core-unit coverage %, Fundamental = elective coverage % (found ÷ required
  * minimum) only when the rubric sets an elective minimum. Historical = positive
- * outcome % of past cases for the ANZSCO (verification_datasheet.json), used
- * whenever at least one past case exists; with none it is left out.
+ * outcome % of past cases for the ANZSCO (verification_datasheet.json),
+ * weighted by similarity to this applicant when known (similarCases.ts),
+ * used whenever at least one past case exists; with none it is left out.
  *
  * A component without usable data is left out and the remaining weights are
  * re-normalised. The overall score maps to the risk category through the
  * thresholds in riskBands.config.ts (weights live there too).
  */
+
+/** Historical component score: similarity-weighted when available, else the plain positive %. */
+export function historicalScorePct(h: HistoricalStats): number {
+  return h.scorePct ?? h.positivePct;
+}
 
 /** Approved weights (from the governance config). */
 export const RISK_WEIGHTS = RISK_SCORING_CONFIG.weights;
@@ -118,7 +126,7 @@ export function computeAlignmentScore(
     { key: "core", pct: clampPct(input.corePct) },
     {
       key: "historical",
-      pct: input.historical.totalCases > 0 ? clampPct(input.historical.positivePct) : null,
+      pct: input.historical.totalCases > 0 ? clampPct(historicalScorePct(input.historical)) : null,
       reason: historicalUsable ? undefined : "No past cases for this ANZSCO",
     },
   ];
@@ -275,6 +283,8 @@ export function buildRiskDrivers(input: {
   historical: HistoricalStats;
   workExperienceBoost: boolean;
   missingCore: string[];
+  /** Missing Supporting core subjects (rubric-marked); listed apart from Major gaps. */
+  missingSupporting?: string[];
 }): { reducingRisk: string[]; increasingRisk: string[] } {
   const reducingRisk: string[] = [];
   const increasingRisk: string[] = [];
@@ -298,6 +308,12 @@ export function buildRiskDrivers(input: {
     increasingRisk.push(`Weak core subject coverage (${input.corePct}%).`);
   }
 
+  const similar = input.historical.similar;
+  if (input.historical.totalCases > 0 && similar && similar.cases > 0) {
+    const line = `${similar.cases} similar past case${similar.cases === 1 ? "" : "s"} (${similar.positive} positive, ${similar.negative} negative).`;
+    if ((similar.weightedPositivePct ?? 0) >= 70) reducingRisk.push(`Similar past cases mostly positive: ${line}`);
+    else if ((similar.weightedPositivePct ?? 100) < 50) increasingRisk.push(`Similar past cases weaker: ${line}`);
+  }
   if (input.historical.totalCases > 0) {
     if (input.historical.positivePct >= 70) {
       reducingRisk.push(
@@ -325,6 +341,14 @@ export function buildRiskDrivers(input: {
         : `Gaps in ${input.missingCore.length} major core subjects.`,
     );
   }
+  const supp = input.missingSupporting ?? [];
+  if (supp.length) {
+    increasingRisk.push(
+      supp.length === 1
+        ? `Gap in supporting core: ${supp[0]} (30% weight).`
+        : `Gaps in ${supp.length} supporting core subjects (30% weight).`,
+    );
+  }
 
   if (!reducingRisk.length) {
     reducingRisk.push("No strong risk-reducing factors identified.");
@@ -348,6 +372,8 @@ export function computeRiskScores(input: {
   assessmentFlow?: "academic" | "vocational_units";
   /** Vocational unit-code detail (electives feed the fundamental slot). */
   vocational?: Pick<VocationalAssessmentDetail, "electiveStatus" | "electiveMinimum" | "electivesFound"> | null;
+  /** 70/30 Major / Supporting split (academic); its pct replaces the plain coverage %. */
+  splits?: { fundamental: ComponentSplit; core: ComponentSplit } | null;
   config?: RiskScoringConfig;
 }): Omit<
   RiskAssessmentResult,
@@ -355,11 +381,14 @@ export function computeRiskScores(input: {
 > {
   const flow = input.assessmentFlow ?? "academic";
   const vocational = flow === "vocational_units";
+  const splits = vocational ? null : input.splits ?? null;
   const fundamentalPct = vocational
     ? vocationalElectivePct(input.vocational)
-    : clampPct(input.fundamentalPct);
-  const corePct = clampPct(input.corePct);
-  const historicalPct = clampPct(input.historical.positivePct);
+    : clampPct(splits ? splits.fundamental.pct : input.fundamentalPct);
+  const corePct = clampPct(splits ? splits.core.pct : input.corePct);
+  const historicalPct = clampPct(historicalScorePct(input.historical));
+  const rubricSplit = splits?.core.method === "rubric";
+  const missingCore = rubricSplit ? splits!.core.missingMajor : input.missingCore;
 
   const scoring = computeAlignmentScore(
     { fundamentalPct, corePct, historical: input.historical, assessmentFlow: flow },
@@ -377,7 +406,8 @@ export function computeRiskScores(input: {
     corePct,
     historical: input.historical,
     workExperienceBoost: input.workExperienceBoost,
-    missingCore: input.missingCore,
+    missingCore,
+    missingSupporting: rubricSplit ? splits!.core.missingSupporting : [],
   });
 
   return {
@@ -396,6 +426,7 @@ export function computeRiskScores(input: {
     assessmentFlow: flow,
     reducingRisk,
     increasingRisk,
-    missingMajorDomains: buildMissingMajorDomainsSentence(input.missingCore),
+    missingMajorDomains: buildMissingMajorDomainsSentence(missingCore),
+    ...(splits ? { componentSplits: splits } : {}),
   };
 }

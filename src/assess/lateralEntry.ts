@@ -60,10 +60,31 @@ export type LateralAnswerValue = "yes" | "no";
 
 const answerSchema = z.object({ value: z.enum(["yes", "no"]), at: z.string() });
 
+/** Decision snapshot kept for audit (see LateralAuditRecord). */
+const auditSchema = z.object({
+  at: z.string(),
+  trigger: z.enum(["decision", "assessment"]),
+  durationYears: z.number().nullable(),
+  durationSource: z.string(),
+  startPeriod: z.string().nullable(),
+  answer: answerSchema.nullable(),
+  confirm: answerSchema.nullable(),
+  contradiction: z.object({ fired: z.boolean(), reasons: z.array(z.string()) }),
+  admissionNote: z.string().nullable(),
+  creditEntries: z.object({ rows: z.number(), noted: z.boolean() }),
+  primarySubjects: z.array(z.string()),
+  priorStudySubjects: z.array(z.string()),
+  route: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).nullable(),
+  step: z.enum(["ask", "reconfirm", "upload", "done"]),
+  reason: z.string(),
+  flagged: z.boolean(),
+});
+
 const answersSchema = z.object({
   answer: answerSchema.nullable().optional().default(null),
   confirm: answerSchema.nullable().optional().default(null),
   priorDocumentIds: z.array(z.string()).optional().default([]),
+  audit: auditSchema.nullable().optional().default(null),
 });
 
 const priorSubjectsSchema = z.object({
@@ -77,6 +98,13 @@ const eventSchema = z.object({ at: z.string(), event: z.string() });
 export type LateralAnswer = z.infer<typeof answerSchema>;
 export type PriorSubjects = z.infer<typeof priorSubjectsSchema>;
 export type LateralEvent = z.infer<typeof eventSchema>;
+/**
+ * What the lateral-entry decision was based on, saved when the decision is
+ * made (answers, prior-study read, transcript read) and on every assessment:
+ * duration + source, first period, answers with their times, whether the
+ * contradiction check fired and why, both subject lists and the route.
+ */
+export type LateralAuditRecord = z.infer<typeof auditSchema>;
 
 export type LateralEntryState = {
   answer: LateralAnswer | null;
@@ -84,6 +112,8 @@ export type LateralEntryState = {
   priorDocumentIds: string[];
   priorSubjects: PriorSubjects | null;
   events: LateralEvent[];
+  /** Last saved decision snapshot (null until a decision was recorded). */
+  audit?: LateralAuditRecord | null;
 };
 
 export const EMPTY_LATERAL_STATE: LateralEntryState = {
@@ -92,6 +122,7 @@ export const EMPTY_LATERAL_STATE: LateralEntryState = {
   priorDocumentIds: [],
   priorSubjects: null,
   events: [],
+  audit: null,
 };
 
 type FieldSourceLike = {
@@ -126,6 +157,7 @@ export function lateralStateOf(fieldSources: readonly FieldSourceLike[]): Latera
     priorDocumentIds: answers.success ? answers.data.priorDocumentIds : [],
     priorSubjects: prior.success ? prior.data : null,
     events: events.success ? events.data : [],
+    audit: answers.success ? answers.data.audit : null,
   };
 }
 
@@ -140,6 +172,7 @@ export function lateralStateColumns(state: LateralEntryState): {
       answer: state.answer,
       confirm: state.confirm,
       priorDocumentIds: state.priorDocumentIds,
+      ...(state.audit ? { audit: state.audit } : {}),
     }),
     extractedValue: state.priorSubjects ? JSON.stringify(state.priorSubjects) : null,
     alternatives: state.events,
@@ -430,6 +463,18 @@ export type LateralEntryView = LateralDecision & {
   /** Earlier-study subjects that were read (names only). */
   priorSubjects: string[] | null;
   events: LateralEvent[];
+  /** Inputs of this decision (saved as the audit record; not shown as such). */
+  basis?: LateralDecisionBasis;
+  /** Set on an assessment result: when its decision record was saved. */
+  audit?: { at: string; trigger: "decision" | "assessment" };
+};
+
+/** Decision inputs that are not already on the view. */
+export type LateralDecisionBasis = {
+  admissionNote: string | null;
+  creditEntries: { rows: number; noted: boolean };
+  primarySubjects: string[];
+  priorStudySubjects: string[];
 };
 
 type SummaryLike = {
@@ -503,7 +548,78 @@ export function lateralEntryView(input: {
         ? input.state.priorSubjects.rows.filter((r) => !r.isRepeat).map((r) => r.name)
         : null,
     events: input.state.events,
+    basis: {
+      admissionNote: admission,
+      creditEntries: credit,
+      primarySubjects: input.rows.filter((r) => !r.isRepeat).map((r) => r.name),
+      priorStudySubjects: (input.state.priorSubjects?.rows ?? []).filter((r) => !r.isRepeat).map((r) => r.name),
+    },
   };
+}
+
+/** Audit record for a lateral-entry view (null when the case has no bachelor view). */
+export function lateralAuditOf(
+  view: LateralEntryView | null,
+  trigger: LateralAuditRecord["trigger"],
+  at: string = new Date().toISOString(),
+): LateralAuditRecord | null {
+  if (!view) return null;
+  return {
+    at,
+    trigger,
+    durationYears: view.durationYears,
+    durationSource: view.durationSource,
+    startPeriod: view.startPeriod,
+    answer: view.answer,
+    confirm: view.confirm,
+    contradiction: view.contradiction,
+    admissionNote: view.basis?.admissionNote ?? null,
+    creditEntries: view.basis?.creditEntries ?? { rows: 0, noted: false },
+    primarySubjects: view.basis?.primarySubjects ?? [],
+    priorStudySubjects: view.basis?.priorStudySubjects ?? [],
+    route: view.route,
+    step: view.step,
+    reason: view.reason,
+    flagged: view.flagged,
+  };
+}
+
+/** True when two records describe the same decision (time and trigger ignored). */
+export function sameLateralDecision(
+  a: LateralAuditRecord | null | undefined,
+  b: LateralAuditRecord | null | undefined,
+): boolean {
+  if (!a || !b) return false;
+  const strip = ({ at: _at, trigger: _t, ...rest }: LateralAuditRecord) => rest;
+  return JSON.stringify(strip(a)) === JSON.stringify(strip(b));
+}
+
+/**
+ * State with `record` saved: a new decision also adds an audit event; the
+ * same decision only refreshes the record on an assessment (its time).
+ * Null when nothing needs saving.
+ */
+export function withLateralAudit(
+  state: LateralEntryState,
+  record: LateralAuditRecord,
+): LateralEntryState | null {
+  const same = sameLateralDecision(state.audit, record);
+  if (same && record.trigger !== "assessment") return null;
+  const events = same
+    ? state.events
+    : [
+        ...state.events,
+        {
+          at: record.at,
+          event:
+            record.route != null
+              ? `Lateral entry decision: Route ${record.route}${record.flagged ? " (flagged)" : ""}${
+                  record.contradiction.fired ? `; contradiction: ${record.contradiction.reasons.join(" and ")}` : ""
+                }`
+              : `Lateral entry pending: ${record.step}`,
+        },
+      ];
+  return { ...state, audit: record, events };
 }
 
 /** The decision lets Gate 1 skip its bridging / credit-transfer review flags (routes 2 and 3). */

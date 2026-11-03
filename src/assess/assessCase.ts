@@ -1,6 +1,13 @@
 import { prisma } from "../lib/prisma.js";
 import { ensureClientNameFromCv } from "../lib/clientName.js";
 import { assessConfig } from "./config.js";
+import { etTierDetail, type EtTierDetail } from "./etTiers.js";
+import {
+  assessSpecialisations,
+  SPECIALISATION_VERSION,
+  specialisationApplies,
+  type SpecialisationResult,
+} from "./specialisation.js";
 import {
   analyzeWorkExperienceForCandidates,
   type OccupationWorkJudgement,
@@ -50,6 +57,7 @@ import {
   priorStudyRowsFor,
   type LateralEntryState,
 } from "./lateralEntry.js";
+import { recordLateralDecision } from "./lateralEntryStore.js";
 import {
   applyDocumentLevels,
   documentLevelResolver,
@@ -333,6 +341,10 @@ export async function assessCase(
     if ((backfilled || !cached.familyAdjustment) && cached.candidates?.length) {
       cached.familyAdjustment = familyAdjustmentForResult(cached);
     }
+    // Deterministic, so derived on load for results saved before it existed.
+    if (cached.specialisation === undefined || (cached.specialisation && cached.specialisation.version !== SPECIALISATION_VERSION)) {
+      cached.specialisation = specialisationFor(cached, cachedRows, caseRow, cvText);
+    }
     return cached;
   }
 
@@ -387,6 +399,9 @@ export async function assessCase(
     documents: caseRow.documents,
   });
   const priorStudyRows = priorStudyRowsFor(lateral, lateralState);
+  // Lateral-entry audit: save what this assessment's decision was based on.
+  const lateralAudit = await recordLateralDecision(caseId, lateral, "assessment");
+  if (lateral && lateralAudit) lateral.audit = { at: lateralAudit.at, trigger: lateralAudit.trigger };
 
   // Gate 1 decides which tracks are scored (before any scoring); each
   // occupation in an open track is then sync-matched (no work experience in ranking).
@@ -547,6 +562,7 @@ export async function assessCase(
   result.familyAdjustment = familyAdjustmentForResult(
     result,
     etOwnScore(shortlist, scoredAll),
+    etTiersOf(shortlist, scoredAll),
   );
 
   // When nothing is recommended, still surface best coverage numbers from the top card
@@ -556,6 +572,8 @@ export async function assessCase(
     result.determination = "no_match";
     result.confidence = null;
   }
+
+  result.specialisation = specialisationFor(result, result.extractedSubjects, caseRow, cvText);
 
   result.explanation = await writeExplanation(result, {
     useLlm: useLlm && assessConfig.llmExplanation,
@@ -575,6 +593,34 @@ export async function assessCase(
 }
 
 /** Upsert the assessment row (same columns as before; Gate 1 lives in resultJson). */
+/** Civil specialisation check (doc 12) on the case's own data; null when not civil. */
+function specialisationFor(
+  result: AssessmentResult,
+  rows: ExtractedSubjectRow[],
+  caseRow: {
+    qualifications: Array<{ degreeLevel: unknown; degreeTitle: string | null; institution: string | null }>;
+    experienceRows: Array<{ title: string | null; start: string | null; end: string | null; domainFinal: boolean | null; domainSuggested: boolean | null }>;
+  },
+  cvText: string | null,
+): SpecialisationResult | null {
+  try {
+    const qualifications = caseRow.qualifications.map((q) => ({
+      degreeLevel: String(q.degreeLevel),
+      degreeTitle: q.degreeTitle ?? null,
+      institution: q.institution ?? null,
+    }));
+    const candidateCodes = [
+      result.anzscoCode ?? "",
+      ...(result.candidates ?? []).map((c) => c.anzscoCode),
+    ].filter(Boolean);
+    if (!specialisationApplies({ candidateCodes, qualifications })) return null;
+    return assessSpecialisations({ rows, qualifications, experienceRows: caseRow.experienceRows, cvText });
+  } catch (err) {
+    console.warn("[assess] specialisation check skipped:", (err as Error).message);
+    return null;
+  }
+}
+
 async function saveAssessment(caseId: string, result: AssessmentResult, inputHash: string) {
   const columns = {
     inputHash,
@@ -1373,15 +1419,31 @@ function candidateFromScored(s: ScoredOccupation): AnzscoCandidate {
   );
 }
 
-/** Engineering Technologist's own matching % when it was scored (first list that has it). */
-function etOwnScore(...lists: ScoredOccupation[][]): number | null {
+/** Engineering Technologist's own scoring (first list that has it). */
+function etScored(...lists: ScoredOccupation[][]): ScoredOccupation | null {
   for (const list of lists) {
     const hit = list.find(
       (s) => normalizeCode(s.rubric.anzscoCode) === ENGINEERING_TECHNOLOGIST_CODE,
     );
-    if (hit) return hit.scored.confidenceScore;
+    if (hit) return hit;
   }
   return null;
+}
+
+/** Engineering Technologist's own matching % when it was scored (first list that has it). */
+function etOwnScore(...lists: ScoredOccupation[][]): number | null {
+  return etScored(...lists)?.scored.confidenceScore ?? null;
+}
+
+/** ET's Tier 1 / 2 / 3 detail for the Maybe Suitable card (academic ET only). */
+function etTiersOf(...lists: ScoredOccupation[][]): EtTierDetail | null {
+  const et = etScored(...lists);
+  if (!et || et.vocational || et.rubric.format !== "academic") return null;
+  try {
+    return etTierDetail({ rubric: et.rubric, scored: et.scored, matches: et.matches });
+  } catch {
+    return null;
+  }
 }
 
 /** Prefer recommended occupations, then Gate 1 track priority, then higher numeric confidence, then coverage. */
@@ -1847,7 +1909,7 @@ export function assessExtractedSubjects(
     finalProjectTitle: winner.finalProject?.title ?? null,
     ...(assessorSelected ? { assessorSelected } : {}),
   };
-  result.familyAdjustment = familyAdjustmentForResult(result, etOwnScore(scoredAll));
+  result.familyAdjustment = familyAdjustmentForResult(result, etOwnScore(scoredAll), etTiersOf(scoredAll));
 
   if (!result.recommended) {
     result.anzscoCode = null;

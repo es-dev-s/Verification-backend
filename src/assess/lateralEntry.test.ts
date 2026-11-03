@@ -9,6 +9,7 @@ import {
   LATERAL_FIELD,
   creditEntriesOf,
   decideLateralEntry,
+  lateralAuditOf,
   lateralEntryConfirmed,
   lateralEntryDecided,
   lateralStateColumns,
@@ -18,7 +19,9 @@ import {
   priorStudyReadPlan,
   priorStudyRowsFor,
   startPeriodOf,
+  sameLateralDecision,
   withAnswer,
+  withLateralAudit,
   withoutPriorDocument,
   type LateralEntryState,
 } from "./lateralEntry.js";
@@ -465,5 +468,73 @@ describe("entryStatus capture", () => {
     assert.equal(entryStatusGrade("null"), null);
     assert.equal(subjectNameToExtractedRow("Physics", null, { entryStatus: "credited" }).grade, "Credit transfer");
     assert.equal(subjectNameToExtractedRow("Physics").grade, null);
+  });
+});
+
+describe("lateral entry: decision audit", () => {
+  const bachelor = (durationYears: number | null): QualificationInfo => ({
+    level: "bachelor",
+    rawLevel: "bachelor",
+    title: "Bachelor of Engineering",
+    countedYearsOverride: durationYears,
+  });
+  const viewFor = (s: LateralEntryState) =>
+    lateralEntryForCase({
+      infos: [bachelor(3)],
+      rows: engRows(),
+      fieldSources: [{ field: LATERAL_FIELD, degreeLevel: "bachelor", ...lateralStateColumns(s) }],
+    });
+
+  it("records duration, answers, both subject lists and the route", () => {
+    const s = state({
+      answer: ans("yes"),
+      priorDocumentIds: ["p1"],
+      priorSubjects: { documentIds: ["p1"], rows: [sub("Engineering Chemistry", null, null, "diploma")], at: AT },
+    });
+    const rec = lateralAuditOf(viewFor(s), "decision", AT);
+    assert.ok(rec);
+    assert.equal(rec.durationYears, 3);
+    assert.ok(rec.durationSource.length > 0);
+    assert.deepEqual(rec.answer, ans("yes"));
+    assert.equal(rec.route, 3);
+    assert.ok(rec.reason.length > 0);
+    assert.equal(typeof rec.contradiction.fired, "boolean");
+    assert.deepEqual(rec.primarySubjects, ENG);
+    assert.deepEqual(rec.priorStudySubjects, ["Engineering Chemistry"]);
+    assert.equal(lateralAuditOf(null, "decision"), null);
+  });
+
+  it("is stored in the existing row and survives a round trip", () => {
+    const s = state({ answer: ans("no") });
+    const rec = lateralAuditOf(viewFor(s), "decision", AT)!;
+    const next = withLateralAudit(s, rec)!;
+    assert.ok(next.events.some((e) => /Lateral entry decision: Route/.test(e.event)));
+    const back = lateralStateOf([{ field: LATERAL_FIELD, degreeLevel: "bachelor", ...lateralStateColumns(next) }]);
+    assert.deepEqual(back.audit, rec);
+    assert.deepEqual(back.answer, ans("no"));
+    // The audit does not change the assessment cache key.
+    assert.deepEqual(lateralHashOf(back), lateralHashOf(s));
+  });
+
+  it("adds an event only when the decision changes; an assessment refreshes the time", () => {
+    const s = state({ answer: ans("no") });
+    const rec = lateralAuditOf(viewFor(s), "decision", AT)!;
+    const saved = withLateralAudit(s, rec)!;
+    const again = lateralAuditOf(viewFor(saved), "decision", "2026-11-02T00:00:00.000Z")!;
+    assert.equal(sameLateralDecision(rec, again), true);
+    assert.equal(withLateralAudit(saved, again), null);
+    const onAssess = withLateralAudit(saved, { ...again, trigger: "assessment" })!;
+    assert.equal(onAssess.events.length, saved.events.length);
+    assert.equal(onAssess.audit?.trigger, "assessment");
+    const changed = { ...again, answer: ans("yes"), route: 2 as const };
+    assert.equal(withLateralAudit(saved, changed)!.events.length, saved.events.length + 1);
+  });
+
+  it("records a contradiction and why", () => {
+    const s = state({ answer: ans("no") });
+    const view = viewFor(s)!;
+    const rec = lateralAuditOf({ ...view, contradiction: { fired: true, reasons: ["admission note"] } }, "decision", AT)!;
+    assert.deepEqual(rec.contradiction, { fired: true, reasons: ["admission note"] });
+    assert.match(withLateralAudit(s, rec)!.events.at(-1)!.event, /contradiction: admission note/);
   });
 });

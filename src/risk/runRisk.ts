@@ -2,6 +2,8 @@ import { prisma } from "../lib/prisma.js";
 import { assessConfig } from "../assess/config.js";
 import type { AssessmentResult } from "../assess/schemas.js";
 import { historicalStatsForAnzsco } from "./historical.js";
+import { academicRubricFor, riskComponentSplits } from "./componentSplit.js";
+import { withSimilarCases } from "./similarCases.js";
 import { buildPrecedentCheck, emptyPrecedentCheck } from "./precedent.js";
 import {
   COMPETENCE_CONFLICT_PREFIX,
@@ -111,7 +113,6 @@ export async function runRiskAssessment(
   }
 
   const title = opts.title?.trim() || candidate.title;
-  const historical = historicalStatsForAnzsco(opts.anzscoCode);
 
   const quals = [...(caseRow.qualifications ?? [])].sort((a, b) => {
     const ia = QUAL_PRIORITY.indexOf(
@@ -123,6 +124,11 @@ export async function runRiskAssessment(
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
   const primaryQual = quals[0] ?? null;
+  const historical = withSimilarCases(historicalStatsForAnzsco(opts.anzscoCode), opts.anzscoCode, {
+    degreeTitle: primaryQual?.degreeTitle ?? null,
+    university: primaryQual?.institution ?? null,
+    country: primaryQual?.country ?? null,
+  });
   const precedent = buildPrecedentCheck({
     anzscoCode: candidate.anzscoCode,
     occupationTitle: title,
@@ -137,6 +143,15 @@ export async function runRiskAssessment(
       assessment.workExperienceBoost,
   );
   const missingCore = candidate.missingSubjects?.tier2 ?? [];
+  const academic = (candidate.assessmentFlow ?? "academic") === "academic" && !("vocational" in candidate && candidate.vocational);
+  const splits = academic
+    ? riskComponentSplits({
+        rubric: academicRubricFor(candidate.anzscoCode, candidate.title),
+        matches: ("matches" in candidate ? candidate.matches : assessment.matches) ?? [],
+        fundamental: { pct: candidate.foundationalPct, matched: candidate.foundationalMatched },
+        core: { pct: candidate.corePct, matched: candidate.coreMatched },
+      })
+    : null;
 
   const scored = computeRiskScores({
     anzscoCode: candidate.anzscoCode,
@@ -149,6 +164,7 @@ export async function runRiskAssessment(
     missingCore,
     assessmentFlow: candidate.assessmentFlow,
     vocational: "vocational" in candidate ? candidate.vocational : null,
+    splits,
   });
 
   const llm = await judgeRiskWithLlm(scored, { deadlineMs });

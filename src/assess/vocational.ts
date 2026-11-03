@@ -188,7 +188,7 @@ function matchUnit(
   return null;
 }
 
-/** Band from matched core units and the rubric thresholds (21–24 / 15–20 / 9–14 / 0–8 for 312311). */
+/** Band from matched core units and the rubric thresholds (21–24 / 15–20 / 9–14 / 0–8 for 312311; 39–44 / 28–38 / 17–27 / 0–16 for 312211). */
 export function coreBand(
   matched: number,
   thresholds: { noRisk: number; lowRisk: number; mediumRisk: number },

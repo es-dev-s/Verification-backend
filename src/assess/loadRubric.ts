@@ -15,6 +15,12 @@ const subjectSchema = z.object({
    * heading per shared row.
    */
   sharedVariantsFrom: z.string().optional(),
+  /**
+   * Risk weighting group inside its tier (doc 05: 70% Major / 30% Supporting).
+   * "supporting" comes from the rubric's own marking (Tier 2 core rows
+   * labelled "(supporting)" or importance "recommended"); unset = major.
+   */
+  weight: z.enum(["major", "supporting"]).optional(),
 });
 
 const rubricSchema = z.object({
@@ -127,6 +133,10 @@ type NamedSubject = {
   aliases?: string[];
   /** Free-text assessor note, e.g. "Includes Mathematics I/II/III, Numerical Methods, etc." */
   matchingNote?: string;
+  /** Tier 2 core row marked "(supporting)" in the rubric. */
+  labelledSupporting?: boolean;
+  /** "recommended" = soft core (supporting for risk weighting). */
+  importance?: string;
 };
 type OccupationRaw = {
   id: string;
@@ -259,6 +269,7 @@ type SubjectsEntry = {
   groups?: Record<
     string,
     {
+      categoryLabel?: string;
       subjects?: Array<{
         id?: string;
         /** Further rubric heading ids this row is linked to (one sheet heading covering several rubric rows). */
@@ -365,6 +376,18 @@ function loadRubricsFile(): RubricsFile {
   const path = resolve(libDir, "anzsco-verification-rubrics.json");
   rubricsFile = JSON.parse(readFileSync(path, "utf8")) as RubricsFile;
   return rubricsFile;
+}
+
+/** Sheet group labels for one occupation in anzsco_subjects.json (group key → label). */
+export function subjectGroupLabels(anzscoCode: string, occupationId?: string): Record<string, string> {
+  const entry = loadSubjectsFile().find(
+    (e) => String(e.anzscoCode) === anzscoCode && (!occupationId || !e.occupationId || e.occupationId === occupationId),
+  );
+  const out: Record<string, string> = {};
+  for (const [key, g] of Object.entries(entry?.groups ?? {})) {
+    if (g.categoryLabel) out[key] = g.categoryLabel;
+  }
+  return out;
 }
 
 function loadSubjectsFile(): SubjectsEntry[] {
@@ -666,9 +689,10 @@ function buildRubricFromOccupation(occupation: OccupationRaw): Rubric {
   });
 
   const tier2Subjects = [
-    ...(occupation.tier2.core ?? []).map((s) =>
-      withVariants(s.id, subjectName(s), "core", byId, extras(s)),
-    ),
+    ...(occupation.tier2.core ?? []).map((s) => {
+      const row = withVariants(s.id, subjectName(s), "core", byId, extras(s));
+      return isSupportingRow(s) ? { ...row, weight: "supporting" as const } : row;
+    }),
     ...(occupation.tier2.optional ?? []).map((s) =>
       withVariants(s.id, subjectName(s), "optional", byId, extras(s)),
     ),
@@ -857,6 +881,11 @@ export function listVocationalOccupations(): VocationalOccupation[] {
         })),
       };
     });
+}
+
+/** Rubric marking for a Supporting (not Major) Tier 2 core row. */
+export function isSupportingRow(s: { labelledSupporting?: boolean; importance?: string }): boolean {
+  return s.labelledSupporting === true || (s.importance ?? "").toLowerCase() === "recommended";
 }
 
 /** Compile rubrics for every academic occupation. */

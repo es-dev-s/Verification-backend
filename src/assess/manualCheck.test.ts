@@ -43,7 +43,9 @@ const OPEN: QualificationInfo[] = [
   { level: "bachelor", title: "Bachelor of Engineering (Mechanical)", countedYearsOverride: 4 },
 ];
 const MANUAL_REVIEW: QualificationInfo[] = [
-  { level: "bachelor", title: "Bachelor of Engineering (Lateral Entry)", countedYearsOverride: 3 },
+  // Part-time study is a Gate 1 manual-review flag (lateral-entry titles now
+  // go through the lateral-entry check instead of manual review).
+  { level: "bachelor", title: "Bachelor of Engineering (Mechanical) (Part-time)", countedYearsOverride: 4 },
 ];
 
 describe("assessor ANZSCO check (read-only)", () => {

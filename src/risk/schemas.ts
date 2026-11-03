@@ -26,6 +26,42 @@ export type HistoricalStats = {
   negative: number;
   banned: number;
   positivePct: number;
+  /**
+   * Score used for the Historical component (0–100): the positive % of past
+   * cases for the ANZSCO weighted by how similar each past case is to this
+   * applicant (see similarCases.ts). Absent on older results → positivePct.
+   */
+  scorePct?: number;
+  /** Similar past cases behind scorePct. */
+  similar?: SimilarCasesSummary;
+};
+
+/** Past cases (same ANZSCO) that resemble this applicant's qualification profile. */
+export type SimilarCasesSummary = {
+  /** Past cases with similarity ≥ the threshold. */
+  cases: number;
+  positive: number;
+  negative: number;
+  /** Similarity-weighted positive % over the similar cases (null when none). */
+  weightedPositivePct: number | null;
+  /** Short description of the method (shown as a tooltip / note). */
+  method: string;
+};
+
+/** Major / Supporting split of one risk component (doc 05 §5–6). */
+export type ComponentSplit = {
+  /** rubric = rubric marks Supporting rows; derived = Optional rows as Supporting (never lowers); plain = no split. */
+  method: "rubric" | "derived" | "plain";
+  /** Component score after the split (0–100). */
+  pct: number;
+  majorMatched: number;
+  majorTotal: number;
+  majorPct: number;
+  supportingMatched: number;
+  supportingTotal: number;
+  supportingPct: number | null;
+  missingMajor: string[];
+  missingSupporting: string[];
 };
 
 /** Per-case precedent risk reused from datasheet `outcomePossibility`. */
@@ -125,6 +161,8 @@ export type RiskAssessmentResult = {
   increasingRisk: string[];
   /** Single sentence on missing major core domains. */
   missingMajorDomains: string;
+  /** 70% Major / 30% Supporting detail behind the Fundamental and Core scores. */
+  componentSplits?: { fundamental: ComponentSplit; core: ComponentSplit };
   competence: Competence;
   competenceSource: "ai" | "manual";
   insight: string;

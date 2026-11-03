@@ -35,6 +35,12 @@ export const assessConfig = {
   extractConcurrency: intEnv("ASSESS_EXTRACT_CONCURRENCY", 3),
   /** Per-attempt Groq timeout for subject extraction. */
   extractRequestTimeoutMs: intEnv("ASSESS_EXTRACT_REQUEST_MS", 60_000),
+  /**
+   * Longest transcript slice sent in one subject-extract request. Longer
+   * transcripts are split further (also with a single Groq key) so no reply
+   * is cut off by the token limit.
+   */
+  extractMaxChunkChars: intEnv("ASSESS_EXTRACT_MAX_CHUNK_CHARS", 14_000),
   /** Fuzzy match similarity threshold (0–1). */
   fuzzyThreshold: floatEnv("ASSESS_FUZZY_THRESHOLD", 0.82),
   /** Use LLM for leftover unclear subject matches (slow). Default off. */

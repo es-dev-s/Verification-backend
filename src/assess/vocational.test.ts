@@ -44,14 +44,14 @@ function score(rows: ExtractedSubjectRow[], extra: Partial<Parameters<typeof sco
 }
 
 describe("312311 rubric", () => {
-  it("is switched on with 24 real core codes; 312211 / 313213 stay off", () => {
+  it("is switched on with 24 real core codes; 312211 is on, 313213 stays off", () => {
     assert.equal(ELEC.scoringEnabled, true);
     assert.equal(ELEC.coreUnits.units.length, 24);
     assert.ok(codes.every((c) => /^[A-Z]{3}[A-Z]{2,3}\d{3,4}[A-Z]?$/.test(c)));
-    for (const a of ["312211", "313213"]) {
-      const o = listVocationalOccupations().find((x) => x.anzsco === a);
-      assert.equal(o?.scoringEnabled ?? false, false, a);
-    }
+    const civil = listVocationalOccupations().find((x) => x.anzsco === "312211");
+    assert.equal(civil?.scoringEnabled, true);
+    const planner = listVocationalOccupations().find((x) => x.anzsco === "313213");
+    assert.equal(planner?.scoringEnabled ?? false, false);
   });
 });
 
@@ -199,5 +199,77 @@ describe("assessExtractedSubjects (vocational route)", () => {
     const drafts = res.candidates!.find((x) => x.anzscoCode === "312511");
     if (drafts) assert.notEqual(drafts.determination, "verified_no_risk");
     assert.ok(res.candidates!.every((x) => x.track === "engineering_associate"));
+  });
+});
+
+describe("312211 Civil Engineering Draftsperson (44 core units)", () => {
+  const CIVIL = listVocationalOccupations().find((o) => o.anzsco === "312211")!;
+  const civilRows = (n: number) => CIVIL.coreUnits.units.slice(0, n).map((u) => row(u.title, u.code));
+  const civilScore = (n: number) =>
+    scoreVocational({
+      occupation: CIVIL,
+      rows: civilRows(n),
+      workExperienceBoost: false,
+      qualificationMet: true,
+      qualificationNote: "ok",
+    });
+
+  it("is switched on with 44 real codes and bands 39 / 28 / 17", () => {
+    assert.equal(CIVIL.scoringEnabled, true);
+    assert.equal(CIVIL.disabledReason, null);
+    assert.equal(CIVIL.coreUnits.total, 44);
+    assert.equal(CIVIL.coreUnits.units.length, 44);
+    assert.ok(CIVIL.coreUnits.units.every((u) => Boolean(u.code)));
+    assert.deepEqual(CIVIL.coreUnits.thresholds, { noRisk: 39, lowRisk: 28, medium: 17 });
+    assert.ok(CIVIL.reviewFlags.some((f) => /39\/28\/17 of the 44/.test(f.message) && /in use/.test(f.message)));
+  });
+
+  it("bands: 39–44 no risk, 28–38 low, 17–27 medium, below 17 high", () => {
+    const cases: Array<[number, string, string]> = [
+      [44, "no_risk", "verified_no_risk"],
+      [39, "no_risk", "verified_no_risk"],
+      [38, "low_risk", "verified_no_risk"],
+      [28, "low_risk", "verified_no_risk"],
+      [27, "medium_risk", "conditional"],
+      [17, "medium_risk", "conditional"],
+      [16, "high_risk", "not_verified"],
+      [0, "high_risk", "not_verified"],
+    ];
+    for (const [n, band, det] of cases) {
+      const r = civilScore(n);
+      assert.equal(r.detail.coreMatched, n, `matched ${n}`);
+      assert.equal(r.detail.coreBand, band, `band at ${n}`);
+      assert.equal(r.scored.determination === "no_match" ? "not_verified" : r.scored.determination, det, `det at ${n}`);
+    }
+  });
+
+  it("electives stay flagged for review (minimum not set), like 312311", () => {
+    const r = civilScore(40);
+    assert.equal(r.detail.electiveStatus, "not_assessed");
+    assert.ok(r.detail.flags.some((f) => /Elective minimum not set/.test(f)));
+  });
+
+  it("foundational units are not scored (core units only, doc 11 §3)", () => {
+    const r = civilScore(44);
+    assert.equal(r.scored.foundationalExpected, 0);
+    assert.equal(r.detail.coreTotal, 44);
+  });
+
+  it("RII60520 with 40 core units → 312211 verified through the assessment", () => {
+    const res = assessExtractedSubjects(civilRows(40), {
+      qualifications: [
+        {
+          level: "advanced_diploma",
+          title: "Advanced Diploma of Civil Construction Design",
+          texts: ["RII60520"],
+          countedYearsOverride: 2,
+        },
+      ],
+    });
+    const c = res.candidates!.find((x) => x.anzscoCode === "312211");
+    assert.ok(c, "312211 candidate scored");
+    assert.equal(c!.vocational?.coreMatched, 40);
+    assert.equal(c!.vocational?.coreBand, "no_risk");
+    assert.equal(c!.determination, "verified_no_risk");
   });
 });

@@ -2213,7 +2213,7 @@
         {
           "severity": "low",
           "field": "coreUnits.thresholds",
-          "message": "Risk bands were scaled from the previous 8-unit ratios (7/8, 5/8, 3/8) to 39/28/17 of 44 after the sheet core units replaced the placeholders. Confirm before scoring is switched on."
+          "message": "Risk bands are 39/28/17 of the 44 core units, scaled from the previous 8-unit ratios (7/8, 5/8, 3/8). Confirmed by the team and in use: 39–44 No Risk, 28–38 Low Risk, 17–27 Medium Risk, below 17 High Risk."
         },
         {
           "severity": "medium",
@@ -2221,7 +2221,7 @@
           "message": "Minimum elective count is not stated in the doc (packaging rule). Set before use."
         }
       ],
-      "dataNote": "Core units are the 44 sheet units from Project Management, Leadership / Innovation, Structural Design, Road & Infrastructure, Business / Feasibility, and Engineering Fundamentals. The five Foundational units (BSBTWK502, BSBWHS616, BSBPMG632, RIICWD601E, RIIQUA601E) are not in this core list. Scoring stays off until the elective minimum is set and the scaled risk bands are confirmed.",
+      "dataNote": "Core units are the 44 sheet units from Project Management, Leadership / Innovation, Structural Design, Road & Infrastructure, Business / Feasibility, and Engineering Fundamentals. The five Foundational units (BSBTWK502, BSBWHS616, BSBPMG632, RIICWD601E, RIIQUA601E) are not in this core list and are not scored (the flow doc bases the score on core units only). Scoring is on; electives are flagged for review until the minimum is set.",
       "qualification": {
         "statement": "Confirm that the qualification is, or is equivalent to, RII60520 -- Advanced Diploma of Civil Construction Design. Accepted qualification titles include: RII60520 Advanced Diploma of Civil Construction Design, Overseas equivalent Advanced Diploma / Associate Degree in Civil Engineering Drafting/Design.",
         "codes": [
@@ -2526,8 +2526,7 @@
       "practicalEvidence": {
         "role": "supporting_only"
       },
-      "scoringEnabled": false,
-      "scoringDisabledReason": "Core units are populated, but scoring stays off until the elective minimum is set and the scaled risk bands are confirmed."
+      "scoringEnabled": true
     },
     {
       "id": "telecommunications-network-planner",

@@ -23,7 +23,7 @@ import {
 import { assessConfig } from "./config.js";
 import {
   degreeLevelToQualification,
-  extractSubjectsFromTranscripts,
+  extractSubjectsDetailed,
   hashAssessmentInput,
   hashSubjectInput,
   type TranscriptSource,
@@ -50,6 +50,7 @@ import {
 import {
   isDiplomaLevel,
   type ExtractedSubjectRow,
+  type ExtractionPartial,
   type ExtractionReport,
   type Gate1AwardLevel,
   type QualificationType,
@@ -359,14 +360,19 @@ export async function readSavedSubjectHash(caseId: string): Promise<string | nul
   return row?.extractedValue ?? null;
 }
 
-async function saveSubjectHash(caseId: string, subjectHash: string) {
+/**
+ * Saved-subject record. A partial read keeps "partial:<hash>" (never current)
+ * and the failure details as JSON in finalValue.
+ */
+async function saveSubjectHash(caseId: string, subjectHash: string, partial?: ExtractionPartial) {
+  const finalValue = partial ? JSON.stringify(partial) : subjectHash;
   const existing = await prisma.fieldSource.findFirst({
     where: { caseId, field: TRANSCRIPT_EXTRACTION_FIELD, degreeLevel: null },
   });
   if (existing) {
     await prisma.fieldSource.update({
       where: { id: existing.id },
-      data: { extractedValue: subjectHash, finalValue: subjectHash },
+      data: { extractedValue: subjectHash, finalValue },
     });
   } else {
     await prisma.fieldSource.create({
@@ -375,9 +381,34 @@ async function saveSubjectHash(caseId: string, subjectHash: string) {
         field: TRANSCRIPT_EXTRACTION_FIELD,
         degreeLevel: null,
         extractedValue: subjectHash,
-        finalValue: subjectHash,
+        finalValue,
       },
     });
+  }
+}
+
+/** Failure details of the last partial read (null when the last read was complete). */
+export async function readSavedExtractionPartial(caseId: string): Promise<ExtractionPartial | null> {
+  const row = await prisma.fieldSource.findFirst({
+    where: { caseId, field: TRANSCRIPT_EXTRACTION_FIELD, degreeLevel: null },
+  });
+  return partialFromSaved(row?.extractedValue ?? null, row?.finalValue ?? null);
+}
+
+export function partialFromSaved(
+  savedHash: string | null,
+  finalValue: string | null,
+): ExtractionPartial | null {
+  if (!savedHash?.startsWith(PARTIAL_HASH_PREFIX)) return null;
+  try {
+    const v = JSON.parse(finalValue ?? "") as Partial<ExtractionPartial>;
+    return {
+      failedChunks: typeof v.failedChunks === "number" ? v.failedChunks : 1,
+      pages: Array.isArray(v.pages) ? v.pages.filter((n) => typeof n === "number") : [],
+      reasons: Array.isArray(v.reasons) ? v.reasons.map(String) : [],
+    };
+  } catch {
+    return { failedChunks: 1, pages: [], reasons: [] };
   }
 }
 
@@ -397,6 +428,22 @@ export function savedSubjectsAreCurrent(input: {
   if (input.savedHash) return input.savedHash === input.subjectHash;
   if (input.previousExtraction) return input.previousExtraction.subjectHash === input.subjectHash;
   return input.legacyHashMatches;
+}
+
+/** Saved-hash marker for a partial read: never equals a real subject hash. */
+export const PARTIAL_HASH_PREFIX = "partial:";
+
+/** One clean line for the UI when some transcript pages could not be read. */
+export const PARTIAL_READ_WARNING = "Some pages couldn't be read.";
+
+export function partialReportOf(
+  failed: Array<{ pages: number[]; reason: string }>,
+): ExtractionPartial {
+  return {
+    failedChunks: failed.length,
+    pages: [...new Set(failed.flatMap((f) => f.pages))].sort((a, b) => a - b),
+    reasons: [...new Set(failed.map((f) => f.reason))],
+  };
 }
 
 export type ResolvedSubjects = {
@@ -430,6 +477,8 @@ export async function resolveSubjects(input: {
   savedOnly?: boolean;
   useLlm: boolean;
   deadlineMs: number;
+  /** Test hook: replaces the Groq subject read. */
+  extract?: typeof extractSubjectsDetailed;
 }): Promise<ResolvedSubjects | null> {
   const { caseId, transcripts, persistedRows, subjectHash } = input;
   const current = savedSubjectsAreCurrent({
@@ -449,9 +498,13 @@ export async function resolveSubjects(input: {
   } else if (input.savedOnly) {
     if (!persistedRows.length) return null;
     rows = persistedRows;
+    const savedPartial = input.savedHash?.startsWith(PARTIAL_HASH_PREFIX)
+      ? await readSavedExtractionPartial(caseId)
+      : null;
     extraction = {
-      subjectHash: input.savedHash ?? input.previousExtraction?.subjectHash ?? "",
+      subjectHash: savedPartial ? "" : (input.savedHash ?? input.previousExtraction?.subjectHash ?? ""),
       source: "persisted",
+      ...(savedPartial ? { partial: savedPartial } : {}),
     };
     cacheable = false;
   } else if (input.useLlm && transcripts.length) {
@@ -460,7 +513,9 @@ export async function resolveSubjects(input: {
       text: t.text!,
       degreeLevelHint: input.docLevel(t),
     }));
-    const fresh = await extractSubjectsFromTranscripts(sources, { deadlineMs: input.deadlineMs });
+    const read = await (input.extract ?? extractSubjectsDetailed)(sources, { deadlineMs: input.deadlineMs });
+    const fresh = read.rows;
+    const partial = read.partial ? partialReportOf(read.failedChunks) : undefined;
     const choice = chooseSubjectsAfterExtraction(fresh, persistedRows);
     rows = choice.rows;
     if (choice.keptSaved) {
@@ -469,7 +524,15 @@ export async function resolveSubjects(input: {
       extraction = {
         subjectHash: input.savedHash ?? input.previousExtraction?.subjectHash ?? "",
         source: "persisted",
+        ...(partial ? { partial } : {}),
       };
+      cacheable = false;
+    } else if (partial) {
+      // Some pages could not be read: show what was read, but never mark it
+      // current, so the next run reads the transcripts again.
+      extraction = { subjectHash: "", source: "llm", partial };
+      await persistExtractedSubjects(caseId, rows, transcripts);
+      await saveSubjectHash(caseId, `${PARTIAL_HASH_PREFIX}${subjectHash}`, partial);
       cacheable = false;
     } else {
       extraction = { subjectHash, source: "llm" };
@@ -578,6 +641,11 @@ export type TranscriptDataSummary = {
   /** Every qualification has a duration (else Gate 1 sends the case to manual review). */
   durationOk: boolean;
   message: string | null;
+  /**
+   * One line when the last read missed some transcript pages (the subjects
+   * are incomplete and will be read again); null otherwise.
+   */
+  readWarning: string | null;
   qualifications: QualificationTranscriptSummary[];
   /** Lateral-entry check for the bachelor (null when there is no bachelor). */
   lateralEntry: LateralEntryView | null;
@@ -808,6 +876,7 @@ export async function getTranscriptData(
   }
 
   const savedNow = await readSavedSubjectHash(caseId);
+  const readWarning = savedNow?.startsWith(PARTIAL_HASH_PREFIX) ? PARTIAL_READ_WARNING : null;
   const subjectsCurrent = savedSubjectsAreCurrent({
     persistedCount: row.extractedSubjects.length,
     subjectHash,
@@ -836,6 +905,7 @@ export async function getTranscriptData(
     source,
     durationOk: qualifications.every((q) => q.durationCheck.ok),
     message,
+    readWarning,
     qualifications,
     lateralEntry,
   };
