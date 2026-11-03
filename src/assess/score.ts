@@ -16,6 +16,11 @@ export type ScoreInput = {
   rubric: Rubric;
   /** Step 1 qualification check for this pool (omitted → no cap, no notes). */
   qualificationCheck?: QualificationCheckResult;
+  /**
+   * Engineering Associate occupations do not use the capstone / major-project gate.
+   * Omitted or true keeps the gate. False leaves determination and the score unchanged by it.
+   */
+  applyCapstone?: boolean;
 };
 
 export type ScoreResult = {
@@ -33,6 +38,8 @@ export type ScoreResult = {
   confidence: ConfidenceLevel | null;
   /** 0–100 numeric confidence for ranking and UI display. */
   confidenceScore: number;
+  /** False when this occupation is Engineering Associate: capstone is not used. */
+  capstoneApplies: boolean;
   anzscoCode: string | null;
   title: string | null;
   /** Step 1 qualification-check notes for the assessor (empty when none). */
@@ -173,6 +180,8 @@ export function computeConfidenceScore(input: {
   corePct: number;
   tier3GateMet: boolean;
   workExperienceBoost: boolean;
+  /** False for Engineering Associate: the capstone does not change the score. */
+  applyCapstone?: boolean;
   /** When provided with totals, coverage uses the blended (size-aware) formula. */
   foundationalMatched?: number;
   foundationalExpected?: number;
@@ -216,12 +225,14 @@ export function computeConfidenceScore(input: {
   }
 
   if (input.workExperienceBoost) score += 4;
-  if (input.tier3GateMet) score += 3;
-  else if (
-    input.rawDetermination === "verified_no_risk" ||
-    input.rawDetermination === "conditional"
-  ) {
-    score -= 6;
+  if (input.applyCapstone !== false) {
+    if (input.tier3GateMet) score += 3;
+    else if (
+      input.rawDetermination === "verified_no_risk" ||
+      input.rawDetermination === "conditional"
+    ) {
+      score -= 6;
+    }
   }
 
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -270,13 +281,17 @@ export function scoreAssessment(input: ScoreInput): ScoreResult {
     rubric.riskScoring.tier2.thresholds,
   );
 
+  const applyCapstone = input.applyCapstone !== false;
+  const tier3ForBand = applyCapstone ? tier3GateMet : true;
+
   const tableDetermination = combineDetermination(
     tier1Outcome,
     tier2Outcome,
-    tier3GateMet,
+    tier3ForBand,
     rubric,
   );
   const gateDowngraded =
+    applyCapstone &&
     !tier3GateMet &&
     tableDetermination !== "verified_no_risk" &&
     combineDetermination(tier1Outcome, tier2Outcome, true, rubric) === "verified_no_risk";
@@ -307,6 +322,7 @@ export function scoreAssessment(input: ScoreInput): ScoreResult {
     foundationalPct,
     corePct,
     tier3GateMet,
+    applyCapstone,
     workExperienceBoost,
     foundationalMatched,
     foundationalExpected,
@@ -338,6 +354,7 @@ export function scoreAssessment(input: ScoreInput): ScoreResult {
     recommended,
     confidence: recommended ? confidence : null,
     confidenceScore,
+    capstoneApplies: applyCapstone,
     anzscoCode: recommended ? rubric.anzscoCode : null,
     title: recommended ? rubric.title : null,
     qualificationNotes: [...(input.qualificationCheck?.notes ?? [])],

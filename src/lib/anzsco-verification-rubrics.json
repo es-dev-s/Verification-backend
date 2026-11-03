@@ -2211,9 +2211,9 @@
       },
       "reviewFlags": [
         {
-          "severity": "high",
-          "field": "coreUnits.units",
-          "message": "Core unit codes are placeholders (\"Core Unit 1–8\") pending validation against training.gov.au. Do not use for production scoring until populated."
+          "severity": "low",
+          "field": "coreUnits.thresholds",
+          "message": "Risk bands were scaled from the previous 8-unit ratios (7/8, 5/8, 3/8) to 39/28/17 of 44 after the sheet core units replaced the placeholders. Confirm before scoring is switched on."
         },
         {
           "severity": "medium",
@@ -2221,7 +2221,7 @@
           "message": "Minimum elective count is not stated in the doc (packaging rule). Set before use."
         }
       ],
-      "dataNote": "Data note: the core unit codes for this qualification are recorded as placeholders in the source rubric and are pending validation against training.gov.au. The counts, risk bands and structure below are ready for production use; the specific unit codes/titles in Step 2 should be populated as soon as they are confirmed.",
+      "dataNote": "Core units are the 44 sheet units from Project Management, Leadership / Innovation, Structural Design, Road & Infrastructure, Business / Feasibility, and Engineering Fundamentals. The five Foundational units (BSBTWK502, BSBWHS616, BSBPMG632, RIICWD601E, RIIQUA601E) are not in this core list. Scoring stays off until the elective minimum is set and the scaled risk bands are confirmed.",
       "qualification": {
         "statement": "Confirm that the qualification is, or is equivalent to, RII60520 -- Advanced Diploma of Civil Construction Design. Accepted qualification titles include: RII60520 Advanced Diploma of Civil Construction Design, Overseas equivalent Advanced Diploma / Associate Degree in Civil Engineering Drafting/Design.",
         "codes": [
@@ -2243,81 +2243,291 @@
         }
       },
       "coreUnits": {
-        "total": 8,
+        "total": 44,
         "thresholds": {
-          "noRisk": 7,
-          "lowRisk": 5,
-          "medium": 3
+          "noRisk": 39,
+          "lowRisk": 28,
+          "medium": 17
         },
         "units": [
           {
             "id": "U1",
-            "code": null,
-            "title": "Core Unit 1",
-            "placeholder": true
+            "code": "BSBPMG530",
+            "title": "Manage project scope",
+            "cluster": "Project Management (varies)"
           },
           {
             "id": "U2",
-            "code": null,
-            "title": "Core Unit 2",
-            "placeholder": true
+            "code": "BSBPMG531",
+            "title": "Manage project time",
+            "cluster": "Project Management (varies)"
           },
           {
             "id": "U3",
-            "code": null,
-            "title": "Core Unit 3",
-            "placeholder": true
+            "code": "BSBPMG533",
+            "title": "Manage project cost",
+            "cluster": "Project Management (varies)"
           },
           {
             "id": "U4",
-            "code": null,
-            "title": "Core Unit 4",
-            "placeholder": true
+            "code": "BSBPMG537",
+            "title": "Manage project procurement",
+            "cluster": "Project Management (varies)"
           },
           {
             "id": "U5",
-            "code": null,
-            "title": "Core Unit 5",
-            "placeholder": true
+            "code": "BSBPMG532",
+            "title": "Manage project quality",
+            "cluster": "Project Management (varies)"
           },
           {
             "id": "U6",
-            "code": null,
-            "title": "Core Unit 6",
-            "placeholder": true
+            "code": "BSBPMG534",
+            "title": "Manage project human resources",
+            "cluster": "Project Management (varies)"
           },
           {
             "id": "U7",
-            "code": null,
-            "title": "Core Unit 7",
-            "placeholder": true
+            "code": "BSBPMG535",
+            "title": "Manage project information and communication",
+            "cluster": "Project Management (varies)"
           },
           {
             "id": "U8",
-            "code": null,
-            "title": "Core Unit 8",
-            "placeholder": true
+            "code": "BSBPMG540",
+            "title": "Manage project integration",
+            "cluster": "Project Management (varies)"
+          },
+          {
+            "id": "U9",
+            "code": "RIILAT402E",
+            "title": "Provide leadership in the supervision of diverse work teams",
+            "cluster": "Leadership / Innovation"
+          },
+          {
+            "id": "U10",
+            "code": "BSBSTR801",
+            "title": "Lead innovative thinking and practice",
+            "cluster": "Leadership / Innovation"
+          },
+          {
+            "id": "U11",
+            "code": "BSBCRT611",
+            "title": "Apply critical thinking for complex problem solving",
+            "cluster": "Leadership / Innovation"
+          },
+          {
+            "id": "U12",
+            "code": "BSBSTR601",
+            "title": "Manage innovation and continuous improvement",
+            "cluster": "Leadership / Innovation"
+          },
+          {
+            "id": "U13",
+            "code": "RIICWD534E",
+            "title": "Prepare detailed design of civil steel structures",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U14",
+            "code": "RIICWD535E",
+            "title": "Prepare detailed design of civil timber structures",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U15",
+            "code": "RIICWD501E",
+            "title": "Prepare detailed design of foundations",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U16",
+            "code": "MEM23004A",
+            "title": "Apply technical mathematics",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U17",
+            "code": "MEM23007A",
+            "title": "Apply calculus to engineering tasks",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U18",
+            "code": "MEM23109",
+            "title": "Apply engineering mechanics principles",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U19",
+            "code": "MEM30005A",
+            "title": "Calculate force systems within simple beam structures",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U20",
+            "code": "MEM30006A",
+            "title": "Calculate stresses in simple structures",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U21",
+            "code": "RIICWD510E",
+            "title": "Prepare detailed design of busways",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U22",
+            "code": "RIICWD520E",
+            "title": "Prepare detailed design of rigid pavements",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U23",
+            "code": "RIICWD528E",
+            "title": "Prepare detailed design of traffic management systems",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U24",
+            "code": "RIICWD532E",
+            "title": "Prepare detailed design of tunnels",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U25",
+            "code": "RIICWD536E",
+            "title": "Prepare detailed design of civil masonry, crib and gabion structures",
+            "cluster": "Structural Design Specialization"
+          },
+          {
+            "id": "U26",
+            "code": "RIICWD509E",
+            "title": "Prepare detailed design of urban roads",
+            "cluster": "Road & Infrastructure Design"
+          },
+          {
+            "id": "U27",
+            "code": "RIICWD511E",
+            "title": "Prepare detailed design of sub-divisions",
+            "cluster": "Road & Infrastructure Design"
+          },
+          {
+            "id": "U28",
+            "code": "RIICWD512E",
+            "title": "Prepare detailed design of motorways and interchanges",
+            "cluster": "Road & Infrastructure Design"
+          },
+          {
+            "id": "U29",
+            "code": "RIICWD526E",
+            "title": "Prepare detailed traffic analysis",
+            "cluster": "Road & Infrastructure Design"
+          },
+          {
+            "id": "U30",
+            "code": "RIICWD530E",
+            "title": "Prepare detailed design of surface drainage",
+            "cluster": "Road & Infrastructure Design"
+          },
+          {
+            "id": "U31",
+            "code": "RIICWD507D",
+            "title": "Prepare detailed geotechnical design",
+            "cluster": "Road & Infrastructure Design"
+          },
+          {
+            "id": "U32",
+            "code": "RIICWD533E",
+            "title": "Prepare detailed design of civil concrete structures",
+            "cluster": "Road & Infrastructure Design"
+          },
+          {
+            "id": "U33",
+            "code": "BSBOPS601",
+            "title": "Develop and implement business plans",
+            "cluster": "Business / Feasibility (isolated)"
+          },
+          {
+            "id": "U34",
+            "code": "RIIBEF601E",
+            "title": "Conduct business negotiations",
+            "cluster": "Business / Feasibility (isolated)"
+          },
+          {
+            "id": "U35",
+            "code": "BSBINS601",
+            "title": "Manage knowledge and information",
+            "cluster": "Business / Feasibility (isolated)"
+          },
+          {
+            "id": "U36",
+            "code": "BSBPEF501",
+            "title": "Manage personal and professional development",
+            "cluster": "Business / Feasibility (isolated)"
+          },
+          {
+            "id": "U37",
+            "code": "BSBESB406",
+            "title": "Establish operational strategies and procedures for new business ventures",
+            "cluster": "Business / Feasibility (isolated)"
+          },
+          {
+            "id": "U38",
+            "code": "RIIBEF604E",
+            "title": "Conduct a feasibility study",
+            "cluster": "Business / Feasibility (isolated)"
+          },
+          {
+            "id": "U39",
+            "code": "MEM30012A",
+            "title": "Apply mathematical techniques",
+            "cluster": "Engineering Fundamentals (isolated, single RTO observed)"
+          },
+          {
+            "id": "U40",
+            "code": "MEM30031",
+            "title": "Operate CAD system to produce basic drawing elements",
+            "cluster": "Engineering Fundamentals (isolated, single RTO observed)"
+          },
+          {
+            "id": "U41",
+            "code": "MEM30032A",
+            "title": "Produce basic engineering drawings",
+            "cluster": "Engineering Fundamentals (isolated, single RTO observed)"
+          },
+          {
+            "id": "U42",
+            "code": "MEM30033A",
+            "title": "Use CAD to create and display 3-D models",
+            "cluster": "Engineering Fundamentals (isolated, single RTO observed)"
+          },
+          {
+            "id": "U43",
+            "code": "CPCCOM2001",
+            "title": "Read and interpret plans and specifications",
+            "cluster": "Engineering Fundamentals (isolated, single RTO observed)"
+          },
+          {
+            "id": "U44",
+            "code": "CPPBDN6106",
+            "title": "Produce building information modelling for building design projects",
+            "cluster": "Engineering Fundamentals (isolated, single RTO observed)"
           }
         ]
       },
       "electives": {
         "clusters": [
-          "Project Management (varies)",
-          "Leadership / Innovation",
-          "Structural Design Specialization",
-          "Road & Infrastructure Design",
-          "Business / Feasibility (isolated)",
-          "Engineering Fundamentals (isolated, single RTO observed)",
           "Others"
         ],
         "minimumUnits": null,
-        "rule": "Count-only check: applicant must meet the qualification packaging-rule minimum; no specific elective is mandatory."
+        "rule": "The sheet groups are scored as core units. Elective minimum is not set, so electives are not assessed."
       },
       "practicalEvidence": {
         "role": "supporting_only"
       },
       "scoringEnabled": false,
-      "scoringDisabledReason": "Core units are placeholders (no unit codes yet)."
+      "scoringDisabledReason": "Core units are populated, but scoring stays off until the elective minimum is set and the scaled risk bands are confirmed."
     },
     {
       "id": "telecommunications-network-planner",

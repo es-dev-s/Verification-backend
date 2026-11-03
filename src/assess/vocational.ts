@@ -465,6 +465,7 @@ export function scoreVocational(input: {
       ? confidenceLabel(determination, confidenceScore, input.workExperienceBoost, true)
       : null,
     confidenceScore,
+    capstoneApplies: false,
     anzscoCode: recommended ? occ.anzsco : null,
     title: recommended ? occ.title : null,
     qualificationNotes,

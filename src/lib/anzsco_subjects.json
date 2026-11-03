@@ -6663,125 +6663,235 @@
     "anzscoCode": "312211",
     "title": "Civil Engineering Draftsperson",
     "sourceSheet": "Civil Engineering Draftsperson",
+    "qualification": "RII60520 Advanced Diploma of Civil Construction Design",
     "groups": {
-      "units_core": {
-        "categoryLabel": "CORE UNITS (unit codes not specified in source rubric - to be confirmed/filled)",
+      "units_foundational": {
+        "categoryLabel": "Foundational Units",
         "subjects": [
           {
-            "name": "Core Unit 1",
-            "variants": [
-              "BSBTWK502 Manage team effectiveness"
-            ]
+            "name": "BSBTWK502 - Manage team effectiveness",
+            "variants": []
           },
           {
-            "name": "Core Unit 2",
-            "variants": [
-              "BSBWHS616 Apply safe design principles to control WHS risks"
-            ]
+            "name": "BSBWHS616 - Apply safe design principles to control WHS risks",
+            "variants": []
           },
           {
-            "name": "Core Unit 3",
-            "variants": [
-              "BSBPMG632 Manage program risk"
-            ]
+            "name": "BSBPMG632 - Manage program risk",
+            "variants": []
           },
           {
-            "name": "Core Unit 4",
-            "variants": [
-              "BSBSTR601 Manage innovation and continuous improvement"
-            ]
+            "name": "RIICWD601E - Manage civil works design processes",
+            "variants": []
           },
           {
-            "name": "Core Unit 5",
-            "variants": [
-              "RIICWD601E Manage civil works design processes"
-            ]
-          },
-          {
-            "name": "Core Unit 6",
-            "variants": [
-              "RIIQUA601E Establish and maintain a quality system"
-            ]
-          },
-          {
-            "name": "Core Unit 7",
-            "variants": [
-              "RIICWD507D Prepare detailed geotechnical design"
-            ]
-          },
-          {
-            "name": "Core Unit 8",
-            "variants": [
-              "RIICWD533E Prepare detailed design of civil concrete structures"
-            ]
+            "name": "RIIQUA601E - Establish and maintain a quality system",
+            "variants": []
           }
         ]
       },
-      "units_optional": {
-        "categoryLabel": "ELECTIVE UNITS (cluster)",
+      "units_project_management": {
+        "categoryLabel": "Core Units - Project Management (varies)",
         "subjects": [
           {
-            "name": "Project Management (varies)",
-            "variants": [
-              "BSBPMG530 Manage project scope",
-              "BSBPMG531 Manage project time",
-              "BSBPMG533 Manage project cost",
-              "BSBPMG537 Manage project procurement"
-            ]
+            "name": "BSBPMG530 - Manage project scope",
+            "variants": []
           },
           {
-            "name": "Leadership / Innovation",
-            "variants": [
-              "RIILAT402E Provide leadership in the supervision of diverse work teams",
-              "BSBSTR801 Lead innovative thinking and practice",
-              "BSBCRT611 Apply critical thinking for complex problem solving"
-            ]
+            "name": "BSBPMG531 - Manage project time",
+            "variants": []
           },
           {
-            "name": "Structural Design Specialization",
-            "variants": [
-              "RIICWD534E Prepare detailed design of civil steel structures",
-              "RIICWD535E Prepare detailed design of civil timber structures",
-              "RIICWD501E Prepare detailed design of foundations",
-              "MEM23004A Apply technical mathematics",
-              "MEM23007A Apply calculus to engineering tasks",
-              "MEM23109 Apply engineering mechanics principles",
-              "MEM30005A Calculate force systems within simple beam structures",
-              "MEM30006A Calculate stresses in simple structures"
-            ]
+            "name": "BSBPMG533 - Manage project cost",
+            "variants": []
           },
           {
-            "name": "Road & Infrastructure Design",
-            "variants": [
-              "RIICWD509E Prepare detailed design of urban roads",
-              "RIICWD511E Prepare detailed design of sub-divisions",
-              "RIICWD512E Prepare detailed design of motorways and interchanges",
-              "RIICWD526E Prepare detailed traffic analysis",
-              "RIICWD530E Prepare detailed design of surface drainage"
-            ]
+            "name": "BSBPMG537 - Manage project procurement",
+            "variants": []
           },
           {
-            "name": "Business / Feasibility (isolated)",
-            "variants": [
-              "BSBOPS601 Develop and implement business plans",
-              "RIIBEF601E Conduct business negotiations",
-              "BSBINS601 Manage knowledge and information",
-              "BSBPEF501 Manage personal and professional development"
-            ]
+            "name": "BSBPMG532 - Manage project quality",
+            "variants": []
           },
           {
-            "name": "Engineering Fundamentals (isolated, single RTO observed)",
-            "variants": [
-              "MEM30012A Apply mathematical techniques",
-              "MEM30031 Operate CAD system to produce basic drawing elements",
-              "MEM30032A Produce basic engineering drawings",
-              "MEM30033A Use CAD to create and display 3-D models",
-              "CPCCOM2001 Read and interpret plans and specifications",
-              "CPPBDN6106 Produce building information modelling for building design projects"
-            ]
+            "name": "BSBPMG534 - Manage project human resources",
+            "variants": []
           },
           {
-            "name": "Others",
+            "name": "BSBPMG535 - Manage project information and communication",
+            "variants": []
+          },
+          {
+            "name": "BSBPMG540 - Manage project integration",
+            "variants": []
+          }
+        ]
+      },
+      "units_leadership": {
+        "categoryLabel": "Core Units - Leadership / Innovation",
+        "subjects": [
+          {
+            "name": "RIILAT402E - Provide leadership in the supervision of diverse work teams",
+            "variants": []
+          },
+          {
+            "name": "BSBSTR801 - Lead innovative thinking and practice",
+            "variants": []
+          },
+          {
+            "name": "BSBCRT611 - Apply critical thinking for complex problem solving",
+            "variants": []
+          },
+          {
+            "name": "BSBSTR601 - Manage innovation and continuous improvement",
+            "variants": []
+          }
+        ]
+      },
+      "units_structural": {
+        "categoryLabel": "Core Units - Structural Design Specialization",
+        "subjects": [
+          {
+            "name": "RIICWD534E - Prepare detailed design of civil steel structures",
+            "variants": []
+          },
+          {
+            "name": "RIICWD535E - Prepare detailed design of civil timber structures",
+            "variants": []
+          },
+          {
+            "name": "RIICWD501E - Prepare detailed design of foundations",
+            "variants": []
+          },
+          {
+            "name": "MEM23004A - Apply technical mathematics",
+            "variants": []
+          },
+          {
+            "name": "MEM23007A - Apply calculus to engineering tasks",
+            "variants": []
+          },
+          {
+            "name": "MEM23109 - Apply engineering mechanics principles",
+            "variants": []
+          },
+          {
+            "name": "MEM30005A - Calculate force systems within simple beam structures",
+            "variants": []
+          },
+          {
+            "name": "MEM30006A - Calculate stresses in simple structures",
+            "variants": []
+          },
+          {
+            "name": "RIICWD510E - Prepare detailed design of busways",
+            "variants": []
+          },
+          {
+            "name": "RIICWD520E - Prepare detailed design of rigid pavements",
+            "variants": []
+          },
+          {
+            "name": "RIICWD528E - Prepare detailed design of traffic management systems",
+            "variants": []
+          },
+          {
+            "name": "RIICWD532E - Prepare detailed design of tunnels",
+            "variants": []
+          },
+          {
+            "name": "RIICWD536E - Prepare detailed design of civil masonry, crib and gabion structures",
+            "variants": []
+          }
+        ]
+      },
+      "units_road": {
+        "categoryLabel": "Core Units - Road & Infrastructure Design",
+        "subjects": [
+          {
+            "name": "RIICWD509E - Prepare detailed design of urban roads",
+            "variants": []
+          },
+          {
+            "name": "RIICWD511E - Prepare detailed design of sub-divisions",
+            "variants": []
+          },
+          {
+            "name": "RIICWD512E - Prepare detailed design of motorways and interchanges",
+            "variants": []
+          },
+          {
+            "name": "RIICWD526E - Prepare detailed traffic analysis",
+            "variants": []
+          },
+          {
+            "name": "RIICWD530E - Prepare detailed design of surface drainage",
+            "variants": []
+          },
+          {
+            "name": "RIICWD507D - Prepare detailed geotechnical design",
+            "variants": []
+          },
+          {
+            "name": "RIICWD533E - Prepare detailed design of civil concrete structures",
+            "variants": []
+          }
+        ]
+      },
+      "units_business": {
+        "categoryLabel": "Core Units - Business / Feasibility (isolated)",
+        "subjects": [
+          {
+            "name": "BSBOPS601 - Develop and implement business plans",
+            "variants": []
+          },
+          {
+            "name": "RIIBEF601E - Conduct business negotiations",
+            "variants": []
+          },
+          {
+            "name": "BSBINS601 - Manage knowledge and information",
+            "variants": []
+          },
+          {
+            "name": "BSBPEF501 - Manage personal and professional development",
+            "variants": []
+          },
+          {
+            "name": "BSBESB406 - Establish operational strategies and procedures for new business ventures",
+            "variants": []
+          },
+          {
+            "name": "RIIBEF604E - Conduct a feasibility study",
+            "variants": []
+          }
+        ]
+      },
+      "units_fundamentals": {
+        "categoryLabel": "Core Units - Engineering Fundamentals (isolated, single RTO observed)",
+        "subjects": [
+          {
+            "name": "MEM30012A - Apply mathematical techniques",
+            "variants": []
+          },
+          {
+            "name": "MEM30031 - Operate CAD system to produce basic drawing elements",
+            "variants": []
+          },
+          {
+            "name": "MEM30032A - Produce basic engineering drawings",
+            "variants": []
+          },
+          {
+            "name": "MEM30033A - Use CAD to create and display 3-D models",
+            "variants": []
+          },
+          {
+            "name": "CPCCOM2001 - Read and interpret plans and specifications",
+            "variants": []
+          },
+          {
+            "name": "CPPBDN6106 - Produce building information modelling for building design projects",
             "variants": []
           }
         ]
@@ -7671,40 +7781,53 @@
     "anzscoCode": "312311",
     "title": "Electrical Engineering Draftsperson",
     "sourceSheet": "Elec Draftsperson subjects",
+    "qualification": "UEE62122 Advanced Diploma of Engineering Technology - Electrical",
     "groups": {
-      "units_core": {
-        "categoryLabel": "CORE UNITS (24 Core Units - expected on every genuine transcript)",
+      "units_foundational": {
+        "categoryLabel": "Foundational Units",
         "subjects": [
           {
-            "name": "UEECD0007 - Apply Work Health and Safety regulations, codes and practices in the workplace",
+            "name": "UEECD0003 - Apply industry and community standards to engineering activities",
             "variants": []
           },
           {
-            "name": "UEECD0030 - Prepare electrotechnology/utilities drawings using manual drafting and CAD equipment and software",
+            "name": "UEECD0004 - Apply material science to solving electrotechnology engineering problems",
             "variants": []
           },
           {
-            "name": "UEECD0031 - Prepare engineering drawings using manual drafting and CAD for electrotechnology applications",
+            "name": "UEECD0005 - Apply physics to solving electrotechnology engineering problems",
             "variants": []
           },
           {
-            "name": "UEECD0032 - Produce detailed electrotechnology/utilities drawings using CAD equipment and software",
+            "name": "UEECD0010 - Compile and produce an energy sector detailed report",
             "variants": []
           },
           {
-            "name": "UEECD0038 - Provide engineering solutions for problems in complex multiple path circuits",
+            "name": "UEECD0014 - Develop design briefs for electrotechnology projects",
             "variants": []
           },
           {
-            "name": "UEECD0044 - Solve problems in single and three phase low voltage electrical apparatus and circuits",
+            "name": "UEECD0017 - Establish and follow a competency development plan in an electrotechnology engineering discipline",
             "variants": []
           },
           {
-            "name": "UEECD0046 - Solve problems in single and three phase low voltage circuits",
+            "name": "UEECD0024 - Implement and monitor energy sector WHS policies and procedures",
             "variants": []
           },
           {
-            "name": "UEECD0051 - Use drawings, diagrams, schedules, standards, codes and specifications",
+            "name": "UEECD0026 - Manage risk in electrotechnology activities",
+            "variants": []
+          },
+          {
+            "name": "UEECD0036 - Provide engineering solutions for problems in complex multiple path circuits",
+            "variants": []
+          },
+          {
+            "name": "UEECD0039 - Provide solutions to basic engineering computational problems",
+            "variants": []
+          },
+          {
+            "name": "UEECD0056 - Apply methods to maintain currency of industry developments",
             "variants": []
           },
           {
@@ -7712,27 +7835,11 @@
             "variants": []
           },
           {
-            "name": "UEECD0064 - Interpret, produce and modify electrotechnology drawings",
+            "name": "UEECS0033 - Use engineering applications software on personal computers",
             "variants": []
           },
           {
-            "name": "UEEEL0006 - Develop detailed and complex drawings for electrical systems using CAD systems",
-            "variants": []
-          },
-          {
-            "name": "UEEEL0007 - Develop detailed electrical drawings",
-            "variants": []
-          },
-          {
-            "name": "UEEEL0013 - Design explosion-protected electrical systems and installations - mining",
-            "variants": []
-          },
-          {
-            "name": "UEEEL0014 - Design explosion-protected electrical systems and installations - gas atmospheres",
-            "variants": []
-          },
-          {
-            "name": "UEEEL0015 - Design explosion-protected electrical systems and installations - dust atmospheres",
+            "name": "UEEEL0015 - Manage large electrical projects",
             "variants": []
           },
           {
@@ -7740,11 +7847,221 @@
             "variants": []
           },
           {
-            "name": "UEEEL0079 - Plan and analyse LV electrical apparatus",
+            "name": "UEEEL0062 - Provide engineering solutions to problems in complex polyphase power circuits",
             "variants": []
           },
           {
-            "name": "UEEEL0080 - Plan and analyse wiring systems, circuits, control and protection for electrical installations",
+            "name": "UEERE0013 - Develop strategies to address environmental and sustainability issues in the energy sector",
+            "variants": []
+          }
+        ]
+      },
+      "units_group_a": {
+        "categoryLabel": "Core Units - Group A: Imported and common elective units",
+        "subjects": [
+          {
+            "name": "BSBINM501 - Manage an information or knowledge management system",
+            "variants": []
+          },
+          {
+            "name": "BSBINN502 - Build and sustain an innovative work environment",
+            "variants": []
+          },
+          {
+            "name": "BSBMGT502 - Manage people performance",
+            "variants": []
+          },
+          {
+            "name": "BSBMGT516 - Facilitate continuous improvement",
+            "variants": []
+          },
+          {
+            "name": "BSBWOR502 - Lead and manage team effectiveness",
+            "variants": []
+          }
+        ]
+      },
+      "units_group_b": {
+        "categoryLabel": "Core Units - Group B",
+        "subjects": [
+          {
+            "name": "UEEAS0007 - Assemble, mount and connect control gear and switchgear",
+            "variants": []
+          },
+          {
+            "name": "UEEAS0008 - Fabricate and assemble bus bars",
+            "variants": []
+          },
+          {
+            "name": "UEEAS0009 - Mount and wire control panel equipment",
+            "variants": []
+          },
+          {
+            "name": "UEECD0028 - Plan an integrated cabling installation system",
+            "variants": []
+          },
+          {
+            "name": "UEEDV0005 - Install and maintain cabling for multiple access to telecommunication services",
+            "variants": []
+          },
+          {
+            "name": "UEEDV0008 - Install, modify and verify coaxial and structured communication copper cabling",
+            "variants": []
+          },
+          {
+            "name": "UEEEC0003 - Assemble and set up basic security systems",
+            "variants": []
+          },
+          {
+            "name": "UEEEC0060 - Repairs basic electronic apparatus faults by replacement of components",
+            "variants": []
+          },
+          {
+            "name": "UEEEC0075 - Troubleshoot single phase input d.c power supplies",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0004 - Carry out basic repairs to electrical components and equipment",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0013 - Install, set up and commission interval metering",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0016 - Provide advice on effective and energy efficient lighting products",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0017 - Repair and maintain mechanical components of electrical machines",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0022 - Supply effective and efficient lighting products for domestic and small commercial applications",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0026 - Align and install traction lift equipment",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0033 - Conduct electrical tests on LV electrical machines",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0034 - Conduct mechanical tests on electrical machines and components",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0045 - Diagnose and rectify faults in traction lift systems",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0046 - Find and repair faults in LV d.c. electrical apparatus and circuits",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0048 - Install and maintain emergency lighting systems",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0049 - Install and maintain emergency safety systems",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0052 - Maintain and service traction lift systems and equipment",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0053 - Maintain operation of electrical marine equipment and systems",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0054 - Maintain operation of electrical mining equipment and systems",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0055 - Overhaul and repair major switchgear and control gear",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0056 - Place and connect electrical coils",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0061 - Provide advice on the application of energy efficient lighting for ambient and aesthetic effect",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0066 - Rewind LV direct current machines",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0067 - Rewind single phase machines",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0068 - Rewind three phase low voltage induction machines",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0069 - Select and arrange equipment for special LV electrical installations",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0074 - Wind electrical coils",
+            "variants": []
+          },
+          {
+            "name": "UEEHA0001 - Conduct detailed inspection of electrical installations for hazardous areas",
+            "variants": []
+          },
+          {
+            "name": "UEEHA0003 - Determine the explosion-protection requirements to meet a specified classified hazardous area",
+            "variants": []
+          },
+          {
+            "name": "UEEHA0005 - Install explosion-protected equipment and associated apparatus and wiring systems",
+            "variants": []
+          },
+          {
+            "name": "UEEHA0006 - Maintain equipment associated with hazardous areas",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0002 - Assemble, enter and verify operating instructions in microprocessor equipped devices",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0011 - Develop electrical integrated systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0013 - Develop, enter and verify discrete control programs for programmable controllers",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0024 - Plan the electrical installation of integrated systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0025 - Provide solutions to extra-low voltage (ELV) electro-pneumatic control systems and drives",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0038 - Solve problems in density/level measurement components and systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0039 - Solve problems in flow measurement components and systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0041 - Solve problems in pressure measurement components and systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0043 - Solve problems in temperature measurement components and systems",
             "variants": []
           },
           {
@@ -7752,56 +8069,351 @@
             "variants": []
           },
           {
-            "name": "UEEIC0048 - Use system CAD software to produce control systems specifications and diagrams",
+            "name": "UEERA0035 - Establish the basic operating conditions of air conditioning systems",
             "variants": []
           },
           {
-            "name": "UEERE0001 - Apply sustainable energy and environmental procedures",
+            "name": "UEERA0036 - Establish the basic operating conditions of vapour compression systems",
             "variants": []
           },
           {
-            "name": "UEERE0011 - Design grid connected power supply systems",
+            "name": "UEERA0059 - Prepare and connect refrigerant tubing and fittings",
             "variants": []
           },
           {
-            "name": "BSBSMB401 - Establish legal and risk management requirements of small business",
+            "name": "UEERE0001 - Apply environmentally and sustainable procedures in the energy sector",
             "variants": []
           },
           {
-            "name": "BSBMSB402 - Plan small business finances",
+            "name": "UEERE0016 - Install, configure and commission LV grid-connected photovoltaic power systems",
+            "variants": []
+          },
+          {
+            "name": "UEERE0022 - Solve basic problems in photovoltaic energy apparatus and systems",
+            "variants": []
+          },
+          {
+            "name": "UETTDRIS44 - Perform HV field switching operation to a given schedule",
+            "variants": []
+          },
+          {
+            "name": "UETTDRIS67 - Solve problems in energy supply network equipment",
+            "variants": []
+          },
+          {
+            "name": "UETTDRIS68 - Solve problems in energy supply network protection equipment and systems",
             "variants": []
           }
         ]
       },
-      "units_optional": {
-        "categoryLabel": "ELECTIVE UNITS (sample key electives for Electrical Draftsperson specialization)",
+      "units_group_c": {
+        "categoryLabel": "Core Units - Group C",
         "subjects": [
           {
-            "name": "UEEEL0002 / Design electrical installations (hazardous areas etc)",
+            "name": "UEECD0013 - Develop and implement energy sector maintenance programs",
             "variants": []
           },
           {
-            "name": "UEEEL0039 / UEEEL0040 Design LV power distribution / installations",
+            "name": "UEECO0001 - Estimate electrotechnology projects",
             "variants": []
           },
           {
-            "name": "UEEEL0042 / UEEEL0045 Design power factor / switchboards",
+            "name": "UEEEL0007 - Develop detailed electrical drawings",
             "variants": []
           },
           {
-            "name": "UEEEL0068 Plan and design renewable energy systems",
+            "name": "UEEEL0027 - Carry out low voltage electrical field testing and report findings",
             "variants": []
           },
           {
-            "name": "UEEIC0013 / UEEIC0025 PLC SCADA / Process control",
+            "name": "UEEEL0029 - Conduct compliance inspection of LV electrical installations with demand exceeding 100 A per phase",
             "variants": []
           },
           {
-            "name": "BSBPMG522 Undertake project work",
+            "name": "UEEEL0030 - Conduct compliance inspection of single phase LV electrical installations",
             "variants": []
           },
           {
-            "name": "Others / Additional electives",
+            "name": "UEEEL0031 - Conduct compliance inspection of special LV electrical installations",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0032 - Conduct electrical tests on HV electrical machines",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0036 - Design effective and efficient lighting for residential and commercial buildings",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0040 - Develop compliance policies and plans to conduct an electrical contracting business",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0044 - Diagnose and rectify faults in complex lift systems",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0050 - Install and replace low voltage current transformer metering",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0051 - Investigate and report on electrical incidents and causes",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0057 - Plan electrical installations with a low voltage demand up to 400 A per phase",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0059 - Plan low voltage switchboard and control panel layouts",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0060 - Prepare quotations for the supply of effective and efficient lighting products for lighting projects",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0063 - Provide photometric data for illumination system design",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0064 - Rewind HV three phase induction machines rated for voltages above 3.3 kV",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0065 - Rewind HV three phase induction machines rated for voltages to 3.3 kV",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0070 - Select effective and efficient light sources and luminaries for given locations and designs",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0071 - Select low voltage power factor correction equipment",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0072 - Set up and place LV electrical apparatus and associated circuits into service",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0073 - Verify compliance and functionality of special LV electrical installations",
+            "variants": []
+          },
+          {
+            "name": "UEEHA0002 - Conduct visual and close inspection of electrical installations for hazardous areas",
+            "variants": []
+          },
+          {
+            "name": "UEEHA0004 - Enter a classified hazardous area to undertake work related to electrical equipment",
+            "variants": []
+          },
+          {
+            "name": "UEEHA0009 - Develop and manage periodic electrical inspection and maintenance programs for hazardous areas",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0009 - Develop an electrical integrated system interface for access through a touch screen",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0012 - Develop structured programs to control external devices",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0014 - Develop, enter and verify programs in supervisory control and data acquisition systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0015 - Develop, enter and verify word and analogue control programs for programmable logic controllers",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0018 - Diagnose and rectify faults in digital controls systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0020 - Fault find and repair analogue circuits and components in electronic control systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0026 - Provide solutions to fluid circuit operations",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0027 - Provide solutions to pneumatic-hydraulic system operations",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0028 - Provide solutions to problems in industrial control systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0034 - Set up industrial field control devices",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0040 - Solve problems in polyphase electronic power control circuits",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0042 - Solve problems in single phase electronic power control circuits",
+            "variants": []
+          },
+          {
+            "name": "UEERE0003 - Assess energy loads and uses for energy efficiency in commercial facilities",
+            "variants": []
+          },
+          {
+            "name": "UEERE0004 - Assess energy loads and uses for energy efficiency in industrial properties and enterprises",
+            "variants": []
+          },
+          {
+            "name": "UEERE0005 - Assess energy loads and uses for energy efficiency in residential, office and retail premises",
+            "variants": []
+          },
+          {
+            "name": "UEERE0011 - Design grid-connected photovoltaic power supply systems",
+            "variants": []
+          },
+          {
+            "name": "UEERE0014 - Develop strategies to address sustainability issues for electrical installations",
+            "variants": []
+          },
+          {
+            "name": "UEERE0015 - Implement and monitor energy sector environmental and sustainable policies and procedures",
+            "variants": []
+          }
+        ]
+      },
+      "units_group_d": {
+        "categoryLabel": "Core Units - Group D",
+        "subjects": [
+          {
+            "name": "UEECO0014 - Prepare tender submissions for electrotechnology projects",
+            "variants": []
+          },
+          {
+            "name": "UEECS0016 - Develop energy sector directory services",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0011 - Evaluate performance of low voltage electrical apparatus",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0037 - Design electrical installations with a low voltage demand greater than 400 A per phase",
+            "variants": []
+          },
+          {
+            "name": "UEEHA0007 - Plan electrical installations for hazardous areas",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0001 - Analyse complex electronic circuits controlling fluids",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0005 - Configure and maintain industrial control system networks",
+            "variants": []
+          },
+          {
+            "name": "UEERE0012 - Develop effective engineering strategies for energy reduction in buildings",
+            "variants": []
+          },
+          {
+            "name": "UETTDRIS69 - Diagnose and rectify faults in energy supply apparatus",
+            "variants": []
+          },
+          {
+            "name": "UETTDRIS70 - Diagnose and rectify faults in electrical energy distribution systems",
+            "variants": []
+          },
+          {
+            "name": "UETTDRIS71 - Diagnose and rectify faults in electrical energy supply transmission systems",
+            "variants": []
+          },
+          {
+            "name": "UETTDRIS72 - Diagnose and rectify faults in distributed generation systems",
+            "variants": []
+          }
+        ]
+      },
+      "units_group_e": {
+        "categoryLabel": "Core Units - Group E",
+        "subjects": [
+          {
+            "name": "UEECD0049 - Use advanced computational processes to provide solutions to energy sector engineering problems",
+            "variants": []
+          },
+          {
+            "name": "UEECO0003 - Manage contract variations",
+            "variants": []
+          },
+          {
+            "name": "UEECS0012 - Design embedded controller control systems",
+            "variants": []
+          },
+          {
+            "name": "UEECS0015 - Develop energy sector computer network applications infrastructure",
+            "variants": []
+          },
+          {
+            "name": "UEECS0017 - Develop industrial control programs for microcomputer equipped devices",
+            "variants": []
+          },
+          {
+            "name": "UEECS0027 - Provide programming solution for computer systems engineering problems",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0038 - Design switchboards rated for high fault levels (greater than 400 A)",
+            "variants": []
+          },
+          {
+            "name": "UEEEL0043 - Develop engineering solutions for induction machine and control problems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0006 - Design and configure human-machine interface (HMI) networks",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0007 - Design and use advanced programming tools, PC networks and HMI Interfacing",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0010 - Develop and test code for microcontroller devices",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0016 - Diagnose and rectify faults in a.c. motor drive systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0017 - Diagnose and rectify faults in d.c. motor drive systems",
+            "variants": []
+          },
+          {
+            "name": "UEEIC0019 - Diagnose and rectify faults in servo drive systems",
+            "variants": []
+          },
+          {
+            "name": "UETTDRIS73 - Develop engineering solutions for energy supply power transformer problems",
+            "variants": []
+          },
+          {
+            "name": "UETTDRIS74 - Develop engineering solutions for energy supply system protection problems",
+            "variants": []
+          }
+        ]
+      },
+      "units_others": {
+        "categoryLabel": "Core Units - OTHERS",
+        "subjects": [
+          {
+            "name": "Others",
             "variants": []
           }
         ]

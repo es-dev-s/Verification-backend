@@ -280,6 +280,7 @@ function card(input: {
     recommended: input.recommended,
     confidence: input.recommended ? "high" : null,
     confidenceScore: input.confidenceScore,
+    capstoneApplies: false,
     anzscoCode: input.code,
     title: input.title,
     qualificationNotes: [input.note],

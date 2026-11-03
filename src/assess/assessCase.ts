@@ -647,7 +647,13 @@ function compareScores(a: ScoreResult, b: ScoreResult): number {
   if (a.foundationalMatched !== b.foundationalMatched) {
     return b.foundationalMatched - a.foundationalMatched;
   }
-  if (a.tier3GateMet !== b.tier3GateMet) return a.tier3GateMet ? -1 : 1;
+  if (
+    a.capstoneApplies !== false &&
+    b.capstoneApplies !== false &&
+    a.tier3GateMet !== b.tier3GateMet
+  ) {
+    return a.tier3GateMet ? -1 : 1;
+  }
   return 0;
 }
 
@@ -680,6 +686,7 @@ function scoreOccupation(
       workExperienceBoost: opts.workExperienceBoost,
       rubric,
       qualificationCheck,
+      applyCapstone: trackForAnzsco(rubric.anzscoCode) !== "engineering_associate",
     });
     // Strictly better only, so earlier pools (Bachelor) win ties.
     if (!best || compareScores(best.scored, scored) > 0) {
@@ -1223,6 +1230,7 @@ function applyWorkExperienceJudgements(
         workExperienceBoost: true,
         rubric: occ.rubric,
         qualificationCheck: occ.qualificationCheck,
+        applyCapstone: occ.track !== "engineering_associate",
       });
     } else {
       occ.workExperienceBoost = false;
@@ -1409,7 +1417,11 @@ function compareScoredOccupations(a: ScoredOccupation, b: ScoredOccupation): num
   const coverB = b.scored.corePct * 2 + b.scored.foundationalPct;
   if (coverB !== coverA) return coverB - coverA;
 
-  if (a.scored.tier3GateMet !== b.scored.tier3GateMet) {
+  if (
+    a.track !== "engineering_associate" &&
+    b.track !== "engineering_associate" &&
+    a.scored.tier3GateMet !== b.scored.tier3GateMet
+  ) {
     return a.scored.tier3GateMet ? -1 : 1;
   }
   return a.rubric.title.localeCompare(b.rubric.title);
@@ -1886,6 +1898,7 @@ export async function scoreOccupationWithLlm(
     workExperienceBoost: opts.workExperienceBoost,
     rubric,
     qualificationCheck,
+    applyCapstone: trackForAnzsco(rubric.anzscoCode) !== "engineering_associate",
   });
   return {
     ...sync,

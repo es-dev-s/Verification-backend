@@ -222,14 +222,14 @@ describe("312511 drafting gate", () => {
     ]);
   });
 
-  it("a missing drafting gate turns verified into conditional", () => {
+  it("a missing capstone does not change the result for an engineering associate", () => {
     const names = STRONG_DRAFTING.filter((n) => n !== "Drafting Project").concat("Final Year Project");
     const r = assessExtractedSubjects(names.map((n) => row(n)), {
       occupationId: "mechanical-engineering-draftsperson",
       qualifications: [{ level: "diploma", title: "Diploma of Mechanical Drafting" }],
     });
     assert.equal(r.tier3GateMet, false);
-    assert.equal(r.determination, "conditional");
+    assert.equal(r.determination, "verified_no_risk");
   });
 });
 

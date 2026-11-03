@@ -22,8 +22,9 @@ export function buildExplanationFallback(result: AssessmentResult): string {
       `No ANZSCO occupation match. ` +
       `Best coverage against ${title}: foundational ${result.foundationalMatched}/${result.foundationalExpected} (${result.foundationalPct}%), ` +
       `core ${result.coreMatched}/${result.coreExpected} (${result.corePct}%). ` +
-      `Tier 1: ${result.tier1Outcome ?? "n/a"}; Tier 2: ${result.tier2Outcome ?? "n/a"}; ` +
-      `major project/thesis gate: ${result.tier3GateMet ? "met" : "not met"}.`
+      `Tier 1: ${result.tier1Outcome ?? "n/a"}; Tier 2: ${result.tier2Outcome ?? "n/a"}` +
+      capstoneClause(result) +
+      `.`
     );
   }
   const analysis =
@@ -39,10 +40,19 @@ export function buildExplanationFallback(result: AssessmentResult): string {
     `(${result.determination.replace(/_/g, " ")}). ` +
     `Foundational ${result.foundationalMatched}/${result.foundationalExpected} (${result.foundationalPct}%), ` +
     `core ${result.coreMatched}/${result.coreExpected} (${result.corePct}%). ` +
-    `Major project/thesis gate ${result.tier3GateMet ? "met" : "not met"}.` +
+    capstoneClause(result) +
     boost +
     qualificationSentence(result)
   );
+}
+
+function capstoneClause(result: AssessmentResult): string {
+  const code = result.anzscoCode ?? result.candidates?.[0]?.anzscoCode;
+  const track = result.candidates?.find((c) => c.anzscoCode === code)?.track;
+  if (track === "engineering_associate") return "";
+  return result.recommended
+    ? `Major project/thesis gate ${result.tier3GateMet ? "met" : "not met"}.`
+    : `; major project/thesis gate: ${result.tier3GateMet ? "met" : "not met"}`;
 }
 
 const BAND_LABEL: Record<string, string> = {
