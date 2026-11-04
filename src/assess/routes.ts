@@ -2,7 +2,11 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { assessCase, checkOccupationForCase } from "../assess/assessCase.js";
 import { prisma } from "../lib/prisma.js";
+import { emAnswersSchema } from "./engineeringManager.js";
+import { engineeringManagerForCase, saveEngineeringManagerAnswers } from "./engineeringManagerStore.js";
 import {
+  EM_CHECK_ONLY,
+  isEngineeringManager,
   listManualOccupationOptions,
   NoSavedSubjectsError,
   resolveManualOccupation,
@@ -80,6 +84,9 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
       } else {
         const resolved = resolveManualOccupation(body.manualOccupation);
         if (!resolved.ok) return reply.code(400).send({ error: resolved.error });
+        if (isEngineeringManager(resolved.selection.occupationId)) {
+          return reply.code(400).send({ error: EM_CHECK_ONLY });
+        }
         if (isTelecomAnzsco(resolved.selection.occupationId)) {
           // Telecom group matching needs ICT60220: stop before saving the choice.
           try {
@@ -124,6 +131,9 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
     if (!existing) return reply.code(404).send({ error: "Case not found" });
     const resolved = resolveManualOccupation(parsed.data.occupation);
     if (!resolved.ok) return reply.code(400).send({ error: resolved.error });
+    if (isEngineeringManager(resolved.selection.occupationId)) {
+      return reply.code(400).send({ error: EM_CHECK_ONLY });
+    }
     try {
       const check = await checkOccupationForCase(id, resolved.selection.occupationId);
       if (!check) {
@@ -139,6 +149,35 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
       }
       req.log.error({ err }, "occupation check failed");
       return reply.code(500).send({ error: "Could not check this occupation" });
+    }
+  });
+
+  // Engineering Manager (133211) check: CV jobs + assessor answers (Check an ANZSCO only).
+  app.get("/cases/:id/assess/engineering-manager", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const existing = await prisma.case.findFirst({ where: { id, clientId: req.clientId } });
+    if (!existing) return reply.code(404).send({ error: "Case not found" });
+    try {
+      return await engineeringManagerForCase(id);
+    } catch (err) {
+      req.log.error({ err }, "engineering manager check failed");
+      return reply.code(500).send({ error: "Could not check Engineering Manager" });
+    }
+  });
+
+  // Save the assessor answers (one FieldSource row) and return the check.
+  app.put("/cases/:id/assess/engineering-manager", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = emAnswersSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid answers" });
+    const existing = await prisma.case.findFirst({ where: { id, clientId: req.clientId } });
+    if (!existing) return reply.code(404).send({ error: "Case not found" });
+    try {
+      await saveEngineeringManagerAnswers(id, parsed.data);
+      return await engineeringManagerForCase(id, parsed.data);
+    } catch (err) {
+      req.log.error({ err }, "engineering manager save failed");
+      return reply.code(500).send({ error: "Could not save the Engineering Manager answers" });
     }
   });
 

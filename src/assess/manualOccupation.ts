@@ -8,6 +8,7 @@
  * extractedValue = ANZSCO code. No schema change.
  */
 import { prisma } from "../lib/prisma.js";
+import { EM_ANZSCO, EM_OCCUPATION_ID } from "./engineeringManager.js";
 import { trackOccupations } from "./gate1.js";
 import { listAcademicOccupations, listVocationalOccupations } from "./loadRubric.js";
 import { TELECOM_ANZSCO, TELECOM_ANZSCO_CODES } from "./telecomGroup.js";
@@ -19,7 +20,7 @@ export type ManualOccupationOption = {
   occupationId: string | null;
   anzscoCode: string;
   title: string;
-  flow: "academic" | "vocational_units" | "telecom_group" | null;
+  flow: "academic" | "vocational_units" | "telecom_group" | "engineering_manager" | null;
   /** True when this occupation can be scored. */
   available: boolean;
   /** Why it cannot be scored (null when available). */
@@ -90,6 +91,18 @@ export function listManualOccupationOptions(): ManualOccupationOption[] {
       unavailableReason: null,
     });
   }
+  // Engineering Manager (133211): never suggested; picked here for its own
+  // eligibility check (Check an ANZSCO only, never saved as the manual choice).
+  out.push({
+    occupationId: EM_OCCUPATION_ID,
+    anzscoCode: EM_ANZSCO,
+    title:
+      trackOccupations("professional_engineer").find((o) => o.anzscoCode === EM_ANZSCO)?.occupation ??
+      "Engineering Manager",
+    flow: "engineering_manager",
+    available: true,
+    unavailableReason: null,
+  });
   const withRubric = new Set(out.map((o) => o.anzscoCode));
   for (const track of TRACKS) {
     for (const o of trackOccupations(track)) {
@@ -140,6 +153,14 @@ export function resolveManualOccupation(
   return { ok: true, selection: { occupationId: o.occupationId!, anzscoCode: o.anzscoCode, title: o.title } };
 }
 
+/** True for the Engineering Manager pick (its own check, not subject matching). */
+export function isEngineeringManager(occupationId: string): boolean {
+  return occupationId === EM_OCCUPATION_ID;
+}
+
+/** Shown when Engineering Manager is sent to subject matching. */
+export const EM_CHECK_ONLY = "Engineering Manager has its own eligibility check. Open it from Check an ANZSCO.";
+
 type FieldSourceLike = { field: string; degreeLevel?: unknown; finalValue?: string | null };
 
 /** The saved assessor choice (null when none, or when it no longer resolves). */
@@ -148,7 +169,8 @@ export function manualSelectionFrom(fieldSources: readonly FieldSourceLike[]): M
   const value = row?.finalValue?.trim();
   if (!value) return null;
   const r = resolveManualOccupation(value);
-  return r.ok ? r.selection : null;
+  // Engineering Manager has its own check; it is never a manual-review choice.
+  return r.ok && !isEngineeringManager(r.selection.occupationId) ? r.selection : null;
 }
 
 /** Save (or clear with null) the assessor choice for a case. */

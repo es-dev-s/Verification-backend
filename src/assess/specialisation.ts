@@ -287,7 +287,7 @@ export function monthIndex(raw: string | null | undefined, now: Date, end = fals
 }
 
 /** Union of month intervals [a, b) in months. */
-function unionMonths(spans: Array<[number, number]>): number {
+export function unionMonths(spans: Array<[number, number]>): number {
   const s = [...spans].filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
   let total = 0;
   let cur: [number, number] | null = null;
