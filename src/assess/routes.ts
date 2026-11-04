@@ -7,7 +7,9 @@ import {
   NoSavedSubjectsError,
   resolveManualOccupation,
   saveManualSelection,
+  TelecomNeedsIct60220Error,
 } from "./manualOccupation.js";
+import { isTelecomAnzsco } from "./telecomGroup.js";
 import { getTranscriptData, saveTranscriptOverrides } from "./transcriptData.js";
 import {
   answerLateralEntry,
@@ -78,6 +80,16 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
       } else {
         const resolved = resolveManualOccupation(body.manualOccupation);
         if (!resolved.ok) return reply.code(400).send({ error: resolved.error });
+        if (isTelecomAnzsco(resolved.selection.occupationId)) {
+          // Telecom group matching needs ICT60220: stop before saving the choice.
+          try {
+            await checkOccupationForCase(id, resolved.selection.occupationId);
+          } catch (err) {
+            if (err instanceof TelecomNeedsIct60220Error) {
+              return reply.code(422).send({ error: err.message });
+            }
+          }
+        }
         await saveManualSelection(id, resolved.selection);
       }
     }
@@ -121,6 +133,9 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
     } catch (err) {
       if (err instanceof NoSavedSubjectsError) {
         return reply.code(409).send({ error: err.message });
+      }
+      if (err instanceof TelecomNeedsIct60220Error) {
+        return reply.code(422).send({ error: err.message });
       }
       req.log.error({ err }, "occupation check failed");
       return reply.code(500).send({ error: "Could not check this occupation" });

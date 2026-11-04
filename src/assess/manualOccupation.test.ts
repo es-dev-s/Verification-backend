@@ -191,3 +191,36 @@ describe("resolveSubjects savedOnly (Assessment re-run never re-extracts)", () =
     assert.equal(r.cacheable, true);
   });
 });
+
+describe("telecommunications group in the manual picker", () => {
+  const options = listManualOccupationOptions();
+  const TELECOM = [
+    ["313212", "313212"],
+    ["313213", "telecommunications-network-planner"],
+    ["313214", "313214"],
+  ] as const;
+
+  it("lists 313212, 313213 and 313214 once each, selectable, with the telecom_group flow", () => {
+    for (const [code, id] of TELECOM) {
+      const hits = options.filter((o) => o.anzscoCode === code);
+      assert.equal(hits.length, 1, `${code} listed once`);
+      const o = hits[0]!;
+      assert.equal(o.available, true, code);
+      assert.equal(o.flow, "telecom_group", code);
+      assert.equal(o.occupationId, id, code);
+      assert.equal(o.unavailableReason, null, code);
+      assert.ok(o.title.length > 0, code);
+    }
+  });
+
+  it("resolves each telecom code by ANZSCO code and by id", () => {
+    for (const [code, id] of TELECOM) {
+      const byCode = resolveManualOccupation(code, options);
+      assert.ok(byCode.ok, code);
+      if (byCode.ok) assert.equal(byCode.selection.occupationId, id);
+      const byId = resolveManualOccupation(id, options);
+      assert.ok(byId.ok, id);
+      if (byId.ok) assert.equal(byId.selection.anzscoCode, code);
+    }
+  });
+});

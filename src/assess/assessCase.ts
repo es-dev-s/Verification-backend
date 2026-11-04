@@ -45,7 +45,12 @@ import {
 } from "./familyAdjust.js";
 import { evaluateGate1, gateIsOpen, openTracks, TRACK_LABELS, trackForAnzsco } from "./gate1.js";
 import { isDiplomaLevel } from "./schemas.js";
-import { manualSelectionFrom, NoSavedSubjectsError, type ManualSelection } from "./manualOccupation.js";
+import {
+  manualSelectionFrom,
+  NoSavedSubjectsError,
+  TelecomNeedsIct60220Error,
+  type ManualSelection,
+} from "./manualOccupation.js";
 import { applyTextPeriods, preferFinalYearGate, withTermIndex } from "./qualificationEvidence.js";
 import {
   hasLateralState,
@@ -900,6 +905,10 @@ export function scoreRoutedOccupations(
 
   const target = ctx.occupationId?.trim();
   if (target) {
+    // A telecom group code without ICT60220 stops here (no rubric fallback).
+    if (isTelecomAnzsco(target) && !hasIct60220(ctx.qualifications, ctx.transcriptTexts)) {
+      throw new TelecomNeedsIct60220Error();
+    }
     if (isTelecomAnzsco(target) && hasIct60220(ctx.qualifications, ctx.transcriptTexts)) {
       const wanted = target === "telecommunications-network-planner" ? "313213" : target.replace(/\s+/g, "");
       const card = scoreTelecomGroup(extracted, ctx.transcriptTexts ?? []).find(
@@ -990,7 +999,14 @@ export function scoreWithManualSelection(
   if (!manual || ctx.occupationId?.trim() || routed.gate.result !== "manual_review") {
     return { ...routed, assessorSelected: null };
   }
-  const targeted = scoreRoutedOccupations(extracted, { ...ctx, occupationId: manual.occupationId });
+  let targeted: { scored: ScoredOccupation[]; gate: Gate1Decision };
+  try {
+    targeted = scoreRoutedOccupations(extracted, { ...ctx, occupationId: manual.occupationId });
+  } catch (err) {
+    // A saved telecom group choice on a case without ICT60220: keep the gate result.
+    if (err instanceof TelecomNeedsIct60220Error) return { ...routed, assessorSelected: null };
+    throw err;
+  }
   if (!targeted.scored.length) return { ...routed, assessorSelected: null };
   return {
     scored: targeted.scored,
@@ -1026,7 +1042,8 @@ export function checkOccupation(
   let routed: { scored: ScoredOccupation[]; gate: Gate1Decision };
   try {
     routed = scoreRoutedOccupations(rows, { ...full, occupationId });
-  } catch {
+  } catch (err) {
+    if (err instanceof TelecomNeedsIct60220Error) throw err;
     return null;
   }
   let s = routed.scored[0];

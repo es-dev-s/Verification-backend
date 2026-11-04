@@ -10,6 +10,7 @@
 import { prisma } from "../lib/prisma.js";
 import { trackOccupations } from "./gate1.js";
 import { listAcademicOccupations, listVocationalOccupations } from "./loadRubric.js";
+import { TELECOM_ANZSCO, TELECOM_ANZSCO_CODES } from "./telecomGroup.js";
 
 export const MANUAL_ANZSCO_FIELD = "manualAnzsco";
 
@@ -18,7 +19,7 @@ export type ManualOccupationOption = {
   occupationId: string | null;
   anzscoCode: string;
   title: string;
-  flow: "academic" | "vocational_units" | null;
+  flow: "academic" | "vocational_units" | "telecom_group" | null;
   /** True when this occupation can be scored. */
   available: boolean;
   /** Why it cannot be scored (null when available). */
@@ -32,6 +33,15 @@ export type ManualSelection = {
 };
 
 const TRACKS = ["professional_engineer", "engineering_technologist", "engineering_associate"] as const;
+
+function isTelecomGroupCode(code: string): boolean {
+  return (TELECOM_ANZSCO_CODES as readonly string[]).includes(code);
+}
+
+/** Picker id for a telecom group code (313213 keeps its rubric id). */
+function telecomOccupationId(code: string): string {
+  return code === TELECOM_ANZSCO.planner ? "telecommunications-network-planner" : code;
+}
 
 /**
  * Occupations the assessor can pick: every academic rubric, every vocational
@@ -50,7 +60,10 @@ export function listManualOccupationOptions(): ManualOccupationOption[] {
       unavailableReason: null,
     });
   }
-  for (const o of listVocationalOccupations()) {
+  const vocational = listVocationalOccupations();
+  for (const o of vocational) {
+    // Telecom group codes are listed once below (telecom group matching).
+    if (isTelecomGroupCode(o.anzsco)) continue;
     out.push({
       occupationId: o.id,
       anzscoCode: o.anzsco,
@@ -60,6 +73,21 @@ export function listManualOccupationOptions(): ManualOccupationOption[] {
       unavailableReason: o.scoringEnabled
         ? null
         : `Matching is not available for this occupation yet (${o.disabledReason ?? "rubric incomplete"}).`,
+    });
+  }
+  // Telecommunications group (313212 / 313213 / 313214): matched with the
+  // telecom group units (telecomGroup.ts), not a rubric. Needs ICT60220.
+  const eaTitles = new Map(
+    trackOccupations("engineering_associate").map((o) => [o.anzscoCode, o.occupation] as const),
+  );
+  for (const code of TELECOM_ANZSCO_CODES) {
+    out.push({
+      occupationId: telecomOccupationId(code),
+      anzscoCode: code,
+      title: eaTitles.get(code) ?? vocational.find((o) => o.anzsco === code)?.title ?? code,
+      flow: "telecom_group",
+      available: true,
+      unavailableReason: null,
     });
   }
   const withRubric = new Set(out.map((o) => o.anzscoCode));
@@ -147,5 +175,17 @@ export class NoSavedSubjectsError extends Error {
   constructor() {
     super("No saved subjects for this case. Open Step 2 (Transcript data) and read the transcripts first.");
     this.name = "NoSavedSubjectsError";
+  }
+}
+
+/** Shown when a telecom group occupation is picked on a case without ICT60220. */
+export const TELECOM_NEEDS_ICT60220 =
+  "Telecom group matching needs ICT60220. It was not found on this case's qualification or transcripts.";
+
+/** Raised by a single-occupation run for a telecom group code when the case has no ICT60220. */
+export class TelecomNeedsIct60220Error extends Error {
+  constructor() {
+    super(TELECOM_NEEDS_ICT60220);
+    this.name = "TelecomNeedsIct60220Error";
   }
 }

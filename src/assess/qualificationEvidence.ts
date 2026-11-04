@@ -571,11 +571,6 @@ export function creditsToYears(
 
 const HEAD_NUM =
   "\\d{1,2}(?:st|nd|rd|th)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|viii|vii|iii|ii|iv|vi|ix|i|v|x";
-/** Semester word with a number beside it ("I SEMESTER", "Semester 3", "2nd Semester"). */
-const SEM_HEAD_RE = new RegExp(
-  `^(?:sem(?:ester)?\\.?\\s*[-:#.]?\\s*(?:se\\s?(?=\\d))?(${HEAD_NUM})|(${HEAD_NUM})\\s*[-:#.]?\\s*sem(?:ester)?)\\b`,
-  "i",
-);
 const YEAR_OF_STUDY_RE = new RegExp(`\\byear\\s+of\\s+study\\s*[-:#.]?\\s*(${HEAD_NUM})\\b`, "gi");
 
 function studyYearToken(raw: string | undefined): number | null {
@@ -614,26 +609,66 @@ function maxRowStudyYear(rows: readonly ExtractedSubjectRow[]): number | null {
   return max;
 }
 
+/** Semester word, then a number ("Semester 3", "Sem-IV", "SEM SE5"). */
+const SEM_THEN_NUM_RE = new RegExp(
+  `(?<![a-z0-9])sem(?:ester)?\\.?\\s*[-:#.]?\\s*(?:se\\s?(?=\\d))?(${HEAD_NUM})(?![a-z0-9])`,
+  "gi",
+);
+/** Number, then the semester word ("2nd Semester", "IV SEM", "FIFTH Semester"). */
+const NUM_THEN_SEM_RE = new RegExp(
+  `(?<![a-z0-9])(${HEAD_NUM})\\s*[-:#.]?\\s*sem(?:ester)?(?![a-z0-9])`,
+  "gi",
+);
 /**
- * Numbered semester headings in reading order. Each one counts as 1, whatever
- * number is printed beside it. "Semester Project" has no number, so it is skipped.
+ * All-caps ordinal word glued to the text before it, as two-column PDFs merge
+ * lines ("TOTALEIGHTH Semester", "NameSIXTH Semester").
  */
-function semesterHeadingCount(text: string): number {
-  let n = 0;
+const GLUED_ORDINAL_SEM_RE =
+  /(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH)\s*[-:#.]?\s*(?:SEM(?:ESTER)?|Sem(?:ester)?)(?![a-zA-Z0-9])/g;
+/** "after 4th semester", "up to 6th semester", "in semester 3": a mention, not a heading. */
+const NOT_A_HEADING_BEFORE_RE = /\b(?:after|before|up\s*to|upto|till|until|of|in|from)\s+(?:the\s+)?$/i;
+
+/**
+ * Semester numbers printed as headings anywhere on the transcript, mid-line
+ * too, in reading order. "Semester Project" has no number, so it is skipped.
+ */
+function semesterHeadingNumbers(text: string): number[] {
+  const found: number[] = [];
   for (const line of text.split("\n")) {
-    for (const cell of line.split("|")) {
-      let rest = cell;
-      for (let i = 0; i < 6 && rest.trim(); i++) {
-        const lead = rest.match(/^[\s*•·>#\-–—]*/)![0].length;
-        const m = rest.slice(lead).match(SEM_HEAD_RE);
-        const num = studyYearToken(m?.[1] ?? m?.[2]) ?? toNum(m?.[1] ?? m?.[2]);
-        if (!m || num == null || num < 1 || num > 16) break;
-        n++;
-        rest = rest.slice(lead + m[0].length);
+    const hits: Array<{ start: number; end: number; raw: string }> = [];
+    for (const re of [SEM_THEN_NUM_RE, NUM_THEN_SEM_RE, GLUED_ORDINAL_SEM_RE]) {
+      re.lastIndex = 0;
+      for (const m of line.matchAll(re)) {
+        hits.push({ start: m.index!, end: m.index! + m[0].length, raw: m[1] });
       }
     }
+    hits.sort((a, b) => a.start - b.start || b.end - a.end);
+    let taken = -1;
+    for (const hit of hits) {
+      if (hit.start < taken) continue;
+      if (NOT_A_HEADING_BEFORE_RE.test(line.slice(Math.max(0, hit.start - 20), hit.start))) continue;
+      const num = studyYearToken(hit.raw) ?? toNum(hit.raw);
+      if (num == null || num < 1 || num > 16) continue;
+      found.push(num);
+      taken = hit.end;
+    }
   }
-  return n;
+  return found;
+}
+
+/**
+ * Semesters counted from the headings. Distinct numbers, first to last printed
+ * (semesters 3–8 → 6, range 3–8). When only I / II repeat (restarting each
+ * year), every heading counts as one, range 1..count, as before. Other repeats
+ * (a summary table listing the semesters again) are counted once.
+ */
+function semesterHeadingSpan(text: string): { count: number; first: number; last: number } | null {
+  const all = semesterHeadingNumbers(text);
+  if (!all.length) return null;
+  const distinct = [...new Set(all)].sort((a, b) => a - b);
+  const restarts = distinct.length < all.length && distinct[distinct.length - 1] <= 2;
+  if (restarts) return { count: all.length, first: 1, last: all.length };
+  return { count: distinct.length, first: distinct[0], last: distinct[distinct.length - 1] };
 }
 
 function yearDuration(year: number): Pick<
@@ -650,8 +685,9 @@ function yearDuration(year: number): Pick<
 }
 
 /**
- * Duration from the transcript text. Numbered semester headings are one
- * semester each (8 headings → 4 years). A printed year of study replaces that
+ * Duration from the transcript text. Each distinct semester number printed
+ * as a heading is one semester (semesters 1–8 → 4 years, 3–8 → 3 years);
+ * repeating I / II headings count one each (8 headings → 4 years). A printed year of study replaces that
  * count when it is higher: three Year 3 transcripts whose semesters restart
  * at 1 and 2 are 3 years, not 2. A lower year mention does not shorten a
  * longer semester span. Null when the text has neither.
@@ -663,16 +699,21 @@ function durationFromHeadings(texts: readonly string[] | null | undefined): Pick
   if (!texts?.some((t) => t?.trim())) return null;
   const blob = texts.filter(Boolean).join("\n");
   const year = maxStudyYear(blob);
-  const headings = semesterHeadingCount(blob);
-  if (headings >= 2) {
+  const sems = semesterHeadingSpan(blob);
+  const headings = sems?.count ?? 0;
+  if (sems && headings >= 2) {
+    const { first, last } = sems;
     const finalYear = Math.ceil(headings / 2);
     if (year == null || year <= finalYear) {
       return {
         countedYears: roundHalf(headings / 2),
         unit: "semester",
-        method: `${headings} semester headings on the transcript`,
+        method:
+          first === 1
+            ? `${headings} semester headings on the transcript`
+            : `${headings} semester headings on the transcript (semesters ${first}–${last})`,
         finalYear,
-        span: { unit: "semester", first: 1, last: headings },
+        span: { unit: "semester", first, last },
       };
     }
   }

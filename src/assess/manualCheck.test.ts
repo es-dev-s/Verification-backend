@@ -6,7 +6,12 @@ import {
   checkOccupationForCase,
   type CheckCaseLoader,
 } from "./assessCase.js";
-import { MANUAL_ANZSCO_FIELD, NoSavedSubjectsError } from "./manualOccupation.js";
+import {
+  MANUAL_ANZSCO_FIELD,
+  NoSavedSubjectsError,
+  TELECOM_NEEDS_ICT60220,
+  TelecomNeedsIct60220Error,
+} from "./manualOccupation.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
 import type { ExtractedSubjectRow } from "./schemas.js";
 
@@ -140,5 +145,89 @@ describe("assessor ANZSCO check (read-only)", () => {
       checkOccupationForCase("case-check", "civil-engineer", (async () => empty) as unknown as CheckCaseLoader),
       NoSavedSubjectsError,
     );
+  });
+});
+
+describe("assessor pick of a telecommunications group code", () => {
+  function unit(code: string, title: string): ExtractedSubjectRow {
+    return { ...sub(`${code} ${title}`), code, qualification: "advanced_diploma" };
+  }
+  const ROWS = [
+    unit("BSBCRT611", "Apply critical thinking for complex problem solving"),
+    unit("BSBTWK502", "Manage team effectiveness"),
+    unit("BSBXCS402", "Promote workplace cyber security awareness and best practices"),
+    unit("ICTICT608", "Interact with clients on a business level"),
+    unit("ICTICT618", "Manage IT projects"),
+    unit("ICTSAD609", "Plan and monitor business analysis activities in an ICT environment"),
+    unit("ICTNPL413", "Evaluate networks and associated plans"),
+    unit("ICTNWK612", "Plan and manage troubleshooting advanced integrated IP networks"),
+    unit("ICTPMG613", "Manage ICT project planning"),
+    unit("ICTTEN615", "Manage network traffic"),
+    unit("ICTTEN622", "Produce ICT network architecture designs"),
+  ];
+  const ICT: QualificationInfo[] = [
+    {
+      level: "advanced_diploma",
+      title: "ICT60220 Advanced Diploma of Information Technology",
+      countedYearsOverride: 2,
+      engineeringShareOverride: 1,
+    },
+  ];
+  const NO_ICT: QualificationInfo[] = [
+    {
+      level: "advanced_diploma",
+      title: "Advanced Diploma of Engineering",
+      countedYearsOverride: 2,
+      engineeringShareOverride: 1,
+    },
+  ];
+
+  it("with ICT60220, 313212 and 313213 are matched by the telecom group logic", () => {
+    for (const [id, code] of [
+      ["313212", "313212"],
+      ["telecommunications-network-planner", "313213"],
+    ] as const) {
+      const check = checkOccupation(ROWS, { qualifications: ICT }, id);
+      assert.ok(check, id);
+      assert.equal(check.candidate.anzscoCode, code);
+      assert.ok(check.candidate.suggestionStatus, `${id} is a telecom group result`);
+    }
+  });
+
+  it("without ICT60220, 313212 and 313213 stop with the ICT60220 message", () => {
+    for (const id of ["313212", "313213", "telecommunications-network-planner"]) {
+      assert.throws(
+        () => checkOccupation(ROWS, { qualifications: NO_ICT }, id),
+        (err: unknown) => err instanceof TelecomNeedsIct60220Error && err.message === TELECOM_NEEDS_ICT60220,
+        id,
+      );
+    }
+  });
+
+  it("case check without ICT60220 rejects with the message (route sends it as 422)", async () => {
+    const caseRow = {
+      id: "case-telecom",
+      engineeringTitledDegree: false,
+      documents: [],
+      qualifications: [
+        { degreeLevel: "advanced_diploma", degreeTitle: "Advanced Diploma of Engineering", country: null, institution: null },
+      ],
+      extractedSubjects: ROWS.map((r, i) => ({ ...r, id: `t${i}`, sortOrder: i, documentId: null })),
+      fieldSources: [],
+      assessment: null,
+    };
+    await assert.rejects(
+      checkOccupationForCase("case-telecom", "313212", (async () => caseRow) as unknown as CheckCaseLoader),
+      (err: unknown) => err instanceof TelecomNeedsIct60220Error && err.message === TELECOM_NEEDS_ICT60220,
+    );
+  });
+
+  it("a saved telecom choice on a case without ICT60220 does not break the assessment", () => {
+    const res = assessExtractedSubjects(ROWS, {
+      qualifications: NO_ICT,
+      manualSelection: { occupationId: "313212", anzscoCode: "313212", title: "Telecommunications Field Engineer" },
+    } as Parameters<typeof assessExtractedSubjects>[1]);
+    assert.ok(res);
+    assert.notEqual(res.assessorSelected?.occupationId, "313212");
   });
 });
