@@ -107,11 +107,11 @@ Return JSON only matching this schema exactly:
 The two fields that must be right are degreeTitle and institution. Copy them from the printed header or the closing award block of THAT source. The text you see is the opening and the closing of the document; a line that says "later pages omitted" is not content.
 
 degreeTitle — the name of the award, not a subject:
-- Use a labeled award line when one is printed: Qualification, Award, Course, Program, Programme, Degree, Award Name, Name of the Degree, Degrees Awarded, Type of Academic Degree.
+- Use a labeled award line when one is printed: Qualification, Award, Course, Program, Programme, Programme Attended, Award Granted (the award may be on the next line), Degree, Award Name, Name of the Degree, Degrees Awarded, Type of Academic Degree.
 - Copy the words after the label. Strip one leading Australian training-package code only (ICT60220, BSB50420, and the same pattern of 3–4 letters plus 5 digits). "ICT60220 Advanced Diploma of Information Technology" → "Advanced Diploma of Information Technology".
 - A unit code in a results table (BSBCRT611, ICTNWK546, ICTSAD612) is never the degree title. A unit name ("Apply critical thinking") is never the degree title.
 - If the source has no award line and no program name, return degreeTitle null. Do not build a title from the unit list, and do not copy the title from a different documentId.
-- Branch, Major, Specialisation, Specialization, Stream, or Department is the field of study. Append it to the award when both are printed: "BACHELOR OF TECHNOLOGY (B.Tech)" plus Branch "CIVIL ENGINEERING" → "Bachelor of Technology in Civil Engineering". If only the branch is printed and no award word (Bachelor, Master, Diploma, Degree, B.Sc, B.Tech, B.Eng) appears anywhere in that source, return degreeTitle null.
+- Branch, Major, Specialisation, Specialization, Stream, or Department is the field of study. Append it to the award when both are printed: "BACHELOR OF TECHNOLOGY (B.Tech)" plus Branch "CIVIL ENGINEERING" → "Bachelor of Technology in Civil Engineering". If only the branch is printed and no award word (Bachelor, Master, Diploma, Certificate, Degree, B.Sc, B.Tech, B.Eng) appears anywhere in that source, return degreeTitle null.
 - On a bilingual transcript, use the English text in parentheses after Program/Department and Type of Academic Degree. Drop a trailing "Pr.".
 - Keep honours in the title when printed: "Bachelor of Engineering (Honours)".
 
@@ -230,7 +230,10 @@ Expected for that source:
 Rules:
 - Include one entry in "sources" for every documentId provided in the user message (even if all fields are null).
 - Echo documentId and documentType exactly as given.
-- Target only the degree level requested in the user message (default bachelor if unspecified). Ignore other levels on the same document.
+- Target the degree level requested in the user message (default bachelor if unspecified). On a TRANSCRIPT or CERTIFICATE, first look for an award at that level.
+- If a TRANSCRIPT or CERTIFICATE prints only one award and it is a different level (e.g. "National Certificate in ...", "National Diploma in ..."), still copy that award as degreeTitle and its issuer as institution. Do not change the level words in the title.
+- If a TRANSCRIPT or CERTIFICATE prints several awards, take the one at the target level and ignore the others. If none is at the target level, return degreeTitle null.
+- On a CV, ignore education lines at other levels.
 - If several awards of the same target level appear in one source, take the first and set multipleBachelors to true when the target is bachelor.
 - CERTIFICATE: the awarded title and the issuing institution on the certificate.
 - TRANSCRIPT: the award and the institution in the header or the degrees-awarded block. This includes VET/RTO/TAFE records of results.

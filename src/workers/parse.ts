@@ -3,10 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { LATERAL_FIELD, priorStudyDocumentIds } from "../assess/lateralEntry.js";
 import { generateJsonGroq, loadGroqKeys } from "../lib/groqClient.js";
 import { acquireParseSlot } from "../lib/rateLimit.js";
-import {
-  degreeReaderWindow,
-  fillEmptyEducationFields,
-} from "../parse/degreeReaderText.js";
+import { degreeReaderWindow } from "../parse/degreeReaderText.js";
 import {
   generateJsonGroqSplit,
   mergeCvEducationParts,
@@ -16,9 +13,13 @@ import {
   heuristicsCvEducationEntries,
   heuristicsEducationMulti,
   heuristicsExperienceFromText,
-  heuristicsPerSource,
 } from "../parse/heuristics.js";
 import { mergeEducation } from "../parse/mergeEducation.js";
+import {
+  educationResultFlags,
+  type LevelMismatch,
+} from "../parse/levelMismatch.js";
+import { resolveLevelSources } from "../parse/levelSources.js";
 import {
   cvEducationSystemPrompt,
   educationMultiSystemPrompt,
@@ -26,7 +27,6 @@ import {
 } from "../parse/prompts.js";
 import {
   cvEducationExtractSchema,
-  educationExtractSchema,
   educationMultiExtractSchema,
   experienceExtractSchema,
   type CvEducationEntry,
@@ -45,16 +45,6 @@ import {
   sanitizeEducationExtract,
   sanitizeExtractedLabel,
 } from "../parse/sanitizeExtracted.js";
-
-const emptyExtract = (): EducationExtract => ({
-  degreeTitle: null,
-  institution: null,
-  country: null,
-  start: null,
-  end: null,
-  statedDuration: null,
-  multipleBachelors: false,
-});
 
 /**
  * Parse every education entry on a CV, each tagged with a degreeLevel guess.
@@ -210,6 +200,7 @@ export async function parseEducation(
   let fallback = false;
   let geminiMeta: { keyUsed?: string; modelUsed?: string } = {};
   let cvGeminiRaw: unknown = null;
+  let levelMismatches: LevelMismatch[] = [];
 
   // Transcript / certificate — one Groq call on the opening and closing pages.
   // Subject lines stay on the parallel multi-key extract.
@@ -222,7 +213,9 @@ export async function parseEducation(
       )
       .join("\n\n");
     const header =
-      `Target degreeLevel=${degreeLevel}. Extract only fields for this level. ` +
+      `Target degreeLevel=${degreeLevel}. Extract fields for this level. ` +
+      `If a TRANSCRIPT or CERTIFICATE prints only one award and it is a different level ` +
+      `(e.g. National Certificate, National Diploma), still copy that award and its issuer. ` +
       `Priority fields: degreeTitle and institution, copied from the printed award and the issuing body. ` +
       `Each source below is the opening and the closing of that file. ` +
       `The unit list in the middle is omitted. A unit line is not a degree title.`;
@@ -256,47 +249,21 @@ export async function parseEducation(
       fallback = true;
     }
 
-    const multi = educationMultiExtractSchema.safeParse(data);
-    const byId = new Map(
-      (multi.success ? multi.data.sources : []).map((s) => [s.documentId, s]),
-    );
-
-    sources = labeled.map((d) => {
-      const raw = byId.get(d.documentId);
-      const parsed = raw ? educationExtractSchema.safeParse(raw) : null;
-      const extract = parsed?.success ? parsed.data : emptyExtract();
-      return {
-        documentId: d.documentId,
-        documentType: d.documentType,
-        extract: fillEmptyEducationFields(sanitizeEducationExtract(extract), d.text),
-        degreeLevel,
-      };
+    const resolved = resolveLevelSources({
+      labeled,
+      data,
+      degreeLevel,
+      groqFailed: fallback,
     });
-
-    const anyValue = sources.some((s) =>
-      Boolean(
-        s.extract.degreeTitle ||
-          s.extract.institution ||
-          s.extract.country ||
-          s.extract.start ||
-          s.extract.end,
-      ),
-    );
-    if (!anyValue) {
+    if (resolved.emptyFields) {
       console.warn(
         `[parse/education/${degreeLevel}] empty Groq fields — heuristics fallback`,
       );
-      sources = heuristicsPerSource(labeled).map((s) => ({
-        ...s,
-        extract: sanitizeEducationExtract(s.extract),
-        degreeLevel,
-      }));
-      data = heuristicsEducationMulti(labeled) as unknown as Record<
-        string,
-        unknown
-      >;
-      fallback = true;
     }
+    sources = resolved.sources;
+    data = resolved.data;
+    fallback = resolved.fallback;
+    levelMismatches = resolved.levelMismatches;
   }
 
   // CV contribution: multi-entry parse, keep only this degreeLevel
@@ -389,7 +356,8 @@ export async function parseEducation(
     degreeLevel,
     fields: merged.fields,
     fromCvOnly: merged.fromCvOnly,
-    flags: fallback ? [...merged.flags, "heuristics_fallback"] : merged.flags,
+    flags: educationResultFlags(merged.flags, fallback, levelMismatches),
+    levelMismatches,
     geminiRaw: { levelDocs: data, cv: cvGeminiRaw },
     fallback,
     geminiMeta,
