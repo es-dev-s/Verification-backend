@@ -28,6 +28,11 @@ const rubricSchema = z.object({
   title: z.string(),
   /** Stable occupation key from anzsco-verification-rubrics.json (unique even when ANZSCO is shared). */
   occupationId: z.string().optional(),
+  /**
+   * Set on an overseas-curriculum rubric (e.g. "312211"): it reports under that
+   * ANZSCO but is looked up by id only, never by ANZSCO.
+   */
+  variantOf: z.string().optional(),
   format: z.string().optional(),
   rubricVersion: z.string().optional(),
   qualificationCheck: z
@@ -77,6 +82,12 @@ const rubricSchema = z.object({
            * ("draft*" = prefix), e.g. drafting / design / CAD for 312511.
            */
           keywordRuleRequires: z.array(z.string()).optional(),
+          /**
+           * True: the gate also applies on the Engineering Associate track
+           * (312411 Electronic Engineering Draftsperson). Other Associate
+           * rubrics ignore the gate there.
+           */
+          required: z.boolean().optional(),
         })
         .optional(),
       subjects: z.array(subjectSchema),
@@ -143,6 +154,13 @@ type OccupationRaw = {
   anzsco: string;
   title: string;
   flow: string;
+  /**
+   * Overseas-curriculum variant of another occupation's ANZSCO (e.g. "312211").
+   * Never listed or found by ANZSCO; scored only through the origin routing.
+   */
+  variantOf?: string;
+  /** "overseas" for an overseas-curriculum variant. */
+  origin?: string;
   qualification?: {
     statement?: string;
     levelPolicy?: "bachelor_expected" | "diploma_ok";
@@ -157,6 +175,14 @@ type OccupationRaw = {
   scoringDisabledReason?: string;
   reviewFlags?: Array<{ severity?: string; field?: string; message: string }>;
   coreUnits?: {
+    /** "pool": units are a list to pick from; matched units count against `total`. */
+    mode?: "all" | "pool";
+    total: number;
+    thresholds: Record<string, number>;
+    units: VocationalUnitRaw[];
+  };
+  /** Vocational flows: Foundational units, scored as Tier 1 (noRisk / lowRisk; below = flag). */
+  foundationalUnits?: {
     total: number;
     thresholds: Record<string, number>;
     units: VocationalUnitRaw[];
@@ -184,6 +210,7 @@ type OccupationRaw = {
       label?: string;
       aliases?: string[];
       keywordRuleRequires?: string[];
+      required?: boolean;
     };
     supporting?: NamedSubject[];
     optional?: NamedSubject[];
@@ -226,7 +253,15 @@ export type VocationalOccupation = {
   qualificationStatement: string;
   qualificationCodes: string[];
   titleMatch: string[][];
-  coreUnits: { total: number; thresholds: Record<string, number>; units: VocationalUnitRaw[] };
+  coreUnits: {
+    /** "pool": matched units count against `total` (more units listed than required). */
+    mode: "all" | "pool";
+    total: number;
+    thresholds: Record<string, number>;
+    units: VocationalUnitRaw[];
+  };
+  /** Foundational units scored as Tier 1 (null when the rubric has none). */
+  foundationalUnits: { total: number; thresholds: Record<string, number>; units: VocationalUnitRaw[] } | null;
   electives: { clusters: string[]; minimumUnits: number | null; rule: string | null };
   /** True only when scoring is switched on and every core unit has a real code. */
   scoringEnabled: boolean;
@@ -717,6 +752,7 @@ function buildRubricFromOccupation(occupation: OccupationRaw): Rubric {
     anzscoCode: String(occupation.anzsco),
     title: occupation.title,
     occupationId: occupation.id,
+    ...(occupation.variantOf ? { variantOf: String(occupation.variantOf) } : {}),
     format: "academic",
     rubricVersion: occupation.source?.version,
     qualificationCheck: occupation.qualification?.statement
@@ -753,6 +789,7 @@ function buildRubricFromOccupation(occupation: OccupationRaw): Rubric {
           ...(occupation.tier3?.gate?.keywordRuleRequires?.length
             ? { keywordRuleRequires: occupation.tier3.gate.keywordRuleRequires }
             : {}),
+          ...(occupation.tier3?.gate?.required ? { required: true } : {}),
         },
         subjects: tier3Subjects,
       },
@@ -795,7 +832,7 @@ function findOccupation(
   const byId = file.occupations.find((o) => o.id === key);
   if (byId) return byId;
   const byCode = file.occupations.filter(
-    (o) => String(o.anzsco) === key && o.flow === "academic_3_tier",
+    (o) => String(o.anzsco) === key && o.flow === "academic_3_tier" && !o.variantOf,
   );
   if (byCode.length === 1) return byCode[0]!;
   if (byCode.length > 1) {
@@ -804,7 +841,7 @@ function findOccupation(
       `ANZSCO ${key} matches multiple occupations (${byCode.map((o) => o.id).join(", ")}). Pass occupation id instead.`,
     );
   }
-  const anyCode = file.occupations.find((o) => String(o.anzsco) === key);
+  const anyCode = file.occupations.find((o) => String(o.anzsco) === key && !o.variantOf);
   if (anyCode) return anyCode;
   throw new Error(`No occupation found for "${codeOrId}"`);
 }
@@ -835,8 +872,19 @@ export function listAcademicOccupations(): Array<{
   title: string;
 }> {
   return loadRubricsFile()
-    .occupations.filter((o) => o.flow === "academic_3_tier")
+    .occupations.filter((o) => o.flow === "academic_3_tier" && !o.variantOf)
     .map((o) => ({ id: o.id, anzsco: o.anzsco, title: o.title }));
+}
+
+/**
+ * Overseas-curriculum rubric id for an ANZSCO (e.g. 312211 → "civil-engineering-draftsperson-os"),
+ * or null. These rubrics are kept out of listAcademicOccupations / ANZSCO lookups.
+ */
+export function overseasVariantId(anzsco: string): string | null {
+  const hit = loadRubricsFile().occupations.find(
+    (o) => o.flow === "academic_3_tier" && o.variantOf != null && String(o.variantOf) === String(anzsco),
+  );
+  return hit?.id ?? null;
 }
 
 /** Every vocational (unit-code) occupation, enabled or not. */
@@ -846,8 +894,10 @@ export function listVocationalOccupations(): VocationalOccupation[] {
     .filter((o) => o.flow === "vocational_units")
     .map((o) => {
       const units = o.coreUnits?.units ?? [];
+      const foundational = o.foundationalUnits?.units ?? [];
       const realCodes =
-        units.length > 0 && units.every((u) => !u.placeholder && Boolean(u.code?.trim()));
+        units.length > 0 &&
+        [...units, ...foundational].every((u) => !u.placeholder && Boolean(u.code?.trim()));
       const switchedOn = o.scoringEnabled !== false;
       const disabledReason = !realCodes
         ? "Core units have no unit codes yet."
@@ -862,10 +912,18 @@ export function listVocationalOccupations(): VocationalOccupation[] {
         qualificationCodes: (o.qualification?.codes ?? []).map((c) => c.trim().toUpperCase()),
         titleMatch: o.qualification?.titleMatch?.allOf ?? [],
         coreUnits: {
+          mode: o.coreUnits?.mode === "pool" ? ("pool" as const) : ("all" as const),
           total: o.coreUnits?.total ?? units.length,
           thresholds: o.coreUnits?.thresholds ?? {},
           units,
         },
+        foundationalUnits: foundational.length
+          ? {
+              total: o.foundationalUnits?.total ?? foundational.length,
+              thresholds: o.foundationalUnits?.thresholds ?? {},
+              units: foundational,
+            }
+          : null,
         electives: {
           clusters: o.electives?.clusters ?? [],
           minimumUnits: o.electives?.minimumUnits ?? null,

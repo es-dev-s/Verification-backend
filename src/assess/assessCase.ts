@@ -19,6 +19,7 @@ import {
   listVocationalOccupations,
   loadAllAcademicRubrics,
   loadRubric,
+  overseasVariantId,
   rubricFingerprint,
   scoringSubjects,
   type Rubric,
@@ -44,6 +45,7 @@ import {
   type RankedCandidate,
 } from "./familyAdjust.js";
 import { evaluateGate1, gateIsOpen, openTracks, TRACK_LABELS, trackForAnzsco } from "./gate1.js";
+import { associateFallbackFor } from "./associateFallback.js";
 import { isDiplomaLevel } from "./schemas.js";
 import {
   manualSelectionFrom,
@@ -80,7 +82,9 @@ import {
 export { applyDocumentLevels, chooseSubjectsAfterExtraction } from "./transcriptData.js";
 import type {
   AnzscoCandidate,
+  AssociateFallback,
   AssessorSelected,
+  DraftspersonPath,
   VocationalAssessmentDetail,
   AssessmentResult,
   ExtractedSubjectRow,
@@ -108,6 +112,7 @@ import {
   type TelecomSuggestionStatus,
 } from "./telecomGroup.js";
 import { hasUnitCodes, scoreVocational, type VocationalScore } from "./vocational.js";
+import { qualificationOrigin, type OriginDecision } from "./origin.js";
 
 export type AssessCaseOpts = {
   /** Force re-extract even if hash matches. */
@@ -173,6 +178,8 @@ export type ScoredOccupation = {
   suggestionStatus?: TelecomSuggestionStatus;
   /** Keep the telecommunications score when a work-experience judgement is applied. */
   lockScore?: boolean;
+  /** 312211 / 312311: draftsperson path scored (AU unit codes / overseas subjects / both). */
+  draftspersonPath?: DraftspersonPath | null;
 };
 
 /** Inputs shared by every occupation scored for one case. */
@@ -288,6 +295,9 @@ export async function assessCase(
     // lateralGate: bumped when the Gate 1 lateral-entry rules change, so saved
     // lateral cases re-score once (other cases keep their cache key).
     ...(hasLateralState(lateralState) ? { lateralEntry: lateralHashOf(lateralState), lateralGate: 3 } : {}),
+    // associateGate: bumped for the Diploma gate / 312999 fallback, so saved
+    // diploma-level cases re-score once (other cases keep their cache key).
+    ...(caseRow.qualifications.some((q) => isDiplomaLevel(q.degreeLevel)) ? { associateGate: 1 } : {}),
     rubric: rubricFingerprint(),
     config: scoringConfigFingerprint(),
   });
@@ -503,7 +513,7 @@ export async function assessCase(
     qualification: u.qualification as QualificationType,
   }));
   const matches = dedupeMatchRows(winner.matches);
-  const missingSubjects = computeMissingSubjects(matches, winner.rubric);
+  const missingSubjects = computeMissingSubjects(matches, winner.rubric, winner.vocational);
   const transcriptSource = winner.vocational
     ? VOCATIONAL_SOURCE
     : buildTranscriptSource(winner.qualificationsUsed, winner.poolKind, extracted);
@@ -513,7 +523,7 @@ export async function assessCase(
       s.rubric,
       s.scored,
       m,
-      computeMissingSubjects(m, s.rubric),
+      computeMissingSubjects(m, s.rubric, s.vocational),
       s.unmatched.map((u) => ({
         name: u.name,
         code: u.code ?? null,
@@ -540,7 +550,8 @@ export async function assessCase(
     coreMatched: winner.scored.coreMatched,
     coreExpected: winner.scored.coreExpected,
     corePct: winner.scored.corePct,
-    tier1Outcome: winner.vocational ? null : winner.scored.tier1Outcome,
+    tier1Outcome:
+      winner.vocational && !winner.vocational.foundationalTotal ? null : winner.scored.tier1Outcome,
     tier2Outcome: winner.scored.tier2Outcome,
     tier3GateMet: winner.scored.tier3GateMet,
     workExperienceBoost: winner.workExperienceBoost,
@@ -569,6 +580,13 @@ export async function assessCase(
     etOwnScore(shortlist, scoredAll),
     etTiersOf(shortlist, scoredAll),
   );
+  if (!opts?.occupationId && !assessorSelected) {
+    const fallback = associateFallbackOf(gate, [scoredAll, shortlist, shown], {
+      qualifications: qualificationInfos,
+      transcriptTexts,
+    });
+    if (fallback) result.associateFallback = fallback;
+  }
 
   // When nothing is recommended, still surface best coverage numbers from the top card
   if (!result.recommended) {
@@ -737,7 +755,7 @@ function scoreOccupation(
       workExperienceBoost: opts.workExperienceBoost,
       rubric,
       qualificationCheck,
-      applyCapstone: trackForAnzsco(rubric.anzscoCode) !== "engineering_associate",
+      applyCapstone: capstoneApplies(rubric, trackForAnzsco(rubric.anzscoCode)),
     });
     // Strictly better only, so earlier pools (Bachelor) win ties.
     if (!best || compareScores(best.scored, scored) > 0) {
@@ -880,6 +898,74 @@ function scoreVocationalOccupation(
 }
 
 /**
+ * Tier 3 gate on/off. The Engineering Associate track ignores the gate,
+ * except for a rubric whose gate is marked `required` (312411 Electronic
+ * Engineering Draftsperson: Projects & Industrial Training).
+ */
+export function capstoneApplies(rubric: Rubric, track: Gate1TrackId | null | undefined): boolean {
+  return track !== "engineering_associate" || rubric.tiers.tier3.gate?.required === true;
+}
+
+/**
+ * One vocational occupation, routed by qualification origin when it has an
+ * overseas-curriculum rubric (312211 / 312311):
+ * - australian: unit codes only (scored when `auEligible`, as before);
+ * - overseas: the overseas subject-heading rubric only;
+ * - unknown: both, the better kept (compareScoredOccupations) and flagged.
+ * Occupations without an overseas rubric are scored as before. Null = not scored.
+ */
+export function scoreDraftsperson(
+  extracted: ExtractedSubjectRow[],
+  occ: VocationalOccupation,
+  routing: RoutingDecision,
+  ctx: ScoringContext,
+  auEligible: boolean,
+  origin?: OriginDecision,
+): ScoredOccupation | null {
+  const auReady = occ.scoringEnabled && occ.coreUnits.units.some((u) => u.code);
+  const osId = overseasVariantId(occ.anzsco);
+  const scoreAu = () => scoreVocationalOccupation(extracted, occ, routing, ctx);
+  if (!osId) return auReady && auEligible ? scoreAu() : null;
+
+  const decided =
+    origin ??
+    qualificationOrigin({ qualifications: ctx.qualifications, rows: extracted, texts: ctx.transcriptTexts });
+  const scoreOs = () =>
+    scoreOccupation(extracted, loadRubric(osId), {
+      workExperienceBoost: ctx.workExperienceBoost,
+      qualifications: ctx.qualifications,
+    });
+  const base = { origin: decided.origin, reason: decided.reason };
+
+  if (decided.origin === "australian") {
+    if (!auReady || !auEligible) return null;
+    return { ...scoreAu(), draftspersonPath: { ...base, path: "au_unit_codes" } };
+  }
+  if (decided.origin === "overseas" || !auReady) {
+    return { ...scoreOs(), draftspersonPath: { ...base, path: "overseas_subjects" } };
+  }
+  const au = scoreAu();
+  const os = scoreOs();
+  const osWins = compareScoredOccupations(os, au) < 0;
+  const kept = osWins ? os : au;
+  const other = osWins ? au : os;
+  const keptLabel = osWins ? "overseas subject headings" : "Australian unit codes";
+  return {
+    ...kept,
+    draftspersonPath: {
+      ...base,
+      path: "both_best",
+      note: `Qualification origin unknown: scored on both Australian unit codes and overseas subject headings; kept ${keptLabel} (${kept.scored.confidenceScore}% vs ${other.scored.confidenceScore}%). Assessor to confirm where the qualification was awarded.`,
+      alsoScored: {
+        path: osWins ? "au_unit_codes" : "overseas_subjects",
+        determination: other.scored.determination,
+        confidenceScore: other.scored.confidenceScore,
+      },
+    },
+  };
+}
+
+/**
  * Gate 1 + scoring: decide eligibility first, then rank only the occupations
  * in the open tracks (academic and vocational), best-first. A blocked gate
  * (not eligible / manual review) scores nothing. A targeted run (occupationId,
@@ -921,9 +1007,8 @@ export function scoreRoutedOccupations(
     }
     const vocTarget = vocational.find((o) => o.id === target || o.anzsco === target);
     if (vocTarget) {
-      if (vocTarget.coreUnits.units.some((u) => u.code)) {
-        out.push({ ...scoreVocationalOccupation(extracted, vocTarget, routing, ctx), track: "engineering_associate" });
-      }
+      const draft = scoreDraftsperson(extracted, vocTarget, routing, ctx, true);
+      if (draft) out.push({ ...draft, track: "engineering_associate" });
     } else {
       const rubric = loadRubric(target);
       const track = trackForAnzsco(rubric.anzscoCode) ?? undefined;
@@ -969,12 +1054,17 @@ export function scoreRoutedOccupations(
       }
     }
     const transcriptHasUnitCodes = hasUnitCodes(extracted, ctx.transcriptTexts);
+    const origin = qualificationOrigin({
+      qualifications: ctx.qualifications,
+      rows: extracted,
+      texts: ctx.transcriptTexts,
+    });
     for (const occ of vocational) {
-      if (!occ.scoringEnabled) continue;
       const pointed = routing.vocationalOccupationIds.includes(occ.id);
-      if (!pointed && !transcriptHasUnitCodes) continue;
+      const draft = scoreDraftsperson(extracted, occ, routing, ctx, pointed || transcriptHasUnitCodes, origin);
+      if (!draft) continue;
       out.push({
-        ...scoreVocationalOccupation(extracted, occ, routing, ctx),
+        ...draft,
         track: "engineering_associate",
         trackPriority: priority.get("engineering_associate"),
       });
@@ -1066,7 +1156,7 @@ export function checkOccupation(
     s.rubric,
     s.scored,
     matches,
-    computeMissingSubjects(matches, s.rubric),
+    computeMissingSubjects(matches, s.rubric, s.vocational),
     s.unmatched.map((u) => ({
       name: u.name,
       code: u.code ?? null,
@@ -1293,7 +1383,7 @@ function applyWorkExperienceJudgements(
         workExperienceBoost: true,
         rubric: occ.rubric,
         qualificationCheck: occ.qualificationCheck,
-        applyCapstone: occ.track !== "engineering_associate",
+        applyCapstone: capstoneApplies(occ.rubric, occ.track),
       });
     } else {
       occ.workExperienceBoost = false;
@@ -1422,7 +1512,7 @@ function candidateFromScored(s: ScoredOccupation): AnzscoCandidate {
     s.rubric,
     s.scored,
     m,
-    computeMissingSubjects(m, s.rubric),
+    computeMissingSubjects(m, s.rubric, s.vocational),
     s.unmatched.map((u) => ({
       name: u.name,
       code: u.code ?? null,
@@ -1623,9 +1713,48 @@ function dedupeMatchRows(matches: SubjectMatch[]): SubjectMatch[] {
   return out;
 }
 
+/**
+ * 312999 fallback (no rubric): Engineering Associate track open and no
+ * specific Associate ANZSCO at 70% or more. Uses the best score per code
+ * across the given lists; missing = core units (vocational) or rubric subjects.
+ */
+function associateFallbackOf(
+  gate: Gate1Decision,
+  lists: ReadonlyArray<readonly ScoredOccupation[]>,
+  ctx?: { qualifications?: QualificationInfo[]; transcriptTexts?: string[] },
+): AssociateFallback | null {
+  const associateOpen =
+    gateIsOpen(gate) && gate.tracks.some((t) => t.track === "engineering_associate" && t.open);
+  if (!associateOpen) return null;
+  const entries = lists.flat().map((s) => {
+    let missing: string[];
+    if (s.vocational) {
+      missing = [...(s.vocational.missingFoundational ?? []), ...s.vocational.missingCore].map((u) =>
+        `${u.code} ${u.title}`.trim(),
+      );
+    } else {
+      const m = computeMissingSubjects(dedupeMatchRows(s.matches), s.rubric, s.vocational);
+      missing = [...m.tier1, ...m.tier2];
+    }
+    return {
+      anzscoCode: s.rubric.anzscoCode,
+      title: s.rubric.title,
+      confidenceScore: s.scored.confidenceScore ?? null,
+      determination: s.scored.determination ?? null,
+      missing,
+    };
+  });
+  return associateFallbackFor({
+    associateOpen,
+    ict60220: hasIct60220(ctx?.qualifications, ctx?.transcriptTexts ?? []),
+    entries,
+  });
+}
+
 function computeMissingSubjects(
   matches: SubjectMatch[],
   rubric: Rubric,
+  vocational?: VocationalAssessmentDetail | null,
 ): MissingSubjectsByTier {
   const covered = new Set(
     matches
@@ -1636,9 +1765,13 @@ function computeMissingSubjects(
     tier1: scoringSubjects(rubric, "tier1")
       .map((s) => s.name)
       .filter((name) => !covered.has(name)),
-    tier2: scoringSubjects(rubric, "tier2")
-      .map((s) => s.name)
-      .filter((name) => !covered.has(name)),
+    // A pool of core units (312311) is a list to pick from, not a list of gaps.
+    tier2:
+      vocational?.coreMode === "pool"
+        ? []
+        : scoringSubjects(rubric, "tier2")
+            .map((s) => s.name)
+            .filter((name) => !covered.has(name)),
   };
 }
 
@@ -1747,6 +1880,7 @@ function buildCandidate(
     bandDetermination?: ScoreResult["bandDetermination"];
     gateDowngraded?: boolean;
     routeCapped?: boolean;
+    capstoneApplies?: boolean;
   },
   matches: SubjectMatch[],
   missingSubjects: MissingSubjectsByTier,
@@ -1760,6 +1894,7 @@ function buildCandidate(
     finalProject?: FinalProjectEvidence | null;
     track?: Gate1TrackId;
     suggestionStatus?: TelecomSuggestionStatus;
+    draftspersonPath?: DraftspersonPath | null;
   },
 ): AnzscoCandidate {
   const vocational = occ?.vocational ?? null;
@@ -1783,10 +1918,13 @@ function buildCandidate(
     missingSubjects,
     unmatched,
     subjectCatalog: buildSubjectCatalog(rubric),
-    qualificationNotes: scored.qualificationNotes ?? [],
+    qualificationNotes: [
+      ...(scored.qualificationNotes ?? []),
+      ...(occ?.draftspersonPath?.note ? [occ.draftspersonPath.note] : []),
+    ],
     qualificationCapped: scored.qualificationCapped ?? false,
     assessmentFlow: vocational ? "vocational_units" : "academic",
-    tier1Outcome: vocational ? null : scored.tier1Outcome ?? null,
+    tier1Outcome: vocational && !vocational.foundationalTotal ? null : scored.tier1Outcome ?? null,
     tier2Outcome: scored.tier2Outcome ?? null,
     bandDetermination: scored.bandDetermination,
     gateDowngraded: scored.gateDowngraded ?? false,
@@ -1795,6 +1933,8 @@ function buildCandidate(
     finalProjectTitle: occ?.finalProject?.title ?? null,
     ...(occ?.track ? { track: occ.track } : {}),
     ...(occ?.suggestionStatus ? { suggestionStatus: occ.suggestionStatus } : {}),
+    ...(occ?.draftspersonPath ? { draftspersonPath: occ.draftspersonPath } : {}),
+    ...(scored.capstoneApplies != null ? { capstoneApplies: scored.capstoneApplies } : {}),
   };
 }
 
@@ -1884,7 +2024,7 @@ export function assessExtractedSubjects(
     code: u.code ?? null,
     qualification: u.qualification as QualificationType,
   }));
-  const missingSubjects = computeMissingSubjects(deduped, winner.rubric);
+  const missingSubjects = computeMissingSubjects(deduped, winner.rubric, winner.vocational);
   const transcriptSource = winner.vocational
     ? VOCATIONAL_SOURCE
     : buildTranscriptSource(winner.qualificationsUsed, winner.poolKind, extracted);
@@ -1905,7 +2045,8 @@ export function assessExtractedSubjects(
     coreMatched: winner.scored.coreMatched,
     coreExpected: winner.scored.coreExpected,
     corePct: winner.scored.corePct,
-    tier1Outcome: winner.vocational ? null : winner.scored.tier1Outcome,
+    tier1Outcome:
+      winner.vocational && !winner.vocational.foundationalTotal ? null : winner.scored.tier1Outcome,
     tier2Outcome: winner.scored.tier2Outcome,
     tier3GateMet: winner.scored.tier3GateMet,
     workExperienceBoost: opts?.workExperienceBoost ?? false,
@@ -1927,6 +2068,10 @@ export function assessExtractedSubjects(
     ...(assessorSelected ? { assessorSelected } : {}),
   };
   result.familyAdjustment = familyAdjustmentForResult(result, etOwnScore(scoredAll), etTiersOf(scoredAll));
+  if (!opts?.occupationId && !assessorSelected) {
+    const fallback = associateFallbackOf(gate, [scoredAll, shown], opts);
+    if (fallback) result.associateFallback = fallback;
+  }
 
   if (!result.recommended) {
     result.anzscoCode = null;
@@ -1977,7 +2122,7 @@ export async function scoreOccupationWithLlm(
     workExperienceBoost: opts.workExperienceBoost,
     rubric,
     qualificationCheck,
-    applyCapstone: trackForAnzsco(rubric.anzscoCode) !== "engineering_associate",
+    applyCapstone: capstoneApplies(rubric, trackForAnzsco(rubric.anzscoCode)),
   });
   return {
     ...sync,

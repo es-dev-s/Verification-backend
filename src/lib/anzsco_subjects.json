@@ -11236,5 +11236,1271 @@
         ]
       }
     }
+  },
+  {
+    "anzscoCode": "312211",
+    "title": "Civil Engineering Draftsperson (overseas curriculum)",
+    "occupationId": "civil-engineering-draftsperson-os",
+    "groups": {
+      "tier1": {
+        "categoryLabel": "Foundational Subjects",
+        "subjects": [
+          {
+            "id": "312211-T1.1",
+            "name": "Engineering Mathematics",
+            "variants": [
+              "Engineering Mathematics - I",
+              "Engineering Mathematics - II",
+              "Engineering Mathematics - III",
+              "Applicable Mathematics",
+              "Mathematics I",
+              "Mathematics II",
+              "Mathematics III",
+              "Numerical Methods",
+              "Numerical Methods (Practical)",
+              "Probability & Statistics",
+              "Calculus and Analytic Geometry",
+              "Linear Algebra"
+            ]
+          },
+          {
+            "id": "312211-T1.2",
+            "name": "Engineering Physics",
+            "variants": [
+              "Engineering Physics Laboratory",
+              "Engineering Physics-I",
+              "Engineering Physics-II",
+              "Physics Laboratory",
+              "Physics",
+              "Physics (Practical)",
+              "Physics Lab"
+            ]
+          },
+          {
+            "id": "312211-T1.3",
+            "name": "Engineering Chemistry",
+            "variants": [
+              "Engineering Chemistry Laboratory",
+              "Engineering Chemistry-I",
+              "Engineering Chemistry-II",
+              "Chemistry Laboratory",
+              "Chemistry",
+              "Chemistry (Practical)",
+              "Chemistry Lab"
+            ]
+          },
+          {
+            "id": "312211-T1.4",
+            "name": "Engineering Mechanics / Mechanics of Solids",
+            "variants": [
+              "Engineering Mechanics",
+              "Mechanics of Materials",
+              "Engineering Mechanics-I",
+              "Engineering Mechanics-II",
+              "Solid Mechanics-I",
+              "Solid Mechanics-II",
+              "Applied Mechanics I (Statics)",
+              "Applied Mechanics II (Dynamics)",
+              "Strength of Materials",
+              "Strength of Materials (Practical)",
+              "Mechanics of Solids",
+              "Strength of Materials-I",
+              "Strength of Materials-II",
+              "Strength of Materials Lab",
+              "Solid Mechanics",
+              "Mechanics of Materials Lab",
+              "Engineering Mechanics Lab-P",
+              "Strength of Material",
+              "Strength of Materials 2"
+            ]
+          },
+          {
+            "id": "312211-T1.5",
+            "name": "Engineering Drawing / CAD / Graphics",
+            "variants": [
+              "Engineering Drawing",
+              "Computer Aided Drafting",
+              "Building Drawing",
+              "Engineering Drawing I (Practical)",
+              "Engineering Drawing II (Practical)",
+              "Civil Engineering Drawing",
+              "Computer Aided Civil Engineering Design and Graphics",
+              "Computer Aided Design CAD",
+              "Descriptive Geometry",
+              "Building Planning and Drawing"
+            ]
+          },
+          {
+            "id": "312211-T1.6",
+            "name": "Computer Programming / Computing (Optional)",
+            "variants": [
+              "Programming for Problem Solving Using C",
+              "Programming for Problem Solving Using C Laboratory",
+              "Data Structures Through C",
+              "Data Structures Through C Laboratory",
+              "Advance Data Structures",
+              "Advance Data Structures Laboratory",
+              "Object Oriented Programming Through Java",
+              "C-Programming",
+              "C-Programming Laboratory",
+              "Computer Programming in Civil Engineering Lab",
+              "Introduction to Computer & Programming",
+              "Introduction to Computer & Programming (Practical)",
+              "Introduction to Computer Programming",
+              "Programming in C & C++",
+              "Programming Lab",
+              "Computer Applications Lab",
+              "Prog.for Problem Solving",
+              "Prog.for Problem Solving Lab",
+              "Computer Appl.Lab",
+              "Computer Concepts & Programming in C",
+              "Introduction to Computer Science",
+              "Algorithm and Programming Languages",
+              "Computer Applications",
+              "Computer Programming",
+              "Basic Electro Mechanical Engineering",
+              "Introduction to Computing",
+              "Introduction to Computer",
+              "Application of Civil Engineering Computer"
+            ]
+          },
+          {
+            "id": "312211-T1.7",
+            "name": "Communication, Ethics & Professional Practice (Optional)",
+            "variants": [
+              "English for Communication",
+              "Professional English",
+              "Soft and Interpersonal Skills",
+              "Universal Human Values - II",
+              "Report Writing Skills",
+              "Social Sciences",
+              "Quantitative Aptitude & Logical Reasoning",
+              "Technical English & Communication Skills",
+              "English Language Laboratory",
+              "Communication Skills Laboratory",
+              "Professional Ethics and Human Values",
+              "Communication I (English)",
+              "Communication II (English)",
+              "Engineering Professional Practice",
+              "English Comprehension and Composition",
+              "Communication Skills",
+              "Professional Ethics",
+              "English",
+              "Effective Tech.Comm.in English",
+              "Soft Skills & Interper.Skills",
+              "Prof.Practice and Ethics",
+              "Professional Communication",
+              "Professional Communication Lab-P",
+              "Humanities & Social Science",
+              "Industrial Sociology",
+              "Industrial Psychology",
+              "Civics and Ethics",
+              "Introduction to Engineering",
+              "Legal Aspects of Civil Engineering",
+              "English Language Skills",
+              "Communication Skills and Technical Writing"
+            ]
+          },
+          {
+            "id": "312211-T1.8",
+            "name": "Others (Foundational)",
+            "variants": [
+              "Basic Electrical Engineering",
+              "Basic Electrical Engineering Laboratory",
+              "Environmental Studies",
+              "Elements of Electrical and Mechanical Engineering",
+              "Electric Circuits & Machines",
+              "Electric Circuits & Machines (Practical)",
+              "Electronics & Instrumentation",
+              "Electronics & Instrumentation (Practical)",
+              "Fundamental of Thermodynamics & Heat",
+              "Fundamental of Thermodynamics & Heat (Practical)",
+              "Applied Electricity and Electronics",
+              "Electrical & Mechanical Tech.",
+              "Industrial Visit / Study",
+              "Environmental Science",
+              "Workshop-Manuf.Process Lab",
+              "Finance and Accounting",
+              "Mechatronics",
+              "Elec.Ene.Conserva.and Safety",
+              "Principles of Climate Change",
+              "Environment & Ecology",
+              "General Proficiency-P",
+              "Electronics Engineering",
+              "Electrical Engineering",
+              "Electrical Engineering Lab-P",
+              "Manufacturing Process",
+              "Material Science",
+              "CBSNT Lab-P",
+              "Industrial Management",
+              "Engineering Thermodynamics",
+              "Laboratory Practice",
+              "Laboratory Practice II",
+              "Laboratory Practice III",
+              "Industrial Attachment",
+              "Industrial Attachment II",
+              "Industrial Attachment III",
+              "Industrial Sociology"
+            ]
+          }
+        ]
+      },
+      "tier2_core": {
+        "categoryLabel": "Core Subjects",
+        "subjects": [
+          {
+            "id": "312211-T2.1",
+            "name": "Structural Analysis/ Structural Design (Concrete / Steel / Timber / Prestressed)",
+            "variants": [
+              "Design of Reinforced Concrete Structures",
+              "Structural Analysis",
+              "Design of Steel Structures",
+              "Structural Engineering Detailing Laboratory",
+              "Earth Retaining Structures",
+              "Structural Analysis-I",
+              "Structural Analysis-II",
+              "Design of Concrete Structures-I",
+              "Design of Concrete Structures-II",
+              "Design of Steel Structures-I",
+              "Design of Steel Structures-II",
+              "Analysis, Design and Detailing of Structures Lab",
+              "Elective-II: Bridge Engineering",
+              "Theory of Structures I",
+              "Theory of Structures I (Practical)",
+              "Theory of Structures II",
+              "Theory of Structures II (Practical)",
+              "Design of Timber & Steel Structures I,II",
+              "Design of Reinforced Concrete Structures (Practical)",
+              "Introduction to Structural Mechanics",
+              "Basic Structural Analysis",
+              "Indeterminate Structural Analysis",
+              "Matrix Analysis of Structures",
+              "Basic Structural Analysis (Improved)",
+              "Steel Structures",
+              "Design of Concrete Structures",
+              "Elementary Structural Dynamics",
+              "Theory of Structures-I",
+              "Theory of Structures-II",
+              "Strl. Engg. Des. & Detailing-I",
+              "Strl. Engg. Des. & Detailing-II",
+              "Reinforced Cement Concrete",
+              "Design of Reinf.Con.Structures",
+              "Prestressed Concrete",
+              "Structure Analysis-I",
+              "Structural Analysis Lab-P",
+              "Structural Analysis-2",
+              "Structural Detailing Lab-(P)",
+              "Bridge Engineering",
+              "Tunnel Engineering",
+              "Reinforced Concrete Design I",
+              "Reinforced Concrete Design II",
+              "Design of Structures I",
+              "Design of Structures II - Project",
+              "Finite Elements",
+              "Structural Analysis I",
+              "Structural Analysis II",
+              "Plain and Reinforced Concrete I",
+              "Plain and Reinforced Concrete II",
+              "Structural Engineering",
+              "Design of Structures",
+              "Structural Mechanics I,II",
+              "Steel and Timber Structures"
+            ]
+          },
+          {
+            "id": "312211-T2.2",
+            "name": "Concrete Technology & Construction Materials",
+            "variants": [
+              "Construction Materials",
+              "Concrete Technology Lab",
+              "Advanced Concrete Technology",
+              "Sustainable Materials and Green Buildings",
+              "Building Materials Planning & Construction",
+              "Concrete Technology",
+              "Material Testing Laboratory",
+              "Elective-I: Pre-stressed Concrete",
+              "Civil Engineering Materials",
+              "Civil Engineering Materials (Practical)",
+              "Concrete Technology (Practical)",
+              "Properties of Concrete",
+              "Reinforced Concrete Design",
+              "Engg. Material & Construction",
+              "Concrete Laboratory",
+              "Building Mater.&Const.",
+              "Building Materials & Construction",
+              "Building Materials Lab-P",
+              "Earth Processes and Materials",
+              "Design of Reinforced & Prestresses Structure",
+              "Reinforced and Prestressed Concrete",
+              "Design of Concrete Structures I,II",
+              "Element and Construction Technology"
+            ]
+          },
+          {
+            "id": "312211-T2.3",
+            "name": "Geotechnical Engineering / Soil Mechanics / Foundations/ Engineering Geology",
+            "variants": [
+              "Engineering Geology",
+              "Engineering Geology Laboratory",
+              "Soil Mechanics",
+              "Foundation Engineering",
+              "Geo-technical Engineering-I",
+              "Geo-technical Engineering-II",
+              "Geo-technical Engineering Laboratory",
+              "Engineering Geology (Practical)",
+              "Soil Mechanics (Practical)",
+              "Foundation Engineering (Practical)",
+              "Geotechnical and Foundation Engineering",
+              "Engineering Geology Lab",
+              "Soil Mechanics Lab",
+              "Ground Improvement Techniques",
+              "Geotechnical Engineering",
+              "Geotechnical Engineering Lab (P)",
+              "Advance Foundation Design",
+              "Soil Mechanics I",
+              "Soil Mechanics II",
+              "Geotechnical Engineering I",
+              "Geotechnical Engineering II",
+              "Advanced Geotechnical Engineering",
+              "Geotechnics I,II",
+              "Deep Foundation Engineering"
+            ]
+          },
+          {
+            "id": "312211-T2.4",
+            "name": "Surveying / Geomatics / GIS",
+            "variants": [
+              "Surveying",
+              "Surveying Field Work-I",
+              "Surveying Field Work-II",
+              "Surveying-I",
+              "Surveying-II",
+              "Surveying Field Work-II Laboratory",
+              "Remote Sensing and GIS",
+              "Surveying I",
+              "Surveying II",
+              "Surveying II (Practical)",
+              "Survey Camp (Practical)",
+              "Plane Surveying",
+              "Advanced Surveying",
+              "Surveying Lab-P",
+              "Geo-Informatics",
+              "Geo-Informatics Lab-P",
+              "Survey Camp-(P)",
+              "Quantity Surveying & Estimation Lab-(P)",
+              "Advanced Engineering Surveying",
+              "Engineering Surveying Photogrammetry and GIS",
+              "Engineering Surveying",
+              "Principles of Surveying I, II",
+              "Geo Informatics",
+              "Land Measurement Science & Mapping",
+              "Practicum of Land Measurement Science",
+              "Practicum of Mechanical of Land"
+            ]
+          },
+          {
+            "id": "312211-T2.5",
+            "name": "Fluid Mechanics & Hydraulics",
+            "variants": [
+              "Fluid Mechanics",
+              "Hydraulics Engineering",
+              "Hydraulic and Hydraulic Machinery Laboratory",
+              "Hydraulics & Hydraulic Machines",
+              "Hydraulics & Hydraulic Machines Lab",
+              "Fluid Mechanics (Practical)",
+              "Hydraulics",
+              "Hydraulics (Practical)",
+              "Elementary Fluid Mechanics",
+              "Advanced Fluid Mechanics",
+              "Fluid Mechanics-I",
+              "Fluid Mechanics-II",
+              "Fluid Mechanics Lab",
+              "Hy. and Hy. Machinery Lab",
+              "Hydraulic Engineering",
+              "Hydraulic Engineering Lab",
+              "Fluid Mechanics Lab-P",
+              "Hydraulics & Hydraulic Machines Lab-P",
+              "Analysis & Design of Hydraulic Structures",
+              "Applied Hydrology",
+              "Hydraulic Engineering I",
+              "Hydraulics and Irrigation Engineering",
+              "Introduction to Fluid Mechanics",
+              "Mechanical of Fluid",
+              "Hidrolic",
+              "Practicum of Hidrolic"
+            ]
+          },
+          {
+            "id": "312211-T2.6",
+            "name": "Water Resources Engineering / Hydrology / Irrigation",
+            "variants": [
+              "Hydrology and Water Resources Engineering",
+              "Water Resources Engineering-I",
+              "Water Resources Engineering-II",
+              "Engineering Hydrology",
+              "Engineering Hydrology (Practical)",
+              "Water Supply Engineering",
+              "Water Supply Engineering (Practical)",
+              "Irrigation Engineering",
+              "Hydropower Engineering",
+              "Hydropower Engineering (Practical)",
+              "Water Resources Engg.-II",
+              "Water Res. Engg. & Mangt.-I",
+              "Ground Water Hydrology",
+              "Hydrology",
+              "Water Resource Engg.-I",
+              "Surface Hydrology",
+              "Water Resources Engineering",
+              "Rural Water Supply and Sanitation",
+              "Water Resources and Environmental Engineering I",
+              "Water Resources and Environmental Engineering II",
+              "Hydrology and Water Resources Management",
+              "Hydrology Engineering",
+              "Power Water Reservoir"
+            ]
+          },
+          {
+            "id": "312211-T2.7",
+            "name": "Transportation / Highway / Traffic Engineering",
+            "variants": [
+              "Highway Engineering",
+              "Highway Engineering Laboratory",
+              "Transportation Engineering-I",
+              "Transportation Engineering-II",
+              "Transportation Engineering I",
+              "Transportation Engineering I (Practical)",
+              "Transportation Engineering II",
+              "Transportation Engineering II (Practical)",
+              "Transportation Planning & Engineering (Elective II)",
+              "Introduction to Transportation Engineering",
+              "Transportation Engineering",
+              "Transportation Engineering Lab",
+              "Intel.Tranportation Systems",
+              "Road Safety Engineering",
+              "Urban Transportation Planning",
+              "Transportation Engineering Lab-(P)",
+              "Highway Engineering I",
+              "Highway and Transportation Engineering I",
+              "Highway and Transportation Engineering II",
+              "Advanced Highway and Transportation Engineering",
+              "Transportation Planning and Engineering",
+              "Highway and Traffic Engineering",
+              "Highway Geometric Design",
+              "Highway Materials",
+              "Pavement Design",
+              "Urban Traffic Management",
+              "Traffic Engineering"
+            ]
+          },
+          {
+            "id": "312211-T2.8",
+            "name": "Construction Management / Estimation & Contracts",
+            "variants": [
+              "Construction Management and Equipment",
+              "Estimation and Valuation",
+              "Construction Contracts Management",
+              "Construction Technology and Management",
+              "Quantity Surveying",
+              "Quantity Estimation & Project Management",
+              "Building Technology",
+              "Estimating & Valuation",
+              "Project Engineering",
+              "Management of Construction & Maintenance",
+              "Quantity Surveying and Cost Estimation",
+              "Project Planning and Management",
+              "Construction Project Scheduling",
+              "Engineering Economics",
+              "Entrepreneurship",
+              "Estimating & Specifications",
+              "Construction Mangt. & Admn.",
+              "Building Tech. and Services",
+              "Mang. Economics & Accountancy",
+              "Construction Engg. and Mngt.",
+              "Estimation and Specification",
+              "Estimation and Specificat.Lab",
+              "Engineering & Managerial Economics",
+              "Construction Technology & Management",
+              "Quality Management",
+              "Construction Management I",
+              "Construction Management II",
+              "Construction Equipment",
+              "Quantity Surveying and Estimation",
+              "Construction Management and Engineering Economics",
+              "Administration of Contracts and Budget",
+              "Law in Construction",
+              "Construction Management Method",
+              "Project Paper / Field Research"
+            ]
+          }
+        ]
+      },
+      "tier2_optional": {
+        "categoryLabel": "Optional / Elective Subjects",
+        "subjects": [
+          {
+            "id": "312211-T2.O1",
+            "name": "Others (Core / Elective)",
+            "variants": [
+              "Elective(Open): Renewable Energy Resources",
+              "Probability Methods in Engineering",
+              "Introduction ot Engineering Economics"
+            ]
+          },
+          {
+            "id": "312211-T2.O2",
+            "name": "Environmental / Water & Wastewater Engineering",
+            "variants": [
+              "Environmental Studies",
+              "Environmental Engineering-I",
+              "Environmental Engineering-II",
+              "Environmental Engineering Laboratory",
+              "Sanitary Engineering",
+              "Water & Waste Water Engg.",
+              "Environmental Engineering",
+              "Environmental Engineering Lab",
+              "Environment Engineering-II",
+              "Environmental Engineering Lab-(P)",
+              "Environmental Engineering I",
+              "Environmental Engineering II",
+              "Solid Waste, Soil Management and Other Environmental Topics",
+              "Sewerage and Waste Water Treatment",
+              "Environment Consequence Analysis"
+            ]
+          },
+          {
+            "id": "312211-T2.O3",
+            "name": "Building Planning, Architecture & Town Planning",
+            "variants": [
+              "Introduction to Architecture and Town Planning",
+              "Green Building Technologies",
+              "Smart Building Systems",
+              "Town Planning",
+              "Building Services",
+              "Architecture and Town Planning",
+              "Building Installation I, II",
+              "Building Planning and Design",
+              "Planning of High Building Construction"
+            ]
+          },
+          {
+            "id": "312211-T2.O4",
+            "name": "Earthquake Engineering",
+            "variants": [
+              "Elective-III: Earthquake Resistant Design of Structures",
+              "Earthquake Resistant Design of Structures"
+            ]
+          },
+          {
+            "id": "312211-T2.O5",
+            "name": "Marine / Airport / Specialized Infrastructure",
+            "variants": [
+              "Dock Harbour & Airport Engineering",
+              "Harbour & Airport Engineering, Maritime Ports",
+              "Planning of Sea Port",
+              "Planning of Air Port"
+            ]
+          },
+          {
+            "id": "312211-T2.O6",
+            "name": "Computational Methods for Civil Engineering",
+            "variants": [
+              "Introduction to the Finite Element Method",
+              "Numerical Analysis in Geotechnics,",
+              "Operations Research",
+              "Software Application in Civil and Structural Engineering"
+            ]
+          },
+          {
+            "id": "312211-T2.O7",
+            "name": "Risk, Hazard & Disaster Management",
+            "variants": [
+              "Disaster Management",
+              "Disaster Mitigation and Mang.",
+              "Disaster Preparedness & Planning"
+            ]
+          },
+          {
+            "id": "312211-T2.O8",
+            "name": "Others (Elective)",
+            "variants": [
+              "Bio Engineering (Elective I)",
+              "Engineering Economics",
+              "Technology Environment & Society",
+              "Non Conventional Energy Resources",
+              "Sustainable Building Planning Design"
+            ]
+          }
+        ]
+      },
+      "tier3_core": {
+        "categoryLabel": "Projects / Practical",
+        "subjects": [
+          {
+            "id": "312211-T3.G",
+            "name": "Final-Year / Capstone Project/ Major Project / Thesis",
+            "variants": [
+              "Major Project - Phase I",
+              "Major Project Phase - II",
+              "Project (Phase-I)",
+              "Project (Phase-II)",
+              "Civil Engineering Project (Practical)",
+              "Final Year Project (Part I)",
+              "Final Year Project (Part II)",
+              "Project",
+              "Project Work-I",
+              "Project Work-II",
+              "Research Project",
+              "Design of Structures II - Project",
+              "Project (Part-A)",
+              "Project (Part-B)",
+              "Civil and Structural Engineering Project",
+              "Thesis"
+            ]
+          },
+          {
+            "id": "312211-T3.1",
+            "name": "Minor Project",
+            "variants": [
+              "Mini Project",
+              "Mini Project Assessment from Third Year"
+            ]
+          },
+          {
+            "id": "312211-T3.2",
+            "name": "Industrial Training / OJT / Internship",
+            "variants": [
+              "Industrial Training (OJT)"
+            ]
+          }
+        ]
+      },
+      "tier3_optional": {
+        "categoryLabel": "Optional Subjects",
+        "subjects": [
+          {
+            "id": "312211-T3.O1",
+            "name": "Technical Seminar / Paper Presentation",
+            "variants": [
+              "Seminar",
+              "Project Seminar"
+            ]
+          },
+          {
+            "id": "312211-T3.O2",
+            "name": "Workshop Practice / Engineering Shop",
+            "variants": [
+              "Workshop Practice",
+              "Workshop Technology (Practical)",
+              "Workshop-Manuf.Process Lab",
+              "Workshop Practice-P"
+            ]
+          },
+          {
+            "id": "312211-T3.O3",
+            "name": "Entrepreneurship / Engineering Management",
+            "variants": []
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "312311",
+    "title": "Electrical Engineering Draftsperson (overseas curriculum)",
+    "occupationId": "electrical-engineering-draftsperson-os",
+    "groups": {
+      "tier1": {
+        "categoryLabel": "Foundational Subjects",
+        "subjects": [
+          {
+            "id": "312311-T1.1",
+            "name": "Mathematics",
+            "variants": [
+              "Mathematics",
+              "Applied Mathematics",
+              "Mathematics I",
+              "Mathematics II",
+              "Mathematics III",
+              "Engineering Mathematics 1",
+              "Engineering Mathematics 2",
+              "Engineering Mathematics 3",
+              "Technical Mathematics"
+            ]
+          },
+          {
+            "id": "312311-T1.2",
+            "name": "Physics / Applied Science",
+            "variants": [
+              "Applied Physics",
+              "Applied Science I",
+              "Physics",
+              "Technician Science"
+            ]
+          },
+          {
+            "id": "312311-T1.3",
+            "name": "English & Technical Communication",
+            "variants": [
+              "English & Technical Communication",
+              "English for Technical Purposes I",
+              "English for Technical Purposes II",
+              "English for Technical Purposes III",
+              "English for Technical Purposes IV",
+              "Communication Skill",
+              "Technical Report Writing",
+              "Technical English"
+            ]
+          },
+          {
+            "id": "312311-T1.4",
+            "name": "Computer Applications / IT",
+            "variants": [
+              "Computer Applications",
+              "Office Automation",
+              "Computer Packages",
+              "Information Technology"
+            ]
+          },
+          {
+            "id": "312311-T1.5",
+            "name": "Workshop Practice",
+            "variants": [
+              "Workshop Practice",
+              "Workshop Project",
+              "Practical Engineering I",
+              "Practical Engineering II",
+              "Engineering Workshop",
+              "Fitting & Welding Workshop"
+            ]
+          },
+          {
+            "id": "312311-T1.6",
+            "name": "Applied Mechanics",
+            "variants": [
+              "Applied Mechanics",
+              "Basic Mechanical Engineering",
+              "Engineering Mechanics"
+            ]
+          },
+          {
+            "id": "312311-T1.7",
+            "name": "Building Construction & Engineering Materials",
+            "variants": [
+              "Building Construction & Materials",
+              "Civil Engineering Basics",
+              "Building Construction",
+              "Engineering Materials"
+            ]
+          },
+          {
+            "id": "312311-T1.8",
+            "name": "Industrial Safety / OHS",
+            "variants": [
+              "Industrial Safety",
+              "Industry Safety",
+              "Occupational Health & Safety"
+            ]
+          },
+          {
+            "id": "312311-T1.9",
+            "name": "Management & Entrepreneurship",
+            "variants": [
+              "Management & Entrepreneurship",
+              "Principles of Management",
+              "Industrial Management",
+              "Entrepreneurship Development",
+              "Engineering Economics & Project Management"
+            ]
+          },
+          {
+            "id": "312311-T1.10",
+            "name": "Environmental Studies",
+            "variants": [
+              "Environmental Studies",
+              "Environmental Science"
+            ]
+          }
+        ]
+      },
+      "tier2_core": {
+        "categoryLabel": "Core Subjects",
+        "subjects": [
+          {
+            "id": "312311-T2.1",
+            "name": "Electrical Drafting, CAD & Diagrams",
+            "variants": [
+              "Engineering Drawing",
+              "Engineering Graphics",
+              "Basic Engineering Graphics",
+              "Technical Drawing",
+              "Engineering Drawing I",
+              "Engineering Drawing II",
+              "Computer Aided Design / Drafting",
+              "CAD",
+              "Computer Assisted Design 1",
+              "Computer Assisted Design 2",
+              "AutoCAD",
+              "CAD for Electrical Engineers",
+              "Electrical Drawing & Drafting",
+              "Elect. Design & Drafting",
+              "Electrical Engineering Drawing",
+              "Electrical Drawing",
+              "Electrical Design",
+              "Electrical Schematics & Wiring Diagrams",
+              "Single Line Diagrams",
+              "Circuit Diagrams",
+              "Wiring Diagrams",
+              "Electrical Symbols & Standards",
+              "Building Services Drawing",
+              "Building Drawing",
+              "Architectural Drawing",
+              "Site Plans & Layouts",
+              "Building Services Electrical"
+            ]
+          },
+          {
+            "id": "312311-T2.2",
+            "name": "Electrical Fundamentals & Machines",
+            "variants": [
+              "Basic Electrical Engineering",
+              "Electrical Technology 1",
+              "Electrical Technology 2",
+              "Fundamentals of Electrical Engineering",
+              "Electrical Engineering",
+              "Basic Electrical Technology",
+              "Electric Circuit Theory",
+              "Electric Circuit Theory I",
+              "Electric Circuit Theory II",
+              "Circuit Analysis",
+              "Network Analysis",
+              "Electrical Circuits",
+              "Electrical Materials",
+              "Electrical Material Science",
+              "Electrical Engineering Materials",
+              "Insulating Materials",
+              "Electrical Measurements",
+              "Electrical Measurement & Instruments",
+              "Measurements & Measuring Instruments",
+              "Electrical Machines",
+              "Electrical Machines I",
+              "Electrical Machines II",
+              "Electric Machines I",
+              "Electric Machines II",
+              "DC Machines",
+              "AC Machines",
+              "Electrical Machinery",
+              "Transformers",
+              "Transformers & Induction Machines",
+              "Power & Distribution Transformers",
+              "Utilisation of Electrical Energy",
+              "Electrical Drives",
+              "Electric Traction",
+              "Electric Heating & Welding",
+              "Illumination & Lighting",
+              "Illumination Engineering",
+              "Lighting Design",
+              "Electric Lighting"
+            ]
+          },
+          {
+            "id": "312311-T2.3",
+            "name": "Power Systems & Electrification",
+            "variants": [
+              "Electrical Power Generation",
+              "Generation of Electrical Power",
+              "Power Plant Engineering",
+              "Transmission & Distribution",
+              "Transmission and Distribution of Electrical Power",
+              "Power Transmission",
+              "Power Distribution",
+              "Overhead Lines & Underground Cables",
+              "Electrical Power Systems",
+              "Electrical Power System I",
+              "Electrical Power System II",
+              "Power System Engineering",
+              "Electrification",
+              "Rural Electrification",
+              "Urban Electrification",
+              "Electrification Systems",
+              "Distribution Network Layout",
+              "Substation Layout & Equipment",
+              "Substations & Switchyards",
+              "Substation Equipment",
+              "Substation Engineering",
+              "Switchgear & Protection",
+              "Switchgear and Protection",
+              "Protective Relays",
+              "Circuit Breakers",
+              "Earthing & Lightning Protection",
+              "Earthing",
+              "Grounding",
+              "Lightning Protection",
+              "Renewable Energy",
+              "Non-Conventional Energy Sources",
+              "Solar Photovoltaic Systems",
+              "Renewable Energy Systems"
+            ]
+          },
+          {
+            "id": "312311-T2.4",
+            "name": "Installation, Estimation & Standards",
+            "variants": [
+              "Electrical Installation & Wiring",
+              "Electrical Installation and Maintenance",
+              "Domestic Wiring",
+              "Industrial Wiring",
+              "Electrical Wiring",
+              "Electrical Installation Practice",
+              "Electrical Switchboards & Control Panels",
+              "Electrical Control Panels",
+              "Panel Wiring",
+              "Switchboard Design",
+              "Cable Selection & Sizing",
+              "Cable Schedules",
+              "Cable Sizing & Routing",
+              "Conductors & Cables",
+              "Estimating & Costing",
+              "Electrical Estimation & Costing",
+              "Estimating, Costing & Contracting",
+              "Electrical Estimating",
+              "Tendering & Contracts",
+              "Electrical Codes & Standards",
+              "Wiring Regulations",
+              "Electricity Rules",
+              "Electrical Safety Codes",
+              "Electrical Regulations"
+            ]
+          },
+          {
+            "id": "312311-T2.5",
+            "name": "Control, Maintenance, Projects & Training",
+            "variants": [
+              "Motor Control Circuits",
+              "Relay Logic",
+              "Industrial Electrical Systems",
+              "Electrical Control Circuits",
+              "PLC",
+              "PLC Basics",
+              "Programmable Logic Controllers",
+              "Instrumentation & PLCs",
+              "Electrical Maintenance & Repairs",
+              "Electrical Maintenance & Repairs I",
+              "Electrical Maintenance & Repairs II",
+              "Maintenance of Electrical Equipment",
+              "Electrical Workshop",
+              "Machine Winding & Repair",
+              "Testing & Commissioning",
+              "Testing Methods & Reliability",
+              "Testing & Commissioning of Electrical Equipment",
+              "Electrical Safety",
+              "Electrical Safety & Protection",
+              "Safety in Electrical Work"
+            ]
+          },
+          {
+            "id": "312311-T2.6",
+            "name": "Projects & Industrial Training",
+            "variants": [
+              "Project",
+              "Projects 1",
+              "Projects 2",
+              "Projects 3",
+              "Project I",
+              "Project II",
+              "Minor Project",
+              "Major Project",
+              "Project Work",
+              "Industrial Training",
+              "On the Job Training",
+              "Summer Internship"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "anzscoCode": "312411",
+    "title": "Electronic Engineering Draftsperson",
+    "occupationId": "electronic-engineering-draftsperson",
+    "groups": {
+      "tier1": {
+        "categoryLabel": "Foundational Subjects",
+        "subjects": [
+          {
+            "id": "312411-T1.1",
+            "name": "Mathematics",
+            "variants": [
+              "Mathematics",
+              "Applied Mathematics",
+              "Mathematics I",
+              "Mathematics II",
+              "Mathematics III",
+              "Engineering Mathematics 1",
+              "Engineering Mathematics 2",
+              "Engineering Mathematics 3",
+              "Technical Mathematics"
+            ]
+          },
+          {
+            "id": "312411-T1.2",
+            "name": "Physics / Applied Science",
+            "variants": [
+              "Applied Physics",
+              "Applied Science I",
+              "Physics",
+              "Technician Science"
+            ]
+          },
+          {
+            "id": "312411-T1.3",
+            "name": "English & Technical Communication",
+            "variants": [
+              "English & Technical Communication",
+              "English for Technical Purposes I",
+              "English for Technical Purposes II",
+              "English for Technical Purposes III",
+              "English for Technical Purposes IV",
+              "Communication Skill",
+              "Technical Report Writing",
+              "Practices in Communication Skills"
+            ]
+          },
+          {
+            "id": "312411-T1.4",
+            "name": "Computer Applications / IT",
+            "variants": [
+              "Computer Applications",
+              "Office Automation",
+              "Computer Packages",
+              "Information Technology"
+            ]
+          },
+          {
+            "id": "312411-T1.5",
+            "name": "Programming",
+            "variants": [
+              "Programming Fundamentals",
+              "Programming in C",
+              "Programming 1",
+              "Programming 2",
+              "Fundamentals of Programming",
+              "Computer Programming & Applications"
+            ]
+          },
+          {
+            "id": "312411-T1.6",
+            "name": "Workshop Practice",
+            "variants": [
+              "Workshop Practice",
+              "Workshop Project",
+              "Practical Engineering I",
+              "Practical Engineering II",
+              "Engineering Workshop"
+            ]
+          },
+          {
+            "id": "312411-T1.7",
+            "name": "Industrial Safety / OHS",
+            "variants": [
+              "Industrial Safety",
+              "Industry Safety",
+              "Occupational Health & Safety"
+            ]
+          },
+          {
+            "id": "312411-T1.8",
+            "name": "Management & Entrepreneurship",
+            "variants": [
+              "Management & Entrepreneurship",
+              "Principles of Management",
+              "Industrial Management & Entrepreneurship",
+              "Entrepreneurship Development"
+            ]
+          },
+          {
+            "id": "312411-T1.9",
+            "name": "Environmental Studies",
+            "variants": [
+              "Essentials of Environment & Seismic Engineering",
+              "Environmental Studies",
+              "Environmental Science"
+            ]
+          }
+        ]
+      },
+      "tier2_core": {
+        "categoryLabel": "Core Subjects",
+        "subjects": [
+          {
+            "id": "312411-T2.1",
+            "name": "Drafting, CAD & PCB Design",
+            "variants": [
+              "Engineering Drawing",
+              "Engineering Graphics",
+              "Basic Engineering Graphics",
+              "Technical Drawing",
+              "Engineering Drawing I",
+              "Engineering Drawing II",
+              "Engg. Drawing",
+              "Computer Aided Design / Drafting",
+              "CAD",
+              "Computer Assisted Design 1",
+              "Computer Assisted Design 2",
+              "AutoCAD",
+              "Electronic Drawing & Schematics",
+              "Electronics Drawing",
+              "Circuit Drawing",
+              "Schematic Capture",
+              "Electronic Design & Drafting",
+              "Block & Circuit Diagrams",
+              "PCB Design & Layout",
+              "PCB Design and Simulation",
+              "PCB Designing Tools",
+              "PCB Layout",
+              "PCB Design & Fabrication",
+              "PCB Technology",
+              "Drawing Standards & Symbols",
+              "Electronic Symbols & Standards",
+              "Technical Drawing Standards",
+              "Drawing Conventions",
+              "Mechanical & Enclosure Drawing",
+              "Mechanical Drawing",
+              "Machine Drawing",
+              "Sheet Metal Drawing",
+              "Panel & Enclosure Drawing"
+            ]
+          },
+          {
+            "id": "312411-T2.2",
+            "name": "Electronic Components & Circuits",
+            "variants": [
+              "Electronic Components & Materials",
+              "Electronic Materials & Components",
+              "Passive & Active Components",
+              "Component Identification",
+              "Electronic Devices & Circuits",
+              "Electronic Devices & Circuits I",
+              "Electronic Devices & Circuits II",
+              "Electronic Devices and Circuit",
+              "Electronic Systems 1",
+              "Electronic Systems 2",
+              "Analog Electronics",
+              "Analogue Electronics I",
+              "Analogue Electronics II",
+              "Linear IC Applications",
+              "Operational Amplifiers",
+              "Digital Electronics",
+              "Digital Electronic Systems",
+              "Digital Electronics & Logic Circuits",
+              "Pulse & Digital Circuits",
+              "Digital System Design",
+              "Basic Electrical Engineering",
+              "Electrical Technology 1",
+              "Electrical Technology 2",
+              "Fundamentals of Electrical Engineering",
+              "Electrical Engineering Fundamentals",
+              "Network Theory",
+              "Electronic Circuits & Network Theory",
+              "Network Analysis",
+              "Circuit Analysis"
+            ]
+          },
+          {
+            "id": "312411-T2.3",
+            "name": "Embedded, Microcontroller & Computer Hardware",
+            "variants": [
+              "Microprocessor & Applications",
+              "Microprocessor & Programming",
+              "Microprocessor & Assembly Language Programming",
+              "Microprocessor Applications",
+              "Microcontroller & Embedded Systems",
+              "Microprocessor & Microcontroller Systems",
+              "Microprocessors, Microcontrollers & Interfacing Devices",
+              "Micro Controller & Embedded Systems",
+              "Computer Hardware & Peripherals",
+              "Computer Systems & Applications",
+              "Computer Hardware Maintenance & Repairs",
+              "Computer System Diagnosis & Maintenance"
+            ]
+          },
+          {
+            "id": "312411-T2.4",
+            "name": "Assembly, Testing & Maintenance",
+            "variants": [
+              "Electronics Workshop",
+              "Electronic Practices",
+              "Electronic Workshop",
+              "Electrical & Electronics Workshop",
+              "Advanced Electronic Workshop",
+              "Soldering & PCB Assembly",
+              "PCB Fabrication & Assembly",
+              "Electronic Assembly",
+              "Wiring & Harness Practice",
+              "Electronic Measurements & Instruments",
+              "Electronic Instruments & Measurements",
+              "Electronic Measurement & Instrumentation",
+              "Measurements & Instruments",
+              "Engineering Measurements I",
+              "Engineering Measurements II",
+              "Electronic Troubleshooting & Repair",
+              "Electronic Device Repair",
+              "Maintenance & Troubleshooting of Equipment",
+              "Troubleshooting of Electronic Equipments",
+              "Electronic Instruments & Troubleshooting"
+            ]
+          },
+          {
+            "id": "312411-T2.5",
+            "name": "Applied Electronic Systems",
+            "variants": [
+              "Consumer Electronics",
+              "Consumer Electronic Equipment",
+              "Audio & Video Systems",
+              "Industrial Electronics",
+              "Industrial Electronics & Control",
+              "Power Electronics",
+              "Electronic Control Systems",
+              "PLC",
+              "PLC Basics",
+              "Programmable Logic Controllers",
+              "Instrumentation & PLCs",
+              "Communication Fundamentals",
+              "Principles of Communication Engineering",
+              "Fundamentals of Communication Engineering",
+              "Communication Systems I",
+              "Communication Engineering I",
+              "Data Communication & Networks",
+              "Data Communication",
+              "Physical Networking",
+              "Computer Networks"
+            ]
+          }
+        ]
+      },
+      "tier3_core": {
+        "categoryLabel": "Projects / Practical",
+        "subjects": [
+          {
+            "id": "312411-T3.G",
+            "name": "Projects & Industrial Training",
+            "variants": [
+              "Project",
+              "Projects 1",
+              "Projects 2",
+              "Projects 3",
+              "Project I",
+              "Project II",
+              "Minor Project",
+              "Major Project",
+              "Project Work",
+              "Industrial Training",
+              "On the Job Training",
+              "Summer Internship"
+            ]
+          }
+        ]
+      }
+    }
   }
 ]

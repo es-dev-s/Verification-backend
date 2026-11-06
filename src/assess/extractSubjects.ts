@@ -462,6 +462,13 @@ export function degreeLevelToQualification(
   degreeTitle?: string | null,
 ): QualificationType | "unknown" {
   const fromTitle = degreeLevelFromTitle(degreeTitle);
+  // Title-derived Diploma / Advanced Diploma / Associate Degree beats a mismatched Bachelor/Master upload tag.
+  if (
+    (level === "bachelor" || level === "master") &&
+    (fromTitle === "diploma" || fromTitle === "advanced_diploma" || fromTitle === "associate_degree")
+  ) {
+    return fromTitle;
+  }
   if (level === "bachelor") return "bachelor";
   if (level === "master") return "master";
   if (level === "diploma" || level === "advanced_diploma") {

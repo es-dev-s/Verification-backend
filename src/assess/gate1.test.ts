@@ -110,6 +110,36 @@ describe("awardLevelOf (Honours, certificate, AQF level)", () => {
     assert.equal(awardLevelOf({ level: "advanced_diploma", title: "Advanced Diploma of Engineering" }).aqfLevel, 6);
     assert.equal(awardLevelOf({ level: "master", title: "Master of Engineering" }).aqfLevel, 9);
   });
+
+  it("title Diploma/Certificate beats mismatched Bachelor upload tag", () => {
+    assert.deepEqual(
+      awardLevelOf({ level: "bachelor", title: "NATIONAL DIPLOMA in CIVIL ENGINEERING" }),
+      { award: "diploma", aqfLevel: 5 },
+    );
+    assert.deepEqual(
+      awardLevelOf({ level: "bachelor", title: "NATIONAL CERTIFICATE IN CIVIL ENGINEERING" }),
+      { award: "certificate", aqfLevel: 4 },
+    );
+    assert.deepEqual(
+      awardLevelOf({ level: "bachelor", title: "Bachelor of Engineering" }),
+      { award: "bachelor", aqfLevel: 7 },
+    );
+    assert.deepEqual(
+      awardLevelOf({ level: "bachelor", title: "Advanced Diploma of Engineering" }),
+      { award: "advanced_diploma", aqfLevel: 6 },
+    );
+  });
+
+  it("assessor awardOverride still wins over diploma title", () => {
+    assert.deepEqual(
+      awardLevelOf({
+        level: "bachelor",
+        title: "NATIONAL DIPLOMA in CIVIL ENGINEERING",
+        awardOverride: "bachelor",
+      }),
+      { award: "bachelor", aqfLevel: 7 },
+    );
+  });
 });
 
 describe("Rule 1: not eligible", () => {
@@ -147,8 +177,14 @@ describe("Rule 1: not eligible", () => {
 });
 
 describe("Rule 2: manual review", () => {
-  it("Diploma (AQF 5)", () => {
-    const g = gate([{ level: "diploma", title: "Diploma of Engineering", countedYearsOverride: 2 }], engRows("diploma"));
+  it("Diploma (AQF 5) entered by confirmed lateral entry", () => {
+    const g = evaluateGate1({
+      qualifications: [{ level: "diploma", title: "Diploma of Engineering", countedYearsOverride: 2 }],
+      rows: engRows("diploma"),
+      vocational: voc,
+      lateralEntryDecided: true,
+      lateralEntryConfirmed: true,
+    });
     assert.equal(g.result, "manual_review");
     assert.equal(g.rule, 2);
     assert.match(g.reason, /Diploma \(AQF 5\)/);
@@ -456,5 +492,63 @@ describe("duration comes only from Transcript data", () => {
     const g = gate([{ level: "bachelor", title: "Bachelor of Engineering", countedYearsOverride: null }], engWithSemesters(8));
     assert.equal(g.rule, 3);
     assert.equal(g.qualifications[0]!.countedYears, 4);
+  });
+});
+
+describe("Rule 5: engineering Diploma as the first-phase qualification", () => {
+  const diploma = (title = "Diploma of Engineering", years = 2): QualificationInfo => ({
+    level: "diploma",
+    title,
+    countedYearsOverride: years,
+  });
+
+  it("an engineering primary Diploma opens Engineering Associate only", () => {
+    const g = gate([diploma()], engRows("diploma"));
+    assert.equal(g.result, "open");
+    assert.equal(g.rule, 5);
+    assert.deepEqual(openIds(g), ["engineering_associate:1"]);
+    assert.match(g.reason, /engineering Diploma \(AQF 5\)/);
+    assert.equal(track(g, "professional_engineer").open, false);
+    assert.equal(track(g, "engineering_technologist").open, false);
+  });
+
+  it("a non-engineering Diploma does not open Engineering Associate", () => {
+    const g = gate([diploma("Diploma of Business")], BUSINESS.map((n) => sub(n, "diploma")));
+    assert.notEqual(g.result, "open");
+    assert.equal(track(g, "engineering_associate").open, false);
+  });
+
+  it("a lateral-entry Diploma (lateral entry confirmed) does not open Engineering Associate", () => {
+    const g = evaluateGate1({
+      qualifications: [diploma()],
+      rows: engRows("diploma"),
+      vocational: voc,
+      lateralEntryDecided: true,
+      lateralEntryConfirmed: true,
+    });
+    assert.equal(g.result, "manual_review");
+    assert.equal(track(g, "engineering_associate").open, false);
+    assert.match(g.reason, /lateral entry/);
+  });
+
+  it("a Diploma with a bachelor on file is earlier study, not the first phase", () => {
+    const g = gate(
+      [diploma(), { level: "bachelor", title: "Bachelor of Engineering (Civil)", countedYearsOverride: 1.5 }],
+      [...engRows("diploma"), ...engRows("bachelor")],
+    );
+    assert.notEqual(g.result, "open");
+    assert.equal(track(g, "engineering_associate").open, false);
+  });
+
+  it("an engineering Diploma under 2 years is still not eligible", () => {
+    const g = gate([diploma("Diploma of Engineering", 1.5)], engRows("diploma"));
+    assert.equal(g.result, "not_eligible");
+    assert.equal(g.rule, 1);
+  });
+
+  it("Advanced Diploma and Associate Degree are unchanged", () => {
+    const adv = gate([{ level: "advanced_diploma", title: "Advanced Diploma of Engineering", countedYearsOverride: 1 }], engRows("advanced_diploma"));
+    assert.equal(adv.rule, 5);
+    assert.deepEqual(openIds(adv), ["engineering_associate:1"]);
   });
 });

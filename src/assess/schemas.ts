@@ -318,6 +318,34 @@ export type VocationalAssessmentDetail = {
   qualificationNote: string;
   /** Review flags (typo codes, title-only matches, non-equivalent successors …). */
   flags: string[];
+  /** "pool": core units are a list to pick from (matched units count against coreTotal). */
+  coreMode?: "all" | "pool";
+  /** Foundational units (Tier 1). Absent when the rubric has none. */
+  foundationalMatched?: number;
+  foundationalTotal?: number;
+  foundationalBand?: TierOutcome;
+  foundationalThresholds?: { noRisk: number; lowRisk: number };
+  matchedFoundational?: VocationalUnitMatch[];
+  missingFoundational?: Array<{ unitId: string; code: string; title: string }>;
+};
+
+/** Draftsperson scoring path (312211 / 312311): AU unit codes, overseas subjects, or both (best kept). */
+export type DraftspersonPathId = "au_unit_codes" | "overseas_subjects" | "both_best";
+
+export type DraftspersonPath = {
+  path: DraftspersonPathId;
+  /** Qualification origin from Step 1 data. */
+  origin: "australian" | "overseas" | "unknown";
+  /** Why the origin was decided (country, AU qualification code, unit codes …). */
+  reason: string;
+  /** both_best: assessor note (origin unknown, which path was kept and why). */
+  note?: string;
+  /** both_best: the path that was also scored but not kept, with its result. */
+  alsoScored?: {
+    path: "au_unit_codes" | "overseas_subjects";
+    determination: Determination;
+    confidenceScore: number;
+  } | null;
 };
 
 /** One occupation evaluated against the transcript (top-N candidates). */
@@ -371,6 +399,10 @@ export type AnzscoCandidate = {
   finalProjectTitle?: string | null;
   /** Gate 1 track this occupation was scored under. */
   track?: Gate1TrackId;
+  /** 312211 / 312311 only: which draftsperson path was scored and why. */
+  draftspersonPath?: DraftspersonPath | null;
+  /** False when the Tier 3 gate was not applied (Engineering Associate track, except 312411). */
+  capstoneApplies?: boolean;
   /**
    * Telecommunications group label. Set only for 313212 / 313213 / 313214
    * when the qualification is ICT60220 and Engineering Associate is open.
@@ -451,6 +483,33 @@ export type AssessmentResult = {
    * Set only when a Civil-family occupation or a civil bachelor is on the case.
    */
   specialisation?: SpecialisationResult | null;
+  /**
+   * 312999 Building and Engineering Technicians nec (fallback only, no rubric).
+   * Set when Gate 1 opened the Engineering Associate track; suggested only when
+   * no specific Associate ANZSCO reaches 70%. Absent on older results.
+   */
+  associateFallback?: AssociateFallback | null;
+};
+
+/** One specific Associate ANZSCO in the 312999 near-miss list. */
+export type AssociateFallbackNearMiss = {
+  anzscoCode: string;
+  title: string;
+  /** Best score for the code (null when it was not scored). */
+  confidenceScore: number | null;
+  determination: string | null;
+  /** Missing units ("CODE Title") or rubric subjects. */
+  missing: string[];
+};
+
+/** 312999 fallback decision (never a first-pass match). */
+export type AssociateFallback = {
+  anzscoCode: string;
+  title: string;
+  suggested: boolean;
+  threshold: number;
+  reason: string;
+  nearMisses: AssociateFallbackNearMiss[];
 };
 
 /** One saved work-experience judgement (same shape as experienceBoost.ts). */

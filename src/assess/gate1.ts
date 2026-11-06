@@ -5,7 +5,9 @@
  *  1. Not engineering, counted duration under 2 years (under 1 year for an
  *     Advanced Diploma), or certificate-level only → NOT ELIGIBLE (nothing
  *     is scored).
- *  2. Unusual case → MANUAL REVIEW (nothing is scored): a Diploma (AQF 5); a
+ *  2. Unusual case → MANUAL REVIEW (nothing is scored): a Diploma (AQF 5) that
+ *     is not clearly engineering, or is not the first-phase qualification
+ *     (a bachelor is on file or lateral entry is confirmed); a
  *     3-year degree from a programme / country that may be recognised higher
  *     (config hook); a combined degree (3+2); a non-engineering bachelor
  *     followed by an engineering master; an engineering master (or doctorate)
@@ -17,8 +19,9 @@
  *  3. Engineering Bachelor / Honours / Master counted ≥ 4 years → Professional
  *     Engineer (priority 1) + Engineering Technologist (priority 2).
  *  4. Engineering Bachelor counted 3 to < 4 years → Engineering Technologist only.
- *  5. Advanced Diploma counted ≥ 1 year / Associate Degree counted ≥ 2 years
- *     → Engineering Associate only.
+ *  5. Advanced Diploma counted ≥ 1 year / Associate Degree counted ≥ 2 years /
+ *     engineering Diploma (AQF 5) counted ≥ 2 years that is the first-phase
+ *     qualification (not lateral entry / earlier study) → Engineering Associate only.
  *
  * With several qualifications the highest-level engineering qualification is
  * used (durations are never added together). The duration is the one entered
@@ -32,6 +35,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ASSOCIATE_FALLBACK_THRESHOLD, NEC_ANZSCO } from "./associateFallback.js";
 import { evidenceConfig } from "./evidenceConfig.js";
 import { degreeLevelFromTitle } from "./extractSubjects.js";
 import type { VocationalOccupation } from "./loadRubric.js";
@@ -165,13 +169,23 @@ export function detectAwardLevel(q: Pick<QualificationInfo, "level" | "title" | 
   if (!degreeInTitle && !titleLevel && codeDigit != null && codeDigit <= 4) {
     return out("certificate", codeDigit);
   }
-  if (titleLevel === "master" || (q.level === "master" && titleLevel !== "bachelor")) return out("master");
+  // Clear Diploma / Advanced Diploma / Associate Degree in the title beats a
+  // mismatched Bachelor or Master upload tag (same idea as the certificate guard).
+  if (titleLevel === "master") return out("master");
+  if (titleLevel === "associate_degree") return out("associate_degree");
+  if (titleLevel === "advanced_diploma") return out("advanced_diploma");
+  if (titleLevel === "diploma") {
+    if (codeDigit === 6) return out("advanced_diploma");
+    if (codeDigit === 8) return out("graduate_diploma");
+    return out("diploma");
+  }
   if (titleLevel === "bachelor" || q.level === "bachelor") {
     return /\bhon(?:ou)?rs?\b|\bhons\b/.test(t) ? out("honours") : out("bachelor");
   }
-  if (q.level === "associate_degree" || titleLevel === "associate_degree") return out("associate_degree");
-  if (q.level === "advanced_diploma" || titleLevel === "advanced_diploma") return out("advanced_diploma");
-  if (q.level === "diploma" || titleLevel === "diploma") {
+  if (q.level === "master") return out("master");
+  if (q.level === "associate_degree") return out("associate_degree");
+  if (q.level === "advanced_diploma") return out("advanced_diploma");
+  if (q.level === "diploma") {
     if (codeDigit === 6) return out("advanced_diploma");
     if (codeDigit === 8) return out("graduate_diploma");
     return out("diploma");
@@ -332,7 +346,7 @@ export const RULE_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
   2: "Rule 2: unusual case, manual review",
   3: "Rule 3: engineering Bachelor / Honours / Master, 4 years or more",
   4: "Rule 4: engineering Bachelor, 3 to under 4 years",
-  5: "Rule 5: Advanced Diploma 1 year or more / Associate Degree 2 years or more",
+  5: "Rule 5: Advanced Diploma 1 year or more / Associate Degree 2 years or more / engineering Diploma (first-phase qualification)",
 };
 
 function basisLabel(e: Pick<QualEval, "source" | "manualCount" | "creditConversion">): string {
@@ -461,7 +475,23 @@ function outcomeFor(e: QualEval, all: readonly QualEval[], lateralEntryConfirmed
     return { kind: "fail", reason: `"${name}" is under ${yearsWord(floor)} (${yrs(d)}, ${basis}).` };
   }
   if (e.award === "diploma") {
-    return { kind: "manual", reason: `"${name}" is a Diploma (AQF 5).` };
+    // An engineering Diploma opens Engineering Associate only when it is the
+    // first-phase qualification: not when it is the earlier study behind a
+    // lateral-entry bachelor (lateral entry confirmed, or a bachelor on file).
+    // Earlier-study (prior-study) documents never reach ctx.qualifications.
+    const bachelorOnFile = all.some((o) => o !== e && isDegreeAward(o.award));
+    if (e.engineering.decision === "yes" && !lateralEntryConfirmed && !bachelorOnFile) {
+      return {
+        kind: "open",
+        rule: 5,
+        reason: `"${name}" is an engineering Diploma (AQF 5) of ${yrs(d)} (${basis}), the first-phase qualification.`,
+      };
+    }
+    const why =
+      e.engineering.decision !== "yes"
+        ? "not clearly engineering"
+        : "earlier study / lateral entry, not the first-phase qualification";
+    return { kind: "manual", reason: `"${name}" is a Diploma (AQF 5) (${why}).` };
   }
   const higher = e.award === "bachelor" || e.award === "honours" ? matchesRecognisedHigher(e.q) : null;
   if (higher && d >= g.technologistMinYears - EPS && d < g.professionalMinYears - EPS) {
@@ -534,6 +564,15 @@ function trackNotes(track: Gate1TrackId, input: Gate1Input): string[] {
     const voc = vocational.find((v) => v.anzsco === o.anzscoCode);
     if (rubricCodes.has(o.anzscoCode)) continue;
     if (voc?.scoringEnabled) continue;
+    if (o.anzscoCode === NEC_ANZSCO) {
+      // Fallback only (no rubric): never for ICT60220 holders.
+      if (!telecomApplies) {
+        notes.push(
+          `${o.occupation} (${o.anzscoCode}): fallback only, no rubric; suggested when no specific Associate ANZSCO reaches ${ASSOCIATE_FALLBACK_THRESHOLD}%.`,
+        );
+      }
+      continue;
+    }
     notes.push(
       voc
         ? `${o.occupation} (${o.anzscoCode}): unit-code scoring is not switched on yet (${voc.disabledReason ?? "rubric incomplete"}); assess manually.`
@@ -571,7 +610,11 @@ function buildTracks(
     closed.professional_engineer = BELOW_PE;
     closed.engineering_associate = "Not assessed: the qualification meets the Engineering Technologist level.";
   } else if (rule === 5) {
-    open.engineering_associate = { priority: 1, reason: "Engineering Advanced Diploma of 1 year or more / Associate Degree of 2 years or more." };
+    open.engineering_associate = {
+      priority: 1,
+      reason:
+        "Engineering Advanced Diploma of 1 year or more / Associate Degree of 2 years or more / engineering Diploma as the first-phase qualification.",
+    };
     closed.professional_engineer = BELOW_PE;
     closed.engineering_technologist = BELOW_TECH;
   }

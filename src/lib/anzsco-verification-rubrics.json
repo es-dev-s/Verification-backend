@@ -2213,15 +2213,20 @@
         {
           "severity": "low",
           "field": "coreUnits.thresholds",
-          "message": "Risk bands are 39/28/17 of the 44 core units, scaled from the previous 8-unit ratios (7/8, 5/8, 3/8). Confirmed by the team and in use: 39–44 No Risk, 28–38 Low Risk, 17–27 Medium Risk, below 17 High Risk."
+          "message": "Core is a pool: any 7 of the 44 sheet units count (RII60520 = 5 core + 7 electives on training.gov.au). Bands 6 / 5 / 3 of 7 (about 85% / 65% / 45%): 6-7 No Risk, 5 Low Risk, 3-4 Medium Risk, below 3 High Risk. Replaces the earlier 39/28/17-of-44 bands, which no RII60520 holder could reach. Approved by the owner."
         },
         {
           "severity": "medium",
           "field": "electives.minimumUnits",
           "message": "Minimum elective count is not stated in the doc (packaging rule). Set before use."
+        },
+        {
+          "severity": "low",
+          "field": "foundationalUnits.thresholds",
+          "message": "Tier 1 Foundational bands 4 / 3 of 5 units (about 85% / 65%, rounded). Below 3 = flag (verified capped at conditional). Set by the developer from the 85/65/45% rule; confirm."
         }
       ],
-      "dataNote": "Core units are the 44 sheet units from Project Management, Leadership / Innovation, Structural Design, Road & Infrastructure, Business / Feasibility, and Engineering Fundamentals. The five Foundational units (BSBTWK502, BSBWHS616, BSBPMG632, RIICWD601E, RIIQUA601E) are not in this core list and are not scored (the flow doc bases the score on core units only). Scoring is on; electives are flagged for review until the minimum is set.",
+      "dataNote": "Core units are a pool of the 44 sheet units from Project Management, Leadership / Innovation, Structural Design, Road & Infrastructure, Business / Feasibility, and Engineering Fundamentals: any 7 count (RII60520 = 5 core + 7 electives), bands 6 / 5 / 3. The five Foundational units (BSBTWK502, BSBWHS616, BSBPMG632, RIICWD601E, RIIQUA601E, the RII60520 core) are scored as Tier 1 (bands 4 / 3 of 5; below 3 flags the case, which caps verified at conditional). Australian qualifications only; overseas Civil diplomas are matched on subjects (civil-engineering-draftsperson-os).",
       "qualification": {
         "statement": "Confirm that the qualification is, or is equivalent to, RII60520 -- Advanced Diploma of Civil Construction Design. Accepted qualification titles include: RII60520 Advanced Diploma of Civil Construction Design, Overseas equivalent Advanced Diploma / Associate Degree in Civil Engineering Drafting/Design.",
         "codes": [
@@ -2243,11 +2248,12 @@
         }
       },
       "coreUnits": {
-        "total": 44,
+        "mode": "pool",
+        "total": 7,
         "thresholds": {
-          "noRisk": 39,
-          "lowRisk": 28,
-          "medium": 17
+          "noRisk": 6,
+          "lowRisk": 5,
+          "medium": 3
         },
         "units": [
           {
@@ -2521,12 +2527,235 @@
           "Others"
         ],
         "minimumUnits": null,
-        "rule": "The sheet groups are scored as core units. Elective minimum is not set, so electives are not assessed."
+        "rule": "The 44 sheet units are scored as the core pool (any 7 count). Elective minimum is not set, so units outside the pool are listed but not assessed."
       },
       "practicalEvidence": {
         "role": "supporting_only"
       },
-      "scoringEnabled": true
+      "scoringEnabled": true,
+      "foundationalUnits": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "units": [
+          {
+            "id": "F1",
+            "code": "BSBTWK502",
+            "title": "Manage team effectiveness",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F2",
+            "code": "BSBWHS616",
+            "title": "Apply safe design principles to control WHS risks",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F3",
+            "code": "BSBPMG632",
+            "title": "Manage program risk",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F4",
+            "code": "RIICWD601E",
+            "title": "Manage civil works design processes",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F5",
+            "code": "RIIQUA601E",
+            "title": "Establish and maintain a quality system",
+            "cluster": "Foundational Units"
+          }
+        ]
+      }
+    },
+    {
+      "id": "civil-engineering-draftsperson-os",
+      "anzsco": "312211",
+      "title": "Civil Engineering Draftsperson",
+      "flow": "academic_3_tier",
+      "variantOf": "312211",
+      "origin": "overseas",
+      "source": {
+        "file": "draftsperson_subjects.xlsx",
+        "version": "v1"
+      },
+      "reviewFlags": [],
+      "dataNote": "Overseas curriculum for ANZSCO 312211 (Sheet 12). Used only when the qualification is not Australian (or the origin is unknown: both paths are scored and the better result kept). Each heading counts once when any variant matches.",
+      "qualification": {
+        "statement": "Overseas (non-Australian) Diploma / Advanced Diploma / Associate Degree in Civil Engineering (or Civil Engineering Drafting / Design). Matched on subjects (Sheet 12).",
+        "levelPolicy": "diploma_ok",
+        "titleCheck": {
+          "allOf": [
+            [
+              "civil"
+            ]
+          ]
+        }
+      },
+      "matching": {
+        "combinedCourses": true
+      },
+      "tier1": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3
+        },
+        "subjects": [
+          {
+            "id": "312211-T1.1",
+            "name": "Engineering Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "312211-T1.2",
+            "name": "Engineering Physics",
+            "status": "expected"
+          },
+          {
+            "id": "312211-T1.3",
+            "name": "Engineering Chemistry",
+            "status": "expected"
+          },
+          {
+            "id": "312211-T1.4",
+            "name": "Engineering Mechanics / Mechanics of Solids",
+            "status": "expected"
+          },
+          {
+            "id": "312211-T1.5",
+            "name": "Engineering Drawing / CAD / Graphics",
+            "status": "expected"
+          },
+          {
+            "id": "312211-T1.6",
+            "name": "Computer Programming / Computing (Optional)",
+            "status": "optional"
+          },
+          {
+            "id": "312211-T1.7",
+            "name": "Communication, Ethics & Professional Practice (Optional)",
+            "status": "optional"
+          },
+          {
+            "id": "312211-T1.8",
+            "name": "Others (Foundational)",
+            "status": "optional"
+          }
+        ]
+      },
+      "tier2": {
+        "total": 8,
+        "thresholds": {
+          "noRisk": 7,
+          "lowRisk": 5,
+          "medium": 4
+        },
+        "core": [
+          {
+            "id": "312211-T2.1",
+            "name": "Structural Analysis/ Structural Design (Concrete / Steel / Timber / Prestressed)"
+          },
+          {
+            "id": "312211-T2.2",
+            "name": "Concrete Technology & Construction Materials"
+          },
+          {
+            "id": "312211-T2.3",
+            "name": "Geotechnical Engineering / Soil Mechanics / Foundations/ Engineering Geology"
+          },
+          {
+            "id": "312211-T2.4",
+            "name": "Surveying / Geomatics / GIS"
+          },
+          {
+            "id": "312211-T2.5",
+            "name": "Fluid Mechanics & Hydraulics"
+          },
+          {
+            "id": "312211-T2.6",
+            "name": "Water Resources Engineering / Hydrology / Irrigation"
+          },
+          {
+            "id": "312211-T2.7",
+            "name": "Transportation / Highway / Traffic Engineering"
+          },
+          {
+            "id": "312211-T2.8",
+            "name": "Construction Management / Estimation & Contracts"
+          }
+        ],
+        "optional": [
+          {
+            "id": "312211-T2.O1",
+            "name": "Others (Core / Elective)"
+          },
+          {
+            "id": "312211-T2.O2",
+            "name": "Environmental / Water & Wastewater Engineering"
+          },
+          {
+            "id": "312211-T2.O3",
+            "name": "Building Planning, Architecture & Town Planning"
+          },
+          {
+            "id": "312211-T2.O4",
+            "name": "Earthquake Engineering"
+          },
+          {
+            "id": "312211-T2.O5",
+            "name": "Marine / Airport / Specialized Infrastructure"
+          },
+          {
+            "id": "312211-T2.O6",
+            "name": "Computational Methods for Civil Engineering"
+          },
+          {
+            "id": "312211-T2.O7",
+            "name": "Risk, Hazard & Disaster Management"
+          },
+          {
+            "id": "312211-T2.O8",
+            "name": "Others (Elective)"
+          }
+        ]
+      },
+      "tier3": {
+        "gate": {
+          "id": "312211-T3.G",
+          "label": "Final-Year / Capstone Project/ Major Project / Thesis"
+        },
+        "supporting": [
+          {
+            "id": "312211-T3.1",
+            "name": "Minor Project"
+          },
+          {
+            "id": "312211-T3.2",
+            "name": "Industrial Training / OJT / Internship"
+          }
+        ],
+        "optional": [
+          {
+            "id": "312211-T3.O1",
+            "name": "Technical Seminar / Paper Presentation"
+          },
+          {
+            "id": "312211-T3.O2",
+            "name": "Workshop Practice / Engineering Shop"
+          },
+          {
+            "id": "312211-T3.O3",
+            "name": "Entrepreneurship / Engineering Management"
+          }
+        ],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
     },
     {
       "id": "telecommunications-network-planner",
@@ -2892,18 +3121,28 @@
         },
         {
           "severity": "low",
-          "field": "coreUnits.units",
-          "message": "The source doc lists BSBMSB402, which does not exist on training.gov.au; it is a typo for BSBSMB402 (Plan small business finances). Code corrected; BSBMSB402 is still accepted on transcripts and flagged."
-        },
-        {
-          "severity": "low",
           "field": "electives.clusters",
           "message": "Source lists \"Others / Additional electives\" twice; deduplicated."
         },
         {
           "severity": "medium",
+          "field": "coreUnits.mode",
+          "message": "The sheet lists 132 Group A-E units (UEE62122 elective groups). They are scored as a pool: matched units counted against 24 with bands 21 / 15 / 9. Confirm the required count."
+        },
+        {
+          "severity": "medium",
           "field": "coreUnits.units",
-          "message": "Rubric unit titles differ from the training.gov.au title for: UEECD0038 (rubric: \"Provide engineering solutions for problems in complex multiple path circuits\"; training.gov.au: \"Provide solutions and report on routine electrotechnology problems\"); UEECD0044 (rubric: \"Solve problems in single and three phase low voltage electrical apparatus and circuits\"; training.gov.au: \"Solve problems in multiple path circuits\"); UEECD0046 (rubric: \"Solve problems in single and three phase low voltage circuits\"; training.gov.au: \"Solve problems in single path circuits\"); UEEEL0013 (rubric: \"Design explosion-protected electrical systems and installations - mining\"; training.gov.au: \"Install, set up and commission interval metering\"); UEEEL0014 (rubric: \"Design explosion-protected electrical systems and installations - gas atmospheres\"; training.gov.au: \"Isolate, test and troubleshoot low voltage electrical circuits\"); UEEEL0015 (rubric: \"Design explosion-protected electrical systems and installations - dust atmospheres\"; training.gov.au: \"Manage large electrical projects\"); UEEIC0048 (rubric: \"Use system CAD software to produce control systems specifications and diagrams\"; training.gov.au: \"Verify compliance and functionality of instrumentation and control installations\"); UEERE0001 (rubric: \"Apply sustainable energy and environmental procedures\"; training.gov.au: \"Apply environmentally and sustainable procedures in the energy sector\"); UEERE0011 (rubric: \"Design grid connected power supply systems\"; training.gov.au: \"Design grid-connected photovoltaic power supply systems\"). Matching is by unit code; a line without a code is matched on the training.gov.au title only (lower confidence, flagged). Confirm the intended units."
+          "message": "Previous core units not on the updated sheet and no longer counted: UEECD0007, UEECD0030, UEECD0031, UEECD0032, UEECD0038, UEECD0044, UEECD0046, UEECD0051, UEECD0064, UEEEL0006, UEEEL0014, UEEEL0079, UEEEL0080, UEEIC0048, BSBSMB401, BSBSMB402."
+        },
+        {
+          "severity": "low",
+          "field": "coreUnits.units",
+          "message": "UETTDRIS unit codes (5 letters + 2 digits) are not recognised as unit codes on transcripts; they match on title only."
+        },
+        {
+          "severity": "low",
+          "field": "foundationalUnits.thresholds",
+          "message": "Tier 1 Foundational bands 14 / 11 of 17 (about 85% / 65%, rounded). Below 11 = flag (verified capped at conditional)."
         }
       ],
       "qualification": {
@@ -2927,6 +3166,7 @@
         }
       },
       "coreUnits": {
+        "mode": "pool",
         "total": 24,
         "thresholds": {
           "noRisk": 21,
@@ -2936,180 +3176,99 @@
         "units": [
           {
             "id": "U1",
-            "code": "UEECD0007",
-            "title": "Apply Work Health and Safety regulations, codes and practices in the workplace",
-            "tgaTitle": "Apply work health and safety regulations, codes and practices in the workplace",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEE101A",
-                "relation": "older code this unit supersedes",
-                "title": "Apply Occupational Health and Safety regulations, codes and practices in the workplace",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEECD0007/unitdetails"
-              }
-            ]
+            "code": "BSBINM501",
+            "title": "Manage an information or knowledge management system",
+            "cluster": "Group A: Imported and common elective units"
           },
           {
             "id": "U2",
-            "code": "UEECD0030",
-            "title": "Prepare electrotechnology/utilities drawings using manual drafting and CAD equipment and software",
-            "tgaTitle": "Prepare electrotechnology/utilities drawings using manual drafting and CAD equipment and software",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEE191A",
-                "relation": "older code this unit supersedes",
-                "title": "Prepare electrotechnology/utilities drawings using manual drafting and CAD equipment and software",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEECD0030/unitdetails"
-              }
-            ]
+            "code": "BSBINN502",
+            "title": "Build and sustain an innovative work environment",
+            "cluster": "Group A: Imported and common elective units"
           },
           {
             "id": "U3",
-            "code": "UEECD0031",
-            "title": "Prepare engineering drawings using manual drafting and CAD for electrotechnology applications",
-            "tgaTitle": "Prepare engineering drawings using manual drafting and CAD for electrotechnology applications",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEE190A",
-                "relation": "older code this unit supersedes",
-                "title": "Prepare engineering drawings using manual drafting and CAD for electrotechnology/utilities applications",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEECD0031/unitdetails"
-              }
-            ]
+            "code": "BSBMGT502",
+            "title": "Manage people performance",
+            "cluster": "Group A: Imported and common elective units"
           },
           {
             "id": "U4",
-            "code": "UEECD0032",
-            "title": "Produce detailed electrotechnology/utilities drawings using CAD equipment and software",
-            "tgaTitle": "Produce detailed electrotechnology/utilities drawings using CAD equipment and software",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEE192A",
-                "relation": "older code this unit supersedes",
-                "title": "Produce detailed electrotechnology /utilities drawings using computer aided design equipment and software",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEECD0032/unitdetails"
-              }
-            ]
+            "code": "BSBMGT516",
+            "title": "Facilitate continuous improvement",
+            "cluster": "Group A: Imported and common elective units"
           },
           {
             "id": "U5",
-            "code": "UEECD0038",
-            "title": "Provide engineering solutions for problems in complex multiple path circuits",
-            "tgaTitle": "Provide solutions and report on routine electrotechnology problems",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEE130A",
-                "relation": "older code this unit supersedes",
-                "title": "Provide solutions and report on routine electrotechnology problems",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEECD0038/unitdetails"
-              }
-            ]
+            "code": "BSBWOR502",
+            "title": "Lead and manage team effectiveness",
+            "cluster": "Group A: Imported and common elective units"
           },
           {
             "id": "U6",
-            "code": "UEECD0044",
-            "title": "Solve problems in single and three phase low voltage electrical apparatus and circuits",
-            "tgaTitle": "Solve problems in multiple path circuits",
-            "tgaStatus": "current",
-            "equivalentCodes": [],
-            "equivalenceNote": "training.gov.au lists no superseded or equivalent code for this unit."
+            "code": "UEEAS0007",
+            "title": "Assemble, mount and connect control gear and switchgear",
+            "cluster": "Group B"
           },
           {
             "id": "U7",
-            "code": "UEECD0046",
-            "title": "Solve problems in single and three phase low voltage circuits",
-            "tgaTitle": "Solve problems in single path circuits",
-            "tgaStatus": "current",
-            "equivalentCodes": [],
-            "equivalenceNote": "training.gov.au lists no superseded or equivalent code for this unit."
+            "code": "UEEAS0008",
+            "title": "Fabricate and assemble bus bars",
+            "cluster": "Group B"
           },
           {
             "id": "U8",
-            "code": "UEECD0051",
-            "title": "Use drawings, diagrams, schedules, standards, codes and specifications",
-            "tgaTitle": "Use drawings, diagrams, schedules, standards, codes and specifications",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEE107A",
-                "relation": "older code this unit supersedes",
-                "title": "Use drawings, diagrams, schedules, standards, codes and specifications",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEECD0051/unitdetails"
-              }
-            ]
+            "code": "UEEAS0009",
+            "title": "Mount and wire control panel equipment",
+            "cluster": "Group B"
           },
           {
             "id": "U9",
-            "code": "UEECD0059",
-            "title": "Write specifications for electrical engineering projects",
-            "tgaTitle": "Write specifications for electrical engineering projects",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEE071B",
-                "relation": "older code this unit supersedes",
-                "title": "Write specifications for electrical engineering projects",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEECD0059/unitdetails"
-              }
-            ]
+            "code": "UEECD0028",
+            "title": "Plan an integrated cabling installation system",
+            "cluster": "Group B"
           },
           {
             "id": "U10",
-            "code": "UEECD0064",
-            "title": "Interpret, produce and modify electrotechnology drawings",
-            "tgaTitle": "Interpret, produce and modify electrotechnology drawings",
-            "tgaStatus": "current",
-            "equivalentCodes": [],
-            "equivalenceNote": "training.gov.au lists no superseded or equivalent code for this unit."
+            "code": "UEEDV0005",
+            "title": "Install and maintain cabling for multiple access to telecommunication services",
+            "cluster": "Group B"
           },
           {
             "id": "U11",
-            "code": "UEEEL0006",
-            "title": "Develop detailed and complex drawings for electrical systems using CAD systems",
-            "tgaTitle": "Develop detailed and complex drawings for electrical systems using CAD systems",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEG180A",
-                "relation": "older code this unit supersedes",
-                "title": "Develop detailed and complex drawings for electrical systems using CAD systems",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEEEL0006/unitdetails"
-              }
-            ]
+            "code": "UEEDV0008",
+            "title": "Install, modify and verify coaxial and structured communication copper cabling",
+            "cluster": "Group B"
           },
           {
             "id": "U12",
-            "code": "UEEEL0007",
-            "title": "Develop detailed electrical drawings",
-            "tgaTitle": "Develop detailed electrical drawings",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEG179A",
-                "relation": "older code this unit supersedes",
-                "title": "Develop detailed electrical drawings",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEEEL0007/unitdetails"
-              }
-            ]
+            "code": "UEEEC0003",
+            "title": "Assemble and set up basic security systems",
+            "cluster": "Group B"
           },
           {
             "id": "U13",
+            "code": "UEEEC0060",
+            "title": "Repairs basic electronic apparatus faults by replacement of components",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U14",
+            "code": "UEEEC0075",
+            "title": "Troubleshoot single phase input d.c power supplies",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U15",
+            "code": "UEEEL0004",
+            "title": "Carry out basic repairs to electrical components and equipment",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U16",
             "code": "UEEEL0013",
-            "title": "Design explosion-protected electrical systems and installations - mining",
-            "tgaTitle": "Install, set up and commission interval metering",
+            "title": "Install, set up and commission interval metering",
+            "cluster": "Group B",
             "tgaStatus": "superseded",
             "equivalentCodes": [
               {
@@ -3131,69 +3290,214 @@
             ]
           },
           {
-            "id": "U14",
-            "code": "UEEEL0014",
-            "title": "Design explosion-protected electrical systems and installations - gas atmospheres",
-            "tgaTitle": "Isolate, test and troubleshoot low voltage electrical circuits",
-            "tgaStatus": "current",
-            "equivalentCodes": [],
-            "equivalenceNote": "training.gov.au lists no superseded or equivalent code for this unit."
-          },
-          {
-            "id": "U15",
-            "code": "UEEEL0015",
-            "title": "Design explosion-protected electrical systems and installations - dust atmospheres",
-            "tgaTitle": "Manage large electrical projects",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEG169A",
-                "relation": "older code this unit supersedes",
-                "title": "Manage large electrical projects",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEEEL0015/unitdetails"
-              }
-            ]
-          },
-          {
-            "id": "U16",
-            "code": "UEEEL0058",
-            "title": "Plan large electrical projects",
-            "tgaTitle": "Plan large electrical projects",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEG170A",
-                "relation": "older code this unit supersedes",
-                "title": "Plan large electrical projects",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEEEL0058/unitdetails"
-              }
-            ]
-          },
-          {
             "id": "U17",
-            "code": "UEEEL0079",
-            "title": "Plan and analyse LV electrical apparatus",
-            "tgaTitle": "Plan and analyse LV electrical apparatus",
-            "tgaStatus": "current",
-            "equivalentCodes": [],
-            "equivalenceNote": "training.gov.au lists no superseded or equivalent code for this unit."
+            "code": "UEEEL0016",
+            "title": "Provide advice on effective and energy efficient lighting products",
+            "cluster": "Group B"
           },
           {
             "id": "U18",
-            "code": "UEEEL0080",
-            "title": "Plan and analyse wiring systems, circuits, control and protection for electrical installations",
-            "tgaTitle": "Plan and analyse wiring systems, circuits, control and protection for electrical installations",
-            "tgaStatus": "current",
-            "equivalentCodes": [],
-            "equivalenceNote": "training.gov.au lists no superseded or equivalent code for this unit."
+            "code": "UEEEL0017",
+            "title": "Repair and maintain mechanical components of electrical machines",
+            "cluster": "Group B"
           },
           {
             "id": "U19",
+            "code": "UEEEL0022",
+            "title": "Supply effective and efficient lighting products for domestic and small commercial applications",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U20",
+            "code": "UEEEL0026",
+            "title": "Align and install traction lift equipment",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U21",
+            "code": "UEEEL0033",
+            "title": "Conduct electrical tests on LV electrical machines",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U22",
+            "code": "UEEEL0034",
+            "title": "Conduct mechanical tests on electrical machines and components",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U23",
+            "code": "UEEEL0045",
+            "title": "Diagnose and rectify faults in traction lift systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U24",
+            "code": "UEEEL0046",
+            "title": "Find and repair faults in LV d.c. electrical apparatus and circuits",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U25",
+            "code": "UEEEL0048",
+            "title": "Install and maintain emergency lighting systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U26",
+            "code": "UEEEL0049",
+            "title": "Install and maintain emergency safety systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U27",
+            "code": "UEEEL0052",
+            "title": "Maintain and service traction lift systems and equipment",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U28",
+            "code": "UEEEL0053",
+            "title": "Maintain operation of electrical marine equipment and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U29",
+            "code": "UEEEL0054",
+            "title": "Maintain operation of electrical mining equipment and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U30",
+            "code": "UEEEL0055",
+            "title": "Overhaul and repair major switchgear and control gear",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U31",
+            "code": "UEEEL0056",
+            "title": "Place and connect electrical coils",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U32",
+            "code": "UEEEL0061",
+            "title": "Provide advice on the application of energy efficient lighting for ambient and aesthetic effect",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U33",
+            "code": "UEEEL0066",
+            "title": "Rewind LV direct current machines",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U34",
+            "code": "UEEEL0067",
+            "title": "Rewind single phase machines",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U35",
+            "code": "UEEEL0068",
+            "title": "Rewind three phase low voltage induction machines",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U36",
+            "code": "UEEEL0069",
+            "title": "Select and arrange equipment for special LV electrical installations",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U37",
+            "code": "UEEEL0074",
+            "title": "Wind electrical coils",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U38",
+            "code": "UEEHA0001",
+            "title": "Conduct detailed inspection of electrical installations for hazardous areas",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U39",
+            "code": "UEEHA0003",
+            "title": "Determine the explosion-protection requirements to meet a specified classified hazardous area",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U40",
+            "code": "UEEHA0005",
+            "title": "Install explosion-protected equipment and associated apparatus and wiring systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U41",
+            "code": "UEEHA0006",
+            "title": "Maintain equipment associated with hazardous areas",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U42",
+            "code": "UEEIC0002",
+            "title": "Assemble, enter and verify operating instructions in microprocessor equipped devices",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U43",
+            "code": "UEEIC0011",
+            "title": "Develop electrical integrated systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U44",
+            "code": "UEEIC0013",
+            "title": "Develop, enter and verify discrete control programs for programmable controllers",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U45",
+            "code": "UEEIC0024",
+            "title": "Plan the electrical installation of integrated systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U46",
+            "code": "UEEIC0025",
+            "title": "Provide solutions to extra-low voltage (ELV) electro-pneumatic control systems and drives",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U47",
+            "code": "UEEIC0038",
+            "title": "Solve problems in density/level measurement components and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U48",
+            "code": "UEEIC0039",
+            "title": "Solve problems in flow measurement components and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U49",
+            "code": "UEEIC0041",
+            "title": "Solve problems in pressure measurement components and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U50",
+            "code": "UEEIC0043",
+            "title": "Solve problems in temperature measurement components and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U51",
             "code": "UEEIC0047",
             "title": "Use instrumentation drawings, specifications, standards and equipment manuals",
-            "tgaTitle": "Use instrumentation drawings, specifications, standards and equipment manuals",
+            "cluster": "Group B",
             "tgaStatus": "current",
             "equivalentCodes": [
               {
@@ -3206,26 +3510,28 @@
             ]
           },
           {
-            "id": "U20",
-            "code": "UEEIC0048",
-            "title": "Use system CAD software to produce control systems specifications and diagrams",
-            "tgaTitle": "Verify compliance and functionality of instrumentation and control installations",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEI112A",
-                "relation": "older code this unit supersedes",
-                "title": "Verify compliance and functionality of instrumentation and control installations",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEEIC0048/unitdetails"
-              }
-            ]
+            "id": "U52",
+            "code": "UEERA0035",
+            "title": "Establish the basic operating conditions of air conditioning systems",
+            "cluster": "Group B"
           },
           {
-            "id": "U21",
+            "id": "U53",
+            "code": "UEERA0036",
+            "title": "Establish the basic operating conditions of vapour compression systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U54",
+            "code": "UEERA0059",
+            "title": "Prepare and connect refrigerant tubing and fittings",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U55",
             "code": "UEERE0001",
-            "title": "Apply sustainable energy and environmental procedures",
-            "tgaTitle": "Apply environmentally and sustainable procedures in the energy sector",
+            "title": "Apply environmentally and sustainable procedures in the energy sector",
+            "cluster": "Group B",
             "tgaStatus": "current",
             "equivalentCodes": [
               {
@@ -3238,10 +3544,296 @@
             ]
           },
           {
-            "id": "U22",
+            "id": "U56",
+            "code": "UEERE0016",
+            "title": "Install, configure and commission LV grid-connected photovoltaic power systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U57",
+            "code": "UEERE0022",
+            "title": "Solve basic problems in photovoltaic energy apparatus and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U58",
+            "code": "UETTDRIS44",
+            "title": "Perform HV field switching operation to a given schedule",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U59",
+            "code": "UETTDRIS67",
+            "title": "Solve problems in energy supply network equipment",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U60",
+            "code": "UETTDRIS68",
+            "title": "Solve problems in energy supply network protection equipment and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U61",
+            "code": "UEECD0013",
+            "title": "Develop and implement energy sector maintenance programs",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U62",
+            "code": "UEECO0001",
+            "title": "Estimate electrotechnology projects",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U63",
+            "code": "UEEEL0007",
+            "title": "Develop detailed electrical drawings",
+            "cluster": "Group C",
+            "tgaStatus": "current",
+            "equivalentCodes": [
+              {
+                "code": "UEENEEG179A",
+                "relation": "older code this unit supersedes",
+                "title": "Develop detailed electrical drawings",
+                "mappingDate": "2020-10-04",
+                "source": "https://training.gov.au/training/details/UEEEL0007/unitdetails"
+              }
+            ]
+          },
+          {
+            "id": "U64",
+            "code": "UEEEL0027",
+            "title": "Carry out low voltage electrical field testing and report findings",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U65",
+            "code": "UEEEL0029",
+            "title": "Conduct compliance inspection of LV electrical installations with demand exceeding 100 A per phase",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U66",
+            "code": "UEEEL0030",
+            "title": "Conduct compliance inspection of single phase LV electrical installations",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U67",
+            "code": "UEEEL0031",
+            "title": "Conduct compliance inspection of special LV electrical installations",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U68",
+            "code": "UEEEL0032",
+            "title": "Conduct electrical tests on HV electrical machines",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U69",
+            "code": "UEEEL0036",
+            "title": "Design effective and efficient lighting for residential and commercial buildings",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U70",
+            "code": "UEEEL0040",
+            "title": "Develop compliance policies and plans to conduct an electrical contracting business",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U71",
+            "code": "UEEEL0044",
+            "title": "Diagnose and rectify faults in complex lift systems",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U72",
+            "code": "UEEEL0050",
+            "title": "Install and replace low voltage current transformer metering",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U73",
+            "code": "UEEEL0051",
+            "title": "Investigate and report on electrical incidents and causes",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U74",
+            "code": "UEEEL0057",
+            "title": "Plan electrical installations with a low voltage demand up to 400 A per phase",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U75",
+            "code": "UEEEL0059",
+            "title": "Plan low voltage switchboard and control panel layouts",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U76",
+            "code": "UEEEL0060",
+            "title": "Prepare quotations for the supply of effective and efficient lighting products for lighting projects",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U77",
+            "code": "UEEEL0063",
+            "title": "Provide photometric data for illumination system design",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U78",
+            "code": "UEEEL0064",
+            "title": "Rewind HV three phase induction machines rated for voltages above 3.3 kV",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U79",
+            "code": "UEEEL0065",
+            "title": "Rewind HV three phase induction machines rated for voltages to 3.3 kV",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U80",
+            "code": "UEEEL0070",
+            "title": "Select effective and efficient light sources and luminaries for given locations and designs",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U81",
+            "code": "UEEEL0071",
+            "title": "Select low voltage power factor correction equipment",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U82",
+            "code": "UEEEL0072",
+            "title": "Set up and place LV electrical apparatus and associated circuits into service",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U83",
+            "code": "UEEEL0073",
+            "title": "Verify compliance and functionality of special LV electrical installations",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U84",
+            "code": "UEEHA0002",
+            "title": "Conduct visual and close inspection of electrical installations for hazardous areas",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U85",
+            "code": "UEEHA0004",
+            "title": "Enter a classified hazardous area to undertake work related to electrical equipment",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U86",
+            "code": "UEEHA0009",
+            "title": "Develop and manage periodic electrical inspection and maintenance programs for hazardous areas",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U87",
+            "code": "UEEIC0009",
+            "title": "Develop an electrical integrated system interface for access through a touch screen",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U88",
+            "code": "UEEIC0012",
+            "title": "Develop structured programs to control external devices",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U89",
+            "code": "UEEIC0014",
+            "title": "Develop, enter and verify programs in supervisory control and data acquisition systems",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U90",
+            "code": "UEEIC0015",
+            "title": "Develop, enter and verify word and analogue control programs for programmable logic controllers",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U91",
+            "code": "UEEIC0018",
+            "title": "Diagnose and rectify faults in digital controls systems",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U92",
+            "code": "UEEIC0020",
+            "title": "Fault find and repair analogue circuits and components in electronic control systems",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U93",
+            "code": "UEEIC0026",
+            "title": "Provide solutions to fluid circuit operations",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U94",
+            "code": "UEEIC0027",
+            "title": "Provide solutions to pneumatic-hydraulic system operations",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U95",
+            "code": "UEEIC0028",
+            "title": "Provide solutions to problems in industrial control systems",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U96",
+            "code": "UEEIC0034",
+            "title": "Set up industrial field control devices",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U97",
+            "code": "UEEIC0040",
+            "title": "Solve problems in polyphase electronic power control circuits",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U98",
+            "code": "UEEIC0042",
+            "title": "Solve problems in single phase electronic power control circuits",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U99",
+            "code": "UEERE0003",
+            "title": "Assess energy loads and uses for energy efficiency in commercial facilities",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U100",
+            "code": "UEERE0004",
+            "title": "Assess energy loads and uses for energy efficiency in industrial properties and enterprises",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U101",
+            "code": "UEERE0005",
+            "title": "Assess energy loads and uses for energy efficiency in residential, office and retail premises",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U102",
             "code": "UEERE0011",
-            "title": "Design grid connected power supply systems",
-            "tgaTitle": "Design grid-connected photovoltaic power supply systems",
+            "title": "Design grid-connected photovoltaic power supply systems",
+            "cluster": "Group C",
             "tgaStatus": "superseded",
             "equivalentCodes": [
               {
@@ -3263,61 +3855,186 @@
             ]
           },
           {
-            "id": "U23",
-            "code": "BSBSMB401",
-            "title": "Establish legal and risk management requirements of small business",
-            "tgaTitle": "Establish legal and risk management requirements of small business",
-            "tgaStatus": "superseded",
-            "equivalentCodes": [
-              {
-                "code": "BSBESB402",
-                "relation": "newer code that supersedes this unit",
-                "title": "Establish legal and risk management requirements of new business ventures",
-                "mappingDate": "2020-10-18",
-                "source": "https://training.gov.au/training/details/BSBSMB401/unitdetails"
-              },
-              {
-                "code": "BSBSMB401A",
-                "relation": "older code this unit supersedes",
-                "title": "Establish legal and risk management requirements of small business",
-                "mappingDate": "2015-03-24",
-                "source": "https://training.gov.au/training/details/BSBSMB401/unitdetails"
-              }
-            ]
+            "id": "U103",
+            "code": "UEERE0014",
+            "title": "Develop strategies to address sustainability issues for electrical installations",
+            "cluster": "Group C"
           },
           {
-            "id": "U24",
-            "code": "BSBSMB402",
-            "title": "Plan small business finances",
-            "typoAliases": [
-              "BSBMSB402"
-            ],
-            "tgaTitle": "Plan small business finances",
-            "tgaStatus": "superseded",
-            "equivalentCodes": [
-              {
-                "code": "BSBESB403",
-                "relation": "newer code that supersedes this unit",
-                "title": "Plan finances for new business ventures",
-                "mappingDate": "2020-10-18",
-                "source": "https://training.gov.au/training/details/BSBSMB402/unitdetails"
-              },
-              {
-                "code": "BSBSMB402A",
-                "relation": "older code this unit supersedes",
-                "title": "Plan small business finances",
-                "mappingDate": "2015-03-24",
-                "source": "https://training.gov.au/training/details/BSBSMB402/unitdetails"
-              }
-            ]
+            "id": "U104",
+            "code": "UEERE0015",
+            "title": "Implement and monitor energy sector environmental and sustainable policies and procedures",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U105",
+            "code": "UEECO0014",
+            "title": "Prepare tender submissions for electrotechnology projects",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U106",
+            "code": "UEECS0016",
+            "title": "Develop energy sector directory services",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U107",
+            "code": "UEEEL0011",
+            "title": "Evaluate performance of low voltage electrical apparatus",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U108",
+            "code": "UEEEL0037",
+            "title": "Design electrical installations with a low voltage demand greater than 400 A per phase",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U109",
+            "code": "UEEHA0007",
+            "title": "Plan electrical installations for hazardous areas",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U110",
+            "code": "UEEIC0001",
+            "title": "Analyse complex electronic circuits controlling fluids",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U111",
+            "code": "UEEIC0005",
+            "title": "Configure and maintain industrial control system networks",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U112",
+            "code": "UEERE0012",
+            "title": "Develop effective engineering strategies for energy reduction in buildings",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U113",
+            "code": "UETTDRIS69",
+            "title": "Diagnose and rectify faults in energy supply apparatus",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U114",
+            "code": "UETTDRIS70",
+            "title": "Diagnose and rectify faults in electrical energy distribution systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U115",
+            "code": "UETTDRIS71",
+            "title": "Diagnose and rectify faults in electrical energy supply transmission systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U116",
+            "code": "UETTDRIS72",
+            "title": "Diagnose and rectify faults in distributed generation systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U117",
+            "code": "UEECD0049",
+            "title": "Use advanced computational processes to provide solutions to energy sector engineering problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U118",
+            "code": "UEECO0003",
+            "title": "Manage contract variations",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U119",
+            "code": "UEECS0012",
+            "title": "Design embedded controller control systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U120",
+            "code": "UEECS0015",
+            "title": "Develop energy sector computer network applications infrastructure",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U121",
+            "code": "UEECS0017",
+            "title": "Develop industrial control programs for microcomputer equipped devices",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U122",
+            "code": "UEECS0027",
+            "title": "Provide programming solution for computer systems engineering problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U123",
+            "code": "UEEEL0038",
+            "title": "Design switchboards rated for high fault levels (greater than 400 A)",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U124",
+            "code": "UEEEL0043",
+            "title": "Develop engineering solutions for induction machine and control problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U125",
+            "code": "UEEIC0006",
+            "title": "Design and configure human-machine interface (HMI) networks",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U126",
+            "code": "UEEIC0007",
+            "title": "Design and use advanced programming tools, PC networks and HMI Interfacing",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U127",
+            "code": "UEEIC0010",
+            "title": "Develop and test code for microcontroller devices",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U128",
+            "code": "UEEIC0016",
+            "title": "Diagnose and rectify faults in a.c. motor drive systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U129",
+            "code": "UEEIC0017",
+            "title": "Diagnose and rectify faults in d.c. motor drive systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U130",
+            "code": "UEEIC0019",
+            "title": "Diagnose and rectify faults in servo drive systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U131",
+            "code": "UETTDRIS73",
+            "title": "Develop engineering solutions for energy supply power transformer problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U132",
+            "code": "UETTDRIS74",
+            "title": "Develop engineering solutions for energy supply system protection problems",
+            "cluster": "Group E"
           }
-        ],
-        "equivalence": {
-          "source": "training.gov.au",
-          "retrieved": "2026-10-28",
-          "method": "Each unit's 'Mapping' section on training.gov.au. Only rows marked 'Supersedes and is equivalent to' / 'Is superseded by and equivalent to' are counted as a match; non-equivalent rows are listed for the assessor only.",
-          "urlPattern": "https://training.gov.au/training/details/{code}/unitdetails"
-        }
+        ]
       },
       "electives": {
         "clusters": [
@@ -3335,7 +4052,399 @@
       "practicalEvidence": {
         "role": "supporting_only"
       },
-      "scoringEnabled": true
+      "scoringEnabled": true,
+      "foundationalUnits": {
+        "total": 17,
+        "thresholds": {
+          "noRisk": 14,
+          "lowRisk": 11
+        },
+        "units": [
+          {
+            "id": "F1",
+            "code": "UEECD0003",
+            "title": "Apply industry and community standards to engineering activities",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F2",
+            "code": "UEECD0004",
+            "title": "Apply material science to solving electrotechnology engineering problems",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F3",
+            "code": "UEECD0005",
+            "title": "Apply physics to solving electrotechnology engineering problems",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F4",
+            "code": "UEECD0010",
+            "title": "Compile and produce an energy sector detailed report",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F5",
+            "code": "UEECD0014",
+            "title": "Develop design briefs for electrotechnology projects",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F6",
+            "code": "UEECD0017",
+            "title": "Establish and follow a competency development plan in an electrotechnology engineering discipline",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F7",
+            "code": "UEECD0024",
+            "title": "Implement and monitor energy sector WHS policies and procedures",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F8",
+            "code": "UEECD0026",
+            "title": "Manage risk in electrotechnology activities",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F9",
+            "code": "UEECD0036",
+            "title": "Provide engineering solutions for problems in complex multiple path circuits",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F10",
+            "code": "UEECD0039",
+            "title": "Provide solutions to basic engineering computational problems",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F11",
+            "code": "UEECD0056",
+            "title": "Apply methods to maintain currency of industry developments",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F12",
+            "code": "UEECD0059",
+            "title": "Write specifications for electrical engineering projects",
+            "cluster": "Foundational Units",
+            "tgaStatus": "current",
+            "equivalentCodes": [
+              {
+                "code": "UEENEEE071B",
+                "relation": "older code this unit supersedes",
+                "title": "Write specifications for electrical engineering projects",
+                "mappingDate": "2020-10-04",
+                "source": "https://training.gov.au/training/details/UEECD0059/unitdetails"
+              }
+            ]
+          },
+          {
+            "id": "F13",
+            "code": "UEECS0033",
+            "title": "Use engineering applications software on personal computers",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F14",
+            "code": "UEEEL0015",
+            "title": "Manage large electrical projects",
+            "cluster": "Foundational Units",
+            "tgaStatus": "current",
+            "equivalentCodes": [
+              {
+                "code": "UEENEEG169A",
+                "relation": "older code this unit supersedes",
+                "title": "Manage large electrical projects",
+                "mappingDate": "2020-10-04",
+                "source": "https://training.gov.au/training/details/UEEEL0015/unitdetails"
+              }
+            ]
+          },
+          {
+            "id": "F15",
+            "code": "UEEEL0058",
+            "title": "Plan large electrical projects",
+            "cluster": "Foundational Units",
+            "tgaStatus": "current",
+            "equivalentCodes": [
+              {
+                "code": "UEENEEG170A",
+                "relation": "older code this unit supersedes",
+                "title": "Plan large electrical projects",
+                "mappingDate": "2020-10-04",
+                "source": "https://training.gov.au/training/details/UEEEL0058/unitdetails"
+              }
+            ]
+          },
+          {
+            "id": "F16",
+            "code": "UEEEL0062",
+            "title": "Provide engineering solutions to problems in complex polyphase power circuits",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F17",
+            "code": "UEERE0013",
+            "title": "Develop strategies to address environmental and sustainability issues in the energy sector",
+            "cluster": "Foundational Units"
+          }
+        ]
+      },
+      "dataNote": "Units from the updated sheet. Tier 1 = the 17 Foundational units (bands 14 / 11). Core = a pool of the 132 Group A-E units: matched pool units are counted against 24 required units with the existing bands 21 / 15 / 9 (the sheet lists far more units than any one student takes). Australian qualifications only; overseas Electrical diplomas are matched on subjects (electrical-engineering-draftsperson-os)."
+    },
+    {
+      "id": "electrical-engineering-draftsperson-os",
+      "anzsco": "312311",
+      "title": "Electrical Engineering Draftsperson",
+      "flow": "academic_3_tier",
+      "variantOf": "312311",
+      "origin": "overseas",
+      "source": {
+        "file": "draftsperson_subjects.xlsx",
+        "version": "v1"
+      },
+      "reviewFlags": [],
+      "dataNote": "Overseas curriculum for ANZSCO 312311 (Sheet 13). Core = the six sheet headings (Projects & Industrial Training is a core heading here, not a gate). Foundational column split into headings by topic.",
+      "qualification": {
+        "statement": "Overseas (non-Australian) Diploma / Advanced Diploma / Associate Degree in Electrical Engineering (or Electrical Engineering Technology / Drafting). Matched on subjects (Sheet 13).",
+        "levelPolicy": "diploma_ok",
+        "titleCheck": {
+          "allOf": [
+            [
+              "electrical",
+              "electrotechnology"
+            ]
+          ]
+        }
+      },
+      "matching": {
+        "combinedCourses": true
+      },
+      "tier1": {
+        "total": 10,
+        "thresholds": {
+          "noRisk": 9,
+          "lowRisk": 7
+        },
+        "subjects": [
+          {
+            "id": "312311-T1.1",
+            "name": "Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "312311-T1.2",
+            "name": "Physics / Applied Science",
+            "status": "expected"
+          },
+          {
+            "id": "312311-T1.3",
+            "name": "English & Technical Communication",
+            "status": "expected"
+          },
+          {
+            "id": "312311-T1.4",
+            "name": "Computer Applications / IT",
+            "status": "expected"
+          },
+          {
+            "id": "312311-T1.5",
+            "name": "Workshop Practice",
+            "status": "expected"
+          },
+          {
+            "id": "312311-T1.6",
+            "name": "Applied Mechanics",
+            "status": "expected"
+          },
+          {
+            "id": "312311-T1.7",
+            "name": "Building Construction & Engineering Materials",
+            "status": "expected"
+          },
+          {
+            "id": "312311-T1.8",
+            "name": "Industrial Safety / OHS",
+            "status": "expected"
+          },
+          {
+            "id": "312311-T1.9",
+            "name": "Management & Entrepreneurship",
+            "status": "expected"
+          },
+          {
+            "id": "312311-T1.10",
+            "name": "Environmental Studies",
+            "status": "expected"
+          }
+        ]
+      },
+      "tier2": {
+        "total": 6,
+        "thresholds": {
+          "noRisk": 5,
+          "lowRisk": 4,
+          "medium": 3
+        },
+        "core": [
+          {
+            "id": "312311-T2.1",
+            "name": "Electrical Drafting, CAD & Diagrams"
+          },
+          {
+            "id": "312311-T2.2",
+            "name": "Electrical Fundamentals & Machines"
+          },
+          {
+            "id": "312311-T2.3",
+            "name": "Power Systems & Electrification"
+          },
+          {
+            "id": "312311-T2.4",
+            "name": "Installation, Estimation & Standards"
+          },
+          {
+            "id": "312311-T2.5",
+            "name": "Control, Maintenance, Projects & Training"
+          },
+          {
+            "id": "312311-T2.6",
+            "name": "Projects & Industrial Training"
+          }
+        ],
+        "optional": []
+      },
+      "tier3": {
+        "supporting": [],
+        "optional": [],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
+    },
+    {
+      "id": "electronic-engineering-draftsperson",
+      "anzsco": "312411",
+      "title": "Electronic Engineering Draftsperson",
+      "flow": "academic_3_tier",
+      "source": {
+        "file": "draftsperson_subjects.xlsx",
+        "version": "v1"
+      },
+      "reviewFlags": [],
+      "dataNote": "From the Electronics Draftsperson sheet; used for every qualification origin. Tier 3 gate (Projects & Industrial Training) is required: a missing gate caps verified at conditional, also on the Engineering Associate track.",
+      "qualification": {
+        "statement": "Confirm the qualification is a Diploma / Advanced Diploma / Associate Degree in Electronics, Electrical and Electronics, or Electronics and Communication Engineering (any country).",
+        "levelPolicy": "diploma_ok",
+        "titleCheck": {
+          "allOf": [
+            [
+              "electronic*"
+            ]
+          ]
+        }
+      },
+      "matching": {
+        "combinedCourses": true
+      },
+      "tier1": {
+        "total": 9,
+        "thresholds": {
+          "noRisk": 8,
+          "lowRisk": 6
+        },
+        "subjects": [
+          {
+            "id": "312411-T1.1",
+            "name": "Mathematics",
+            "status": "expected"
+          },
+          {
+            "id": "312411-T1.2",
+            "name": "Physics / Applied Science",
+            "status": "expected"
+          },
+          {
+            "id": "312411-T1.3",
+            "name": "English & Technical Communication",
+            "status": "expected"
+          },
+          {
+            "id": "312411-T1.4",
+            "name": "Computer Applications / IT",
+            "status": "expected"
+          },
+          {
+            "id": "312411-T1.5",
+            "name": "Programming",
+            "status": "expected"
+          },
+          {
+            "id": "312411-T1.6",
+            "name": "Workshop Practice",
+            "status": "expected"
+          },
+          {
+            "id": "312411-T1.7",
+            "name": "Industrial Safety / OHS",
+            "status": "expected"
+          },
+          {
+            "id": "312411-T1.8",
+            "name": "Management & Entrepreneurship",
+            "status": "expected"
+          },
+          {
+            "id": "312411-T1.9",
+            "name": "Environmental Studies",
+            "status": "expected"
+          }
+        ]
+      },
+      "tier2": {
+        "total": 5,
+        "thresholds": {
+          "noRisk": 4,
+          "lowRisk": 3,
+          "medium": 2
+        },
+        "core": [
+          {
+            "id": "312411-T2.1",
+            "name": "Drafting, CAD & PCB Design"
+          },
+          {
+            "id": "312411-T2.2",
+            "name": "Electronic Components & Circuits"
+          },
+          {
+            "id": "312411-T2.3",
+            "name": "Embedded, Microcontroller & Computer Hardware"
+          },
+          {
+            "id": "312411-T2.4",
+            "name": "Assembly, Testing & Maintenance"
+          },
+          {
+            "id": "312411-T2.5",
+            "name": "Applied Electronic Systems"
+          }
+        ],
+        "optional": []
+      },
+      "tier3": {
+        "gate": {
+          "id": "312411-T3.G",
+          "label": "Projects & Industrial Training",
+          "required": true,
+          "aliases": []
+        },
+        "supporting": [],
+        "optional": [],
+        "onGateMissing": "downgrade_auto_approve_to_manual_review"
+      }
     },
     {
       "id": "aeronautical-engineer",

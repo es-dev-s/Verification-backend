@@ -32,6 +32,12 @@ import type { QualificationCheckResult, ScoreResult } from "./score.js";
  *  5. title only, for transcript lines that carry no code at all — matched
  *     against the training.gov.au title, lower confidence, flagged.
  *
+ * Foundational units (when the rubric lists them) are matched the same way
+ * and scored as Tier 1: at or above `noRisk` / `lowRisk` is fine, below is a
+ * flag, which caps a verified result at conditional (as on the academic flow).
+ * A "pool" core list (312311: Group A–E units) counts matched pool units
+ * against the required total; it does not list every unmatched pool unit.
+ *
  * Band → 0–100 confidence uses the same bases as the academic scale
  * (computeConfidenceScore): verified 78 + 0.18·core%, conditional
  * 52 + 0.22·core%, otherwise 8 + 0.34·core%; +4 for related work. There is no
@@ -265,10 +271,28 @@ function confidenceLabel(det: Determination, score: number, boost: boolean, reco
   return null;
 }
 
+/** Tier 1 band from matched Foundational units: noRisk / lowRisk, otherwise a flag. */
+export function foundationalBand(
+  matched: number,
+  thresholds: { noRisk: number; lowRisk: number },
+): TierOutcome {
+  if (matched >= thresholds.noRisk) return "no_risk";
+  if (matched >= thresholds.lowRisk) return "low_risk";
+  return "flag";
+}
+
+function foundationalThresholds(occ: VocationalOccupation): { noRisk: number; lowRisk: number } | null {
+  const f = occ.foundationalUnits;
+  if (!f || f.total <= 0) return null;
+  return { noRisk: f.thresholds.noRisk ?? f.total, lowRisk: f.thresholds.lowRisk ?? 0 };
+}
+
 /** Synthetic Rubric so the existing breakdown / candidate code works unchanged. */
 export function vocationalRubric(occ: VocationalOccupation): Rubric {
   const t = bandThresholds(occ);
   const total = occ.coreUnits.total;
+  const f = occ.foundationalUnits;
+  const ft = foundationalThresholds(occ);
   return {
     anzscoCode: occ.anzsco,
     title: occ.title,
@@ -281,9 +305,20 @@ export function vocationalRubric(occ: VocationalOccupation): Rubric {
       levelPolicy: "diploma_ok",
     },
     tiers: {
-      tier1: { label: "Foundation (not used for unit-code occupations)", scoreDenominator: 0, subjects: [] },
+      tier1:
+        f && ft
+          ? {
+              label: "Foundational units",
+              scoreDenominator: f.total,
+              subjects: f.units.map((u) => ({
+                name: unitLabel(u),
+                category: "expected",
+                variants: u.tgaTitle && u.tgaTitle !== u.title ? [u.tgaTitle] : [],
+              })),
+            }
+          : { label: "Foundation (not used for unit-code occupations)", scoreDenominator: 0, subjects: [] },
       tier2: {
-        label: "Core units",
+        label: occ.coreUnits.mode === "pool" ? `Core units (any ${total} of ${occ.coreUnits.units.length})` : "Core units",
         scoreDenominator: total,
         subjects: occ.coreUnits.units.map((u) => ({
           name: unitLabel(u),
@@ -294,7 +329,16 @@ export function vocationalRubric(occ: VocationalOccupation): Rubric {
       tier3: { label: "Electives", subjects: [] },
     },
     riskScoring: {
-      tier1: { thresholds: [{ matchedRange: [0, 0], outcome: "no_risk", label: "Not used" }] },
+      tier1:
+        f && ft
+          ? {
+              thresholds: [
+                { matchedRange: [ft.noRisk, f.total], outcome: "no_risk", label: "No Risk" },
+                { matchedRange: [ft.lowRisk, ft.noRisk - 1], outcome: "low_risk", label: "Low Risk" },
+                { matchedRange: [0, ft.lowRisk - 1], outcome: "flag", label: "Flag" },
+              ],
+            }
+          : { thresholds: [{ matchedRange: [0, 0], outcome: "no_risk", label: "Not used" }] },
       tier2: {
         thresholds: [
           { matchedRange: [t.noRisk, total], outcome: "no_risk", label: "No Risk" },
@@ -369,13 +413,46 @@ export function scoreVocational(input: {
     if (m.matchType === "title") flags.push(`${m.code}: matched on title only ("${m.transcriptName}") — confirm the unit.`);
   }
 
-  const missingCore = occ.coreUnits.units
-    .filter((u) => !unitMatches.some((m) => m.unit === u))
+  // Foundational units (Tier 1), matched after the core units with the same rules.
+  const foundationalMatches: UnitMatch[] = [];
+  for (const unit of occ.foundationalUnits?.units ?? []) {
+    const m = matchUnit(unit, cands, used);
+    if (m) {
+      used.add(m.cand);
+      foundationalMatches.push(m);
+    }
+  }
+  const toUnitMatch = (m: UnitMatch): VocationalUnitMatch => ({
+    unitId: m.unit.id,
+    code: m.unit.code!,
+    title: m.unit.title,
+    transcriptCode: m.cand.code,
+    transcriptName: m.cand.name,
+    matchType: m.type,
+    note: m.note,
+    confidence: CONFIDENCE[m.type],
+    ...(m.source ? { source: m.source } : {}),
+  });
+  const matchedFoundational = foundationalMatches.map(toUnitMatch);
+  for (const m of matchedFoundational) {
+    if (m.matchType === "typo") flags.push(`${m.code}: ${m.note}.`);
+    if (m.matchType === "title") flags.push(`${m.code}: matched on title only ("${m.transcriptName}") — confirm the unit.`);
+  }
+  const missingFoundational = (occ.foundationalUnits?.units ?? [])
+    .filter((u) => !foundationalMatches.some((m) => m.unit === u))
     .map((u) => ({ unitId: u.id, code: u.code ?? "", title: u.title }));
+
+  const pool = occ.coreUnits.mode === "pool";
+  // A pool lists far more units than any one student takes: unmatched pool units are not "missing".
+  const missingCore = pool
+    ? []
+    : occ.coreUnits.units
+        .filter((u) => !unitMatches.some((m) => m.unit === u))
+        .map((u) => ({ unitId: u.id, code: u.code ?? "", title: u.title }));
 
   // Codes training.gov.au maps without equivalence: shown, never counted.
   const nonEquivalent = new Map<string, string>();
-  for (const u of occ.coreUnits.units) {
+  for (const u of [...occ.coreUnits.units, ...(occ.foundationalUnits?.units ?? [])]) {
     for (const ne of u.nonEquivalentCodes ?? []) nonEquivalent.set(normalizeUnitCode(ne.code)!, u.code ?? "");
   }
   const electivesFound: Array<{ code: string; name: string }> = [];
@@ -384,7 +461,7 @@ export function scoreVocational(input: {
     const of = nonEquivalent.get(c.code) ?? nonEquivalent.get(stripReleaseLetter(c.code));
     if (of) {
       flags.push(
-        `${c.code} found: training.gov.au maps it to core unit ${of} but NOT as equivalent, so it is not counted; assessor to review.`,
+        `${c.code} found: training.gov.au maps it to unit ${of} but NOT as equivalent, so it is not counted; assessor to review.`,
       );
       continue;
     }
@@ -394,6 +471,15 @@ export function scoreVocational(input: {
   const coreMatched = matchedCore.length;
   const coreTotal = occ.coreUnits.total;
   const band = coreBand(coreMatched, thresholds);
+  if (pool) {
+    flags.push(
+      `Core units are a pool: ${coreMatched} of the ${occ.coreUnits.units.length} listed units found, counted against ${coreTotal} required.`,
+    );
+  }
+  const fThresholds = foundationalThresholds(occ);
+  const foundationalTotal = fThresholds ? occ.foundationalUnits!.total : 0;
+  const foundationalMatched = matchedFoundational.length;
+  const tier1Band: TierOutcome = fThresholds ? foundationalBand(foundationalMatched, fThresholds) : "no_risk";
   const minimum = occ.electives.minimumUnits;
   const electiveStatus: VocationalAssessmentDetail["electiveStatus"] =
     minimum == null ? "not_assessed" : electivesFound.length >= minimum ? "met" : "not_met";
@@ -403,7 +489,15 @@ export function scoreVocational(input: {
       : `${electivesFound.length} of the ${minimum} required elective units found (${electiveStatus === "met" ? "met" : "not met"}).`;
   if (minimum == null) flags.push("Elective minimum not set in the rubric: electives not assessed.");
 
-  const bandDetermination = vocationalDetermination(band, electiveStatus, occ.determinationRules);
+  const coreDetermination = vocationalDetermination(band, electiveStatus, occ.determinationRules);
+  // Tier 1 flag (too few Foundational units) caps verified at conditional.
+  const tier1Capped = tier1Band === "flag" && coreDetermination === "verified_no_risk";
+  if (fThresholds && tier1Band === "flag") {
+    flags.push(
+      `Foundational units: ${foundationalMatched} of ${foundationalTotal} found (below ${fThresholds.lowRisk}); verified is capped at conditional.`,
+    );
+  }
+  const bandDetermination: Determination = tier1Capped ? "conditional" : coreDetermination;
   const qualificationNotes = [...(input.qualificationCheck?.notes ?? [])];
   const capQualification = !input.qualificationMet;
   if (capQualification && !qualificationNotes.includes(input.qualificationNote)) {
@@ -414,11 +508,24 @@ export function scoreVocational(input: {
     bandDetermination === "verified_no_risk";
   const determination: Determination = capped ? "conditional" : bandDetermination;
   const recommended = (assessConfig.recommendOn as readonly string[]).includes(determination);
-  const corePct = coreTotal > 0 ? Math.round((coreMatched / coreTotal) * 1000) / 10 : 0;
+  const corePct = coreTotal > 0 ? Math.min(100, Math.round((coreMatched / coreTotal) * 1000) / 10) : 0;
+  const foundationalPct =
+    foundationalTotal > 0 ? Math.round((foundationalMatched / foundationalTotal) * 1000) / 10 : 0;
   const confidenceScore = vocationalConfidenceScore(determination, corePct, input.workExperienceBoost);
 
-  const matchedCands = new Set(unitMatches.map((m) => m.cand));
-  const matches: SubjectMatch[] = unitMatches.map((m) => ({
+  const matchedCands = new Set([...unitMatches, ...foundationalMatches].map((m) => m.cand));
+  const foundationalSubjectMatches: SubjectMatch[] = foundationalMatches.map((m) => ({
+    transcriptName: m.cand.code ? `${m.cand.code} ${m.cand.name}`.trim() : m.cand.name,
+    transcriptCode: m.cand.code,
+    qualification: (m.cand.row?.qualification ?? "unknown") as QualificationType,
+    rubricSubject: unitLabel(m.unit),
+    tier: "tier1",
+    category: "expected",
+    method: m.type === "title" ? "fuzzy" : "exact",
+    confidence: CONFIDENCE[m.type],
+    reason: m.note,
+  }));
+  const coreSubjectMatches: SubjectMatch[] = unitMatches.map((m) => ({
     transcriptName: m.cand.code ? `${m.cand.code} ${m.cand.name}`.trim() : m.cand.name,
     transcriptCode: m.cand.code,
     qualification: (m.cand.row?.qualification ?? "unknown") as QualificationType,
@@ -429,6 +536,7 @@ export function scoreVocational(input: {
     confidence: CONFIDENCE[m.type],
     reason: m.note,
   }));
+  const matches: SubjectMatch[] = [...foundationalSubjectMatches, ...coreSubjectMatches];
   const unmatched = input.rows.filter((r) => !cands.some((c) => c.row === r && matchedCands.has(c)));
 
   const detail: VocationalAssessmentDetail = {
@@ -447,16 +555,27 @@ export function scoreVocational(input: {
     qualificationMet: input.qualificationMet,
     qualificationNote: input.qualificationNote,
     flags,
+    coreMode: pool ? "pool" : "all",
+    ...(fThresholds
+      ? {
+          foundationalMatched,
+          foundationalTotal,
+          foundationalBand: tier1Band,
+          foundationalThresholds: fThresholds,
+          matchedFoundational,
+          missingFoundational,
+        }
+      : {}),
   };
 
   const scored: ScoreResult = {
-    foundationalMatched: 0,
-    foundationalExpected: 0,
-    foundationalPct: 0,
+    foundationalMatched,
+    foundationalExpected: foundationalTotal,
+    foundationalPct,
     coreMatched,
     coreExpected: coreTotal,
     corePct,
-    tier1Outcome: "no_risk",
+    tier1Outcome: tier1Band,
     tier2Outcome: band,
     tier3GateMet: false,
     determination: recommended ? determination : "no_match",
