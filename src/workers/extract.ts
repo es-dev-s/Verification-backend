@@ -83,8 +83,8 @@ export async function processExtractJob(documentId: string): Promise<void> {
       await markReadsStale(doc.caseId);
     }
 
-    // Clients page name from the CV text (no LLM; Step 2 Read refines it).
-    if (doc.type === "CV") {
+    // Clients page name from CV or transcript/certificate OCR text (no LLM).
+    if (doc.type === "CV" || doc.type === "TRANSCRIPT" || doc.type === "CERTIFICATE") {
       await ensureClientNameFromCv(doc.caseId);
     }
   } catch (err) {

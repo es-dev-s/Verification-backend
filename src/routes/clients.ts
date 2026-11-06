@@ -121,7 +121,7 @@ export const clientRoutes: FastifyPluginAsync = async (app) => {
           select: { type: true, originalName: true },
         },
         assessment: { select: { anzscoCode: true, resultJson: true } },
-        // Name read from the CV text (stored on FieldSource; see lib/clientName.ts).
+        // Stored client name (CV or transcript text; see lib/clientName.ts).
         fieldSources: {
           where: { field: CLIENT_NAME_FIELD, degreeLevel: null },
           orderBy: { id: "asc" },
@@ -146,7 +146,7 @@ export const clientRoutes: FastifyPluginAsync = async (app) => {
       const degree = highestDegree(c.qualifications, c.selectedDegreeLevels);
       const clientName = resolveClientName({
         caseId: c.id,
-        cvTextName: c.fieldSources[0]?.finalValue,
+        storedName: c.fieldSources[0]?.finalValue,
         cvFileName: c.documents.find((d) => d.type === "CV")?.originalName,
         firstFileName: c.documents[0]?.originalName,
       });

@@ -37,6 +37,8 @@ export function verificationOf(
 /**
  * Best-effort client name from an uploaded file name, e.g.
  * "7. Rahna - cv.docx" → "Rahna", "Shobit Razdan RESUME 25052026.docx" → "Shobit Razdan".
+ * Degree-like leftovers (diploma/bachelor/…) are rejected so a
+ * filename does not show as the client.
  */
 export function nameFromFileName(fileName: string | null | undefined): string | null {
   let name = (fileName ?? "").trim();
@@ -52,25 +54,33 @@ export function nameFromFileName(fileName: string | null | undefined): string | 
     .replace(/^\s*[-–—]\s*/g, "")
     .replace(/\s{2,}/g, " ")
     .trim()
-    .replace(/[\s\-–—,.]+$/, "")
+    .replace(/[\s\-–—,."]+$/, "")
     .trim();
-  return name || null;
+  if (!name) return null;
+  // Reject degree / institution leftovers so transcript filenames are not clients.
+  if (/\b(national|diploma|certificate|bachelor|master|degree|engineering|engineer|transcript|university|college|polytechnic|civil|mechanical|electrical|electronics|curriculum|vitae)\b/i.test(name)) {
+    return null;
+  }
+  return name;
 }
 
-export type ClientNameSource = "cv_text" | "cv_file" | "document_file" | "case_id";
+export type ClientNameSource = "stored" | "cv_text" | "cv_file" | "document_file" | "case_id";
 
 /**
- * Clients page name: the name read from the CV text first, then the old
- * file-name guess (CV file, then the first document), then the case id.
+ * Clients page name: stored FieldSource name (CV or transcript text) first,
+ * then the old file-name guess (CV file, then the first document), then the case id.
  */
 export function resolveClientName(input: {
   caseId: string;
+  /** Stored FieldSource clientName (CV or transcript). */
+  storedName?: string | null;
+  /** @deprecated Use storedName — kept for older call sites / tests. */
   cvTextName?: string | null;
   cvFileName?: string | null;
   firstFileName?: string | null;
 }): { name: string; source: ClientNameSource } {
-  const fromText = (input.cvTextName ?? "").trim();
-  if (fromText) return { name: fromText, source: "cv_text" };
+  const fromText = (input.storedName ?? input.cvTextName ?? "").trim();
+  if (fromText) return { name: fromText, source: "stored" };
   const fromCv = nameFromFileName(input.cvFileName);
   if (fromCv) return { name: fromCv, source: "cv_file" };
   const fromOther = nameFromFileName(input.firstFileName);

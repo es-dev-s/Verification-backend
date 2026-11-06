@@ -238,7 +238,7 @@ export async function assessCase(
     .reverse()
     .find((d) => d.type === "CV" && d.status === "DONE");
   const cvText = cvDoc?.text ?? null;
-  // Clients page name only (no LLM, not part of any hash or the result).
+  // Clients page name only from CV/transcript text (no LLM, not part of any hash or the result).
   if (!opts?.injectedSubjects?.length) await ensureClientNameFromCv(caseId);
   // Year / semester filled from the transcript's headings where the read gave none.
   const persistedRows = applyTextPeriods(caseRow.extractedSubjects.map(rowFromDb), transcripts);

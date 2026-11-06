@@ -262,7 +262,7 @@ async function runExperienceRead(
     console.log(
       `[read] EXPERIENCE case=${caseId} job=${jobId} CACHE HIT — no Gemini call`,
     );
-    // Older reads have no client name yet: fill it from the CV text (no LLM).
+    // Older reads may have no client name yet: fill from CV/transcript text (no LLM).
     await ensureClientNameFromCv(caseId);
     return {
       jobId: existing.id,
