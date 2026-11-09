@@ -24,8 +24,8 @@ import type { VocationalAssessmentDetail } from "../assess/schemas.js";
  * Academic occupations: Fundamental = Tier 1 (foundational) score, Core =
  * Tier 2 (core) score, each 70% Major + 30% Supporting (doc 05 §5–6, see
  * componentSplit.ts). Vocational unit-code occupations: Core =
- * core-unit coverage %, Fundamental = elective coverage % (found ÷ required
- * minimum) only when the rubric sets an elective minimum. Historical = positive
+ * core-unit coverage %, Fundamental = foundational-unit coverage %
+ * (Step 3 foundationalPct; dropped when missing). Historical = positive
  * outcome % of past cases for the ANZSCO (verification_datasheet.json),
  * weighted by similarity to this applicant when known (similarCases.ts),
  * used whenever at least one past case exists; with none it is left out.
@@ -67,18 +67,6 @@ export function riskLevelFromScore(
   return "high";
 }
 
-/**
- * Vocational "fundamental" slot: elective coverage % (found ÷ required
- * minimum, capped at 100). Null when electives are not assessed (no minimum).
- */
-export function vocationalElectivePct(
-  detail: Pick<VocationalAssessmentDetail, "electiveStatus" | "electiveMinimum" | "electivesFound"> | null | undefined,
-): number | null {
-  if (!detail || detail.electiveStatus === "not_assessed") return null;
-  const min = detail.electiveMinimum;
-  if (min == null || min <= 0) return null;
-  return clampPct(Math.min(100, (detail.electivesFound.length / min) * 100));
-}
 
 const COMPONENT_LABELS: Record<"academic" | "vocational_units", Record<RiskComponentKey, string>> = {
   academic: {
@@ -87,7 +75,7 @@ const COMPONENT_LABELS: Record<"academic" | "vocational_units", Record<RiskCompo
     historical: "Historical outcomes",
   },
   vocational_units: {
-    fundamental: "Electives",
+    fundamental: "Foundational units",
     core: "Core units",
     historical: "Historical outcomes",
   },
@@ -100,7 +88,7 @@ function weightPct(w: number): string {
 /** Weighted overall score with re-normalisation for missing components. */
 export function computeAlignmentScore(
   input: {
-    /** Null when not applicable (vocational without an elective minimum). */
+    /** Null when not applicable (e.g. vocational with no foundational score). */
     fundamentalPct: number | null;
     corePct: number;
     historical: HistoricalStats;
@@ -118,9 +106,7 @@ export function computeAlignmentScore(
       pct: input.fundamentalPct == null ? null : clampPct(input.fundamentalPct),
       reason:
         input.fundamentalPct == null
-          ? flow === "vocational_units"
-            ? "Electives not assessed (no minimum set in the rubric)"
-            : "No fundamental score"
+          ? "No fundamental score"
           : undefined,
     },
     { key: "core", pct: clampPct(input.corePct) },
@@ -275,9 +261,9 @@ export function buildMissingMajorDomainsSentence(
 }
 
 export function buildRiskDrivers(input: {
-  /** Null when not applicable (vocational without an elective minimum). */
+  /** Null when not applicable (e.g. vocational with no foundational score). */
   fundamentalPct: number | null;
-  /** "foundational" (academic) or "elective" (vocational). */
+  /** Driver wording for the fundamental component (default "foundational"). */
   fundamentalLabel?: string;
   corePct: number;
   historical: HistoricalStats;
@@ -363,14 +349,15 @@ export function buildRiskDrivers(input: {
 export function computeRiskScores(input: {
   anzscoCode: string;
   title: string;
-  fundamentalPct: number;
+  /** Null drops the fundamental component (weights re-normalised). */
+  fundamentalPct: number | null;
   corePct: number;
   historical: HistoricalStats;
   precedent?: PrecedentCheck;
   workExperienceBoost: boolean;
   missingCore: string[];
   assessmentFlow?: "academic" | "vocational_units";
-  /** Vocational unit-code detail (electives feed the fundamental slot). */
+  /** Vocational unit-code detail (Step 3 electives; unused for the risk score). */
   vocational?: Pick<VocationalAssessmentDetail, "electiveStatus" | "electiveMinimum" | "electivesFound"> | null;
   /** 70/30 Major / Supporting split (academic); its pct replaces the plain coverage %. */
   splits?: { fundamental: ComponentSplit; core: ComponentSplit } | null;
@@ -383,8 +370,10 @@ export function computeRiskScores(input: {
   const vocational = flow === "vocational_units";
   const splits = vocational ? null : input.splits ?? null;
   const fundamentalPct = vocational
-    ? vocationalElectivePct(input.vocational)
-    : clampPct(splits ? splits.fundamental.pct : input.fundamentalPct);
+    ? input.fundamentalPct == null
+      ? null
+      : clampPct(input.fundamentalPct)
+    : clampPct(splits ? splits.fundamental.pct : (input.fundamentalPct ?? 0));
   const corePct = clampPct(splits ? splits.core.pct : input.corePct);
   const historicalPct = clampPct(historicalScorePct(input.historical));
   const rubricSplit = splits?.core.method === "rubric";
@@ -402,7 +391,7 @@ export function computeRiskScores(input: {
 
   const { reducingRisk, increasingRisk } = buildRiskDrivers({
     fundamentalPct,
-    fundamentalLabel: vocational ? "elective" : "foundational",
+    fundamentalLabel: "foundational",
     corePct,
     historical: input.historical,
     workExperienceBoost: input.workExperienceBoost,
