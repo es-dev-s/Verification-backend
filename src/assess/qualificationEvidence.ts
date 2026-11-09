@@ -628,9 +628,21 @@ const GLUED_ORDINAL_SEM_RE =
 /** "after 4th semester", "up to 6th semester", "in semester 3": a mention, not a heading. */
 const NOT_A_HEADING_BEFORE_RE = /\b(?:after|before|up\s*to|upto|till|until|of|in|from)\s+(?:the\s+)?$/i;
 
+/** Grade point glued to Semester ("2.7 Semester", "9.9Semester") is not a heading. */
+function isGradePointGlue(line: string, hitStart: number): boolean {
+  if (hitStart < 2) return false;
+  return /\d\.$/.test(line.slice(0, hitStart));
+}
+
+/** "Semester CH:" / "Sem CH" credit-hour summary lines are not semester headings. */
+function isSemesterCreditHours(line: string, hitEnd: number): boolean {
+  return /^\s*[-:#.]?\s*(?:C\.?\s*H\.?\b|credit\s*hours?\b)/i.test(line.slice(hitEnd));
+}
+
 /**
  * Semester numbers printed as headings anywhere on the transcript, mid-line
  * too, in reading order. "Semester Project" has no number, so it is skipped.
+ * Ignores Semester CH credit summaries and GPA digits glued onto Semester.
  */
 function semesterHeadingNumbers(text: string): number[] {
   const found: number[] = [];
@@ -647,6 +659,10 @@ function semesterHeadingNumbers(text: string): number[] {
     for (const hit of hits) {
       if (hit.start < taken) continue;
       if (NOT_A_HEADING_BEFORE_RE.test(line.slice(Math.max(0, hit.start - 20), hit.start))) continue;
+      // GPA digits before "Semester" ("2.7 Semester CH") look like a semester number.
+      if (isGradePointGlue(line, hit.start)) continue;
+      // Credit-hour summaries ("Semester CH: 17.0") are not period headings.
+      if (isSemesterCreditHours(line, hit.end)) continue;
       const num = studyYearToken(hit.raw) ?? toNum(hit.raw);
       if (num == null || num < 1 || num > 16) continue;
       found.push(num);
@@ -669,6 +685,65 @@ function semesterHeadingSpan(text: string): { count: number; first: number; last
   const restarts = distinct.length < all.length && distinct[distinct.length - 1] <= 2;
   if (restarts) return { count: all.length, first: 1, last: all.length };
   return { count: distinct.length, first: distinct[0], last: distinct[distinct.length - 1] };
+}
+
+/** Season word then a calendar year ("Fall 2017", "Spring 2021", "Autumn-2019"). */
+/** Season+year; allow light OCR glue before the season ("WaringFall 2017"). */
+const SEASON_YEAR_RE =
+  /(?<![a-z])(fall|autumn|spring|summer|winter)\s*[,.\-/]?\s*(19[5-9]\d|20\d{2})(?![0-9])/gi;
+
+/**
+ * Academic years implied by Fall/Spring-style headings in the OCR text.
+ * Same mapping as parseTerm: Fall/Autumn = that year; Spring/Summer/Winter with
+ * one year maps back one (Spring 2021 -> 2020). Distinct years, first to last.
+ */
+function seasonHeadingAcademicYears(text: string): number[] {
+  const found: number[] = [];
+  SEASON_YEAR_RE.lastIndex = 0;
+  for (const m of text.matchAll(SEASON_YEAR_RE)) {
+    const season = m[1]!.toLowerCase();
+    const y = Number(m[2]);
+    const academicYear =
+      season !== "fall" && season !== "autumn" ? y - 1 : y;
+    found.push(academicYear);
+  }
+  return found;
+}
+
+/**
+ * Programme length from seasonal headings on the page (two-column Fall/Spring
+ * transcripts whose subject rows only kept the left column). Null when fewer
+ * than two seasonal headings are present.
+ */
+function seasonHeadingSpan(
+  text: string,
+): { count: number; first: number; last: number } | null {
+  const all = seasonHeadingAcademicYears(text);
+  if (all.length < 2) return null;
+  const first = Math.min(...all);
+  const last = Math.max(...all);
+  const count = last - first + 1;
+  if (count < 2) return null;
+  return { count, first, last };
+}
+
+/** Duration from Fall/Spring (etc.) headings printed on the transcript text. */
+function durationFromSeasonHeadings(texts: readonly string[] | null | undefined): Pick<
+  DurationCount,
+  "countedYears" | "unit" | "method" | "finalYear" | "span"
+> | null {
+  if (!texts?.some((t) => t?.trim())) return null;
+  const blob = texts.filter(Boolean).join("\n");
+  const span = seasonHeadingSpan(blob);
+  if (!span) return null;
+  const { count, first, last } = span;
+  return {
+    countedYears: count,
+    unit: "calendar",
+    method: `fall/spring headings on the transcript (academic years ${first}–${last})`,
+    finalYear: last,
+    span: null,
+  };
 }
 
 function yearDuration(year: number): Pick<
@@ -737,10 +812,12 @@ function withHigherPrintedYear(count: DurationCount, printedYear: number | null)
 
 /**
  * Count programme length from the rows of one qualification: a year number
- * printed on the transcript, otherwise the number of semester headings, then
- * the years / semesters on the subject rows; when those cannot be counted
- * reliably, the credit total (assessor value first) converted to years.
- * A half year is then rounded up to the whole year (duration.roundHalfUp).
+ * printed on the transcript, otherwise the number of semester headings (ignoring
+ * Semester CH credit summaries and GPA digits glued to Semester), then a longer
+ * reliable subject-row calendar or Fall/Spring OCR span when that beats a shorter
+ * heading count, then the years / semesters on the subject rows; when those
+ * cannot be counted reliably, the credit total (assessor value first) converted
+ * to years. A half year is then rounded up to the whole year (duration.roundHalfUp).
  */
 export function countDuration(
   rows: readonly ExtractedSubjectRow[],
@@ -773,22 +850,53 @@ function countDurationUnrounded(
 ): DurationCount {
   const byTerms = countFromTerms(rows);
   const headed = durationFromHeadings(ctx.texts);
+  const seasonal = durationFromSeasonHeadings(ctx.texts);
   const printedYear = Math.max(
     maxStudyYear((ctx.texts ?? []).filter(Boolean).join("\n")) ?? 0,
     maxRowStudyYear(rows) ?? 0,
   ) || null;
+  // When numbered headings fired, a longer reliable calendar (subject-row
+  // Fall/Spring) or seasonal OCR span beats a shorter heading count so false
+  // "Semester CH" / GPA glue cannot force 2 years over a 4-year calendar.
+  // Equal or shorter calendar leaves real spans (semesters 3-8 -> 3 years) on
+  // the heading path. When there are no numbered headings, fall through so
+  // seasonal text can still lift truncated calendar rows.
   if (headed) {
-    const counted = withHigherPrintedYear(
-      {
-        ...byTerms,
-        ...headed,
-        confidence: "high",
-        source: "terms",
-        creditConversion: null,
-      },
-      printedYear,
-    );
-    return counted;
+    const headedYears = headed.countedYears ?? 0;
+    const calendarLonger =
+      isReliableCount(byTerms) &&
+      byTerms.unit === "calendar" &&
+      (byTerms.countedYears ?? 0) > headedYears;
+    const seasonalLonger = !!seasonal && (seasonal.countedYears ?? 0) > headedYears;
+    if (!calendarLonger && !seasonalLonger) {
+      return withHigherPrintedYear(
+        {
+          ...byTerms,
+          ...headed,
+          confidence: "high",
+          source: "terms",
+          creditConversion: null,
+        },
+        printedYear,
+      );
+    }
+    if (calendarLonger) return withHigherPrintedYear(byTerms, printedYear);
+    // seasonalLonger: fall through to the seasonal return below
+  }
+  // Seasonal Fall/Spring headings in the OCR text: use when they span more
+  // academic years than the (often truncated) subject-row calendar terms, or
+  // when the rows have no usable term count.
+  if (
+    seasonal &&
+    ((seasonal.countedYears ?? 0) > (byTerms.countedYears ?? 0) || !isReliableCount(byTerms))
+  ) {
+    return {
+      ...byTerms,
+      ...seasonal,
+      confidence: "medium",
+      source: "terms",
+      creditConversion: null,
+    };
   }
   if (isReliableCount(byTerms)) return withHigherPrintedYear(byTerms, printedYear);
   const credits = ctx.creditTotalOverride ?? byTerms.creditTotal;

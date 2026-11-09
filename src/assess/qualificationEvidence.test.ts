@@ -237,6 +237,123 @@ describe("B2. credits → years (no printed years / semesters)", () => {
   });
 });
 
+
+describe("B3. seasonal Fall/Spring headings (OCR text)", () => {
+  const uetText = [
+    "UNIVERSITY OF ENGINEERING AND TECHNOLOGY LAHORE",
+    "Fall 2017",
+    "Spring 2018",
+    "Summer 2018",
+    "Fall 2018",
+    "Spring 2019",
+    "Fall 2019",
+    "Spring 2020",
+    "Fall 2020",
+    "Spring 2021",
+    "Total Credits 135 CH Degree Complete",
+  ].join("\n");
+
+  /** Left-column-only rows: Fall 2017 through Spring 2019 → 2 academic years alone. */
+  const truncatedRows = (): ExtractedSubjectRow[] => [
+    sub("Introduction to Engineering", "Fall 2017", "bachelor", "2"),
+    sub("Engineering Geology", "Fall 2017", "bachelor", "3"),
+    sub("Mining Engineering Fundamentals", "Spring 2018", "bachelor", "3"),
+    sub("Fluid Mechanics", "Fall 2018", "bachelor", "3"),
+    sub("Thermodynamics", "Spring 2019", "bachelor", "3"),
+    sub("Mine Surveying", "Spring 2019", "bachelor", "3"),
+  ];
+
+  const fullSeasonRows = (): ExtractedSubjectRow[] => [
+    sub("Introduction to Engineering", "Fall 2017", "bachelor", "2"),
+    sub("Mining Engineering Fundamentals", "Spring 2018", "bachelor", "3"),
+    sub("Fluid Mechanics", "Fall 2018", "bachelor", "3"),
+    sub("Thermodynamics", "Spring 2019", "bachelor", "3"),
+    sub("Rock Mechanics", "Fall 2019", "bachelor", "3"),
+    sub("Mine Ventilation", "Spring 2020", "bachelor", "3"),
+    sub("Mineral Processing", "Fall 2020", "bachelor", "3"),
+    sub("Final Year Project", "Spring 2021", "bachelor", "6"),
+  ];
+
+  it("truncated calendar rows are lifted to 4 years by Fall/Spring headings in the text", () => {
+    const c = countDuration(truncatedRows(), { texts: [uetText] });
+    assert.equal(c.countedYears, 4);
+    assert.equal(c.source, "terms");
+    assert.equal(c.confidence, "medium");
+    assert.equal(c.unit, "calendar");
+    assert.match(c.method, /fall\/spring headings on the transcript/);
+    assert.match(c.method, /2017\u20132020/);
+  });
+
+  it("full seasons on subject rows still count as 4 years", () => {
+    const c = countDuration(fullSeasonRows(), { texts: [uetText] });
+    assert.equal(c.countedYears, 4);
+    assert.equal(c.source, "terms");
+  });
+
+  it("numbered semester headings still win over seasonal words in the same text", () => {
+    const text = [
+      "Semester 3 Fall 2018",
+      "Semester 4 Spring 2019",
+      "Semester 5 Fall 2019",
+      "Semester 6 Spring 2020",
+      "Semester 7 Fall 2020",
+      "Semester 8 Spring 2021",
+    ].join("\n");
+    const c = countDuration([sub("Engineering Mathematics"), sub("Engineering Drawing")], {
+      texts: [text],
+    });
+    assert.equal(c.countedYears, 3);
+    assert.match(c.method ?? "", /semester headings/);
+    assert.match(c.method ?? "", /semesters 3\u20138/);
+  });
+  it("Semester CH / GPA glue noise does not force 2 years over Fall/Spring rows", () => {
+    const noisy = [
+      "UNIVERSITY OF ENGINEERING AND TECHNOLOGY LAHORE",
+      "WaringFall 2017",
+      "MinE-111 Introduction to Mining 2.7 Semester CH: 17.0",
+      "Spring 2018 Fluid Mechanics 5.4 Semester CH: 18.0",
+      "Fall 2019MinE-351 Rock Mechanics 9.9Semester CH: 16.0",
+      "Summer 2020",
+      "Fall 2020",
+      "Spring 2021 Final Year Project",
+      "Cum CH: 135 Degree Complete",
+    ].join("\n");
+    const rows = [
+      sub("Introduction to Engineering", "Fall 2017", "bachelor", "2"),
+      sub("Mining Engineering Fundamentals", "Spring 2018", "bachelor", "3"),
+      sub("Fluid Mechanics", "Fall 2018", "bachelor", "3"),
+      sub("Thermodynamics", "Spring 2019", "bachelor", "3"),
+      sub("Rock Mechanics", "Fall 2019", "bachelor", "3"),
+      sub("Mine Ventilation", "Spring 2020", "bachelor", "3"),
+      sub("Mineral Processing", "Fall 2020", "bachelor", "3"),
+      sub("Final Year Project", "Spring 2021", "bachelor", "6"),
+    ];
+    const c = countDuration(rows, { texts: [noisy] });
+    assert.equal(c.countedYears, 4);
+    assert.notEqual(c.unit, "semester");
+    assert.doesNotMatch(c.method ?? "", /semester headings/);
+  });
+
+  it("weak false semester headings lose to a longer reliable calendar row span", () => {
+    const rows = [
+      sub("Introduction to Engineering", "Fall 2017", "bachelor", "2"),
+      sub("Mining Engineering Fundamentals", "Spring 2018", "bachelor", "3"),
+      sub("Fluid Mechanics", "Fall 2018", "bachelor", "3"),
+      sub("Thermodynamics", "Spring 2019", "bachelor", "3"),
+      sub("Rock Mechanics", "Fall 2019", "bachelor", "3"),
+      sub("Mine Ventilation", "Spring 2020", "bachelor", "3"),
+      sub("Mineral Processing", "Fall 2020", "bachelor", "3"),
+      sub("Final Year Project", "Spring 2021", "bachelor", "6"),
+    ];
+    const text = "Semester 7\nSemester 8\nSemester 9";
+    const c = countDuration(rows, { texts: [text] });
+    assert.equal(c.countedYears, 4);
+    assert.equal(c.unit, "calendar");
+    assert.match(c.method ?? "", /academic years printed/);
+  });
+
+});
+
 describe("C. final-year project", () => {
   const gateName = "Major Project / Thesis / Final-Year Project/ Capstone Project";
   const gm = (name: string): SubjectMatch => ({
