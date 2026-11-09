@@ -5,7 +5,6 @@ import {
   computeAlignmentScore,
   computeRiskScores,
   riskLevelFromScore,
-  vocationalElectivePct,
   withCurrentScoring,
 } from "./scoreRisk.js";
 import { RISK_SCORING_CONFIG } from "./riskBands.config.js";
@@ -154,51 +153,77 @@ describe("computeRiskScores", () => {
     assert.ok(b.riskNotes?.some((n) => /work experience/i.test(n)));
   });
 
-  it("vocational: core units + historical when electives are not assessed", () => {
+    it("vocational AU Civil/Electrical: foundationalPct feeds Fundamental; electives ignored", () => {
+    const withElectives = {
+      electiveStatus: "met" as const,
+      electiveMinimum: 4,
+      electivesFound: [
+        { code: "E1", name: "elective one" },
+        { code: "E2", name: "elective two" },
+        { code: "E3", name: "elective three" },
+        { code: "E4", name: "elective four" },
+      ],
+    };
     const r = computeRiskScores({
+      anzscoCode: "312211",
+      title: "Civil Engineering Draftsperson",
+      fundamentalPct: 80,
+      corePct: 70,
+      historical: hist(50, 60),
+      workExperienceBoost: false,
+      missingCore: [],
+      assessmentFlow: "vocational_units",
+      vocational: withElectives,
+    });
+    // 0.3*80 + 0.5*70 + 0.2*60 = 24 + 35 + 12 = 71
+    assert.equal(r.overallPct, 71);
+    assert.equal(r.riskLevel, "medium");
+    const f = r.scoring!.components.find((c) => c.key === "fundamental")!;
+    assert.equal(f.label, "Foundational units");
+    assert.equal(f.used, true);
+    assert.equal(f.pct, 80);
+    const core = r.scoring!.components.find((c) => c.key === "core")!;
+    assert.equal(core.label, "Core units");
+    assert.equal(r.componentSplits, undefined);
+    // Same score when electives are not_assessed / empty: electives do not affect risk.
+    const r2 = computeRiskScores({
       anzscoCode: "312311",
       title: "Electrical Engineering Draftsperson",
-      fundamentalPct: 0,
-      corePct: 80,
-      historical: hist(61, 70),
+      fundamentalPct: 80,
+      corePct: 70,
+      historical: hist(50, 60),
       workExperienceBoost: false,
       missingCore: [],
       assessmentFlow: "vocational_units",
       vocational: { electiveStatus: "not_assessed", electiveMinimum: null, electivesFound: [] },
     });
-    // (0.5×80 + 0.2×70) / 0.7 = 77.14 → 77.1
+    assert.equal(r2.overallPct, r.overallPct);
+    assert.equal(r2.scoring!.components.find((c) => c.key === "fundamental")!.pct, 80);
+  });
+
+  it("vocational: missing foundationalPct drops Fundamental and re-normalises", () => {
+    const r = computeRiskScores({
+      anzscoCode: "312311",
+      title: "Electrical Engineering Draftsperson",
+      fundamentalPct: null,
+      corePct: 80,
+      historical: hist(61, 70),
+      workExperienceBoost: false,
+      missingCore: [],
+      assessmentFlow: "vocational_units",
+      vocational: { electiveStatus: "met", electiveMinimum: 2, electivesFound: [{ code: "A", name: "a" }, { code: "B", name: "b" }] },
+    });
+    // (0.5*80 + 0.2*70) / 0.7 = 77.14 -> 77.1
     assert.equal(r.overallPct, 77.1);
     assert.equal(r.riskLevel, "low");
     const f = r.scoring!.components.find((c) => c.key === "fundamental")!;
-    assert.equal(f.label, "Electives");
+    assert.equal(f.label, "Foundational units");
     assert.equal(f.used, false);
-    assert.ok(!r.increasingRisk.some((l) => /foundational/.test(l)));
-  });
-
-  it("vocational: electives fill the fundamental slot when a minimum is set", () => {
-    assert.equal(
-      vocationalElectivePct({
-        electiveStatus: "not_met",
-        electiveMinimum: 4,
-        electivesFound: [{ code: "A", name: "a" }],
-      }),
-      25,
-    );
-    assert.equal(
-      vocationalElectivePct({
-        electiveStatus: "met",
-        electiveMinimum: 2,
-        electivesFound: [
-          { code: "A", name: "a" },
-          { code: "B", name: "b" },
-          { code: "C", name: "c" },
-        ],
-      }),
-      100,
-    );
-    assert.equal(vocationalElectivePct(null), null);
+    assert.equal(f.pct, null);
+    assert.ok(r.scoring!.renormalised);
   });
 });
+
 
 describe("competence", () => {
   it("fallback is competent only for No risk / Low", () => {
@@ -280,12 +305,12 @@ describe("withCurrentScoring (saved results shown with the current bands)", () =
     assert.deepEqual(v.riskNotes, ["Keep me."]);
   });
 
-  it("vocational without electives keeps the fundamental slot empty", () => {
+  it("vocational with null foundational keeps the fundamental slot empty when re-scored", () => {
     const r = full(
       computeRiskScores({
         anzscoCode: "312311",
         title: "Electrical Engineering Draftsperson",
-        fundamentalPct: 0,
+        fundamentalPct: null,
         corePct: 80,
         historical: hist(0, 0),
         workExperienceBoost: false,
@@ -297,6 +322,7 @@ describe("withCurrentScoring (saved results shown with the current bands)", () =
     const v = withCurrentScoring({ ...r, scoring: { ...r.scoring!, configVersion: "old" } });
     assert.equal(v.overallPct, 80);
     assert.equal(v.scoring?.components.find((c) => c.key === "fundamental")?.used, false);
+    assert.equal(v.scoring?.components.find((c) => c.key === "fundamental")?.label, "Foundational units");
   });
 });
 
