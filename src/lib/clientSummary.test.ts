@@ -24,6 +24,7 @@ test("nameFromFileName strips numbering, cv/resume words and extensions", () => 
   assert.equal(nameFromFileName("Jane Doe Résumé (1).pdf"), "Jane Doe");
   assert.equal(nameFromFileName("cv.pdf"), null);
   assert.equal(nameFromFileName(""), null);
+  assert.equal(nameFromFileName("NATIONAL_DIPLOMA_CIVIL_ENGINEERING.pdf"), null);
 });
 
 test("parseOccupationLabel splits title and code", () => {

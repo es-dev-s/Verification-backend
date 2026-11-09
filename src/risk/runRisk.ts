@@ -2,9 +2,15 @@ import { prisma } from "../lib/prisma.js";
 import { assessConfig } from "../assess/config.js";
 import type { AssessmentResult } from "../assess/schemas.js";
 import { historicalStatsForAnzsco } from "./historical.js";
+import { academicRubricFor, riskComponentSplits } from "./componentSplit.js";
+import { withSimilarCases } from "./similarCases.js";
 import { buildPrecedentCheck, emptyPrecedentCheck } from "./precedent.js";
-import { judgeRiskWithLlm } from "./analyzeRisk.js";
-import { computeRiskScores } from "./scoreRisk.js";
+import {
+  COMPETENCE_CONFLICT_PREFIX,
+  judgeRiskWithLlm,
+  withCompetence,
+} from "./analyzeRisk.js";
+import { computeRiskScores, withCurrentScoring } from "./scoreRisk.js";
 import type { Competence, RiskAssessmentResult } from "./schemas.js";
 
 const QUAL_PRIORITY = [
@@ -34,6 +40,14 @@ function findCandidate(assessment: AssessmentResult, anzscoCode: string) {
       title: assessment.title ?? "Occupation",
       foundationalPct: assessment.foundationalPct,
       corePct: assessment.corePct,
+      foundationalMatched: assessment.foundationalMatched,
+      coreMatched: assessment.coreMatched,
+      determination: assessment.determination,
+      tier1Outcome: assessment.tier1Outcome,
+      tier2Outcome: assessment.tier2Outcome,
+      tier3GateMet: assessment.tier3GateMet,
+      bandDetermination: assessment.bandDetermination,
+      assessmentFlow: assessment.assessmentFlow,
       missingSubjects: assessment.missingSubjects ?? { tier1: [], tier2: [] },
       workExperienceBoost: assessment.workExperienceBoost,
       workExperienceAnalysis: null,
@@ -55,8 +69,24 @@ async function persistRisk(
 }
 
 /**
- * Compute Step-4 risk for a chosen ANZSCO using assessment coverage,
- * historical datasheet outcomes, and related work experience.
+ * Why risk analysis cannot run for this assessment (null when it can).
+ * Gate 1 must be open, or manual review with an assessor-selected occupation.
+ */
+export function riskGateBlockReason(
+  assessment: Pick<AssessmentResult, "gate1" | "assessorSelected">,
+): string | null {
+  const gate = assessment.gate1;
+  if (!gate || gate.result === "open") return null;
+  if (gate.result === "manual_review" && assessment.assessorSelected) return null;
+  return gate.result === "not_eligible"
+    ? "Risk analysis is not available: the assessment Gate 1 result is not eligible."
+    : "Risk analysis is not available: the assessment Gate 1 result needs manual review.";
+}
+
+/**
+ * Compute Step 5 risk for a chosen ANZSCO: weighted overall academic alignment
+ * score (fundamental / core / historical, see riskBands.config.ts) mapped to
+ * the risk category. Work experience is a note only.
  */
 export async function runRiskAssessment(
   caseId: string,
@@ -73,6 +103,8 @@ export async function runRiskAssessment(
   }
 
   const assessment = caseRow.assessment.resultJson as StoredAssessment;
+  const blocked = riskGateBlockReason(assessment);
+  if (blocked) throw new Error(blocked);
   const candidate = findCandidate(assessment, opts.anzscoCode);
   if (!candidate) {
     throw new Error(
@@ -81,7 +113,6 @@ export async function runRiskAssessment(
   }
 
   const title = opts.title?.trim() || candidate.title;
-  const historical = historicalStatsForAnzsco(opts.anzscoCode);
 
   const quals = [...(caseRow.qualifications ?? [])].sort((a, b) => {
     const ia = QUAL_PRIORITY.indexOf(
@@ -93,6 +124,11 @@ export async function runRiskAssessment(
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
   const primaryQual = quals[0] ?? null;
+  const historical = withSimilarCases(historicalStatsForAnzsco(opts.anzscoCode), opts.anzscoCode, {
+    degreeTitle: primaryQual?.degreeTitle ?? null,
+    university: primaryQual?.institution ?? null,
+    country: primaryQual?.country ?? null,
+  });
   const precedent = buildPrecedentCheck({
     anzscoCode: candidate.anzscoCode,
     occupationTitle: title,
@@ -107,6 +143,15 @@ export async function runRiskAssessment(
       assessment.workExperienceBoost,
   );
   const missingCore = candidate.missingSubjects?.tier2 ?? [];
+  const academic = (candidate.assessmentFlow ?? "academic") === "academic" && !("vocational" in candidate && candidate.vocational);
+  const splits = academic
+    ? riskComponentSplits({
+        rubric: academicRubricFor(candidate.anzscoCode, candidate.title),
+        matches: ("matches" in candidate ? candidate.matches : assessment.matches) ?? [],
+        fundamental: { pct: candidate.foundationalPct, matched: candidate.foundationalMatched },
+        core: { pct: candidate.corePct, matched: candidate.coreMatched },
+      })
+    : null;
 
   const scored = computeRiskScores({
     anzscoCode: candidate.anzscoCode,
@@ -117,15 +162,13 @@ export async function runRiskAssessment(
     precedent,
     workExperienceBoost,
     missingCore,
+    assessmentFlow: candidate.assessmentFlow,
+    vocational: "vocational" in candidate ? candidate.vocational : null,
+    splits,
   });
 
   const llm = await judgeRiskWithLlm(scored, { deadlineMs });
-  const result: RiskAssessmentResult = {
-    ...scored,
-    competence: llm.competent ? "competent" : "not_competent",
-    competenceSource: "ai",
-    insight: llm.insight,
-  };
+  const result: RiskAssessmentResult = withCompetence(scored, llm);
 
   await persistRisk(caseId, assessment, result);
 
@@ -146,10 +189,10 @@ export async function getStoredRisk(
   if (!row?.resultJson) return null;
   const json = row.resultJson as StoredAssessment;
   if (!json.risk) return null;
-  return {
+  return withCurrentScoring({
     ...json.risk,
     precedent: json.risk.precedent ?? emptyPrecedentCheck(),
-  };
+  });
 }
 
 export async function patchRiskCompetence(
@@ -169,7 +212,12 @@ export async function patchRiskCompetence(
     precedent: assessment.risk.precedent ?? emptyPrecedentCheck(),
     competence,
     competenceSource: "manual",
+    // The assessor has reviewed: drop the AI conflict note.
+    competenceConflict: false,
+    riskNotes: (assessment.risk.riskNotes ?? []).filter(
+      (n) => !n.startsWith(COMPETENCE_CONFLICT_PREFIX),
+    ),
   };
   await persistRisk(caseId, assessment, next);
-  return next;
+  return withCurrentScoring(next);
 }

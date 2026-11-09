@@ -1,20 +1,25 @@
 import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
+import { LATERAL_FIELD, priorStudyDocumentIds } from "../assess/lateralEntry.js";
+import { generateJsonGroq, loadGroqKeys } from "../lib/groqClient.js";
 import { acquireParseSlot } from "../lib/rateLimit.js";
-import { computeDuration } from "../parse/duration.js";
+import { degreeReaderWindow } from "../parse/degreeReaderText.js";
 import {
   generateJsonGroqSplit,
   mergeCvEducationParts,
-  mergeEducationMultiParts,
   mergeExperienceParts,
 } from "../parse/groqFormParse.js";
 import {
   heuristicsCvEducationEntries,
   heuristicsEducationMulti,
   heuristicsExperienceFromText,
-  heuristicsPerSource,
 } from "../parse/heuristics.js";
 import { mergeEducation } from "../parse/mergeEducation.js";
+import {
+  educationResultFlags,
+  type LevelMismatch,
+} from "../parse/levelMismatch.js";
+import { resolveLevelSources } from "../parse/levelSources.js";
 import {
   cvEducationSystemPrompt,
   educationMultiSystemPrompt,
@@ -22,7 +27,6 @@ import {
 } from "../parse/prompts.js";
 import {
   cvEducationExtractSchema,
-  educationExtractSchema,
   educationMultiExtractSchema,
   experienceExtractSchema,
   type CvEducationEntry,
@@ -33,19 +37,14 @@ import {
 } from "../parse/schemas.js";
 import { correctOcrEducationText } from "../parse/ocrCorrect.js";
 import {
+  clientNameFromCvText,
+  saveClientName,
+  sanitizeClientName,
+} from "../lib/clientName.js";
+import {
   sanitizeEducationExtract,
   sanitizeExtractedLabel,
 } from "../parse/sanitizeExtracted.js";
-
-const emptyExtract = (): EducationExtract => ({
-  degreeTitle: null,
-  institution: null,
-  country: null,
-  start: null,
-  end: null,
-  statedDuration: null,
-  multipleBachelors: false,
-});
 
 /**
  * Parse every education entry on a CV, each tagged with a degreeLevel guess.
@@ -162,8 +161,12 @@ export async function parseEducation(
     },
   });
 
+  // Earlier-study transcripts (lateral entry) are not part of this qualification.
+  const priorStudy = priorStudyDocumentIds(
+    await prisma.fieldSource.findMany({ where: { caseId, field: LATERAL_FIELD } }),
+  );
   const cvDoc = docs.find((d) => d.type === "CV");
-  const levelDocs = docs.filter((d) => d.type !== "CV");
+  const levelDocs = docs.filter((d) => d.type !== "CV" && !priorStudy.has(d.id));
 
   if (!cvDoc && !levelDocs.length) {
     return {
@@ -187,7 +190,7 @@ export async function parseEducation(
       return {
         documentId: doc.id,
         documentType: doc.type as DocumentTypeLabel,
-        text: text.slice(0, 8_000),
+        text,
       };
     })
     .filter((d): d is NonNullable<typeof d> => d != null);
@@ -197,27 +200,41 @@ export async function parseEducation(
   let fallback = false;
   let geminiMeta: { keyUsed?: string; modelUsed?: string } = {};
   let cvGeminiRaw: unknown = null;
+  let levelMismatches: LevelMismatch[] = [];
 
-  // Transcript / certificate for this level — Groq split across keys
+  // Transcript / certificate — one Groq call on the opening and closing pages.
+  // Subject lines stay on the parallel multi-key extract.
   if (labeled.length) {
     await acquireParseSlot(config.parseRpm);
     const bodyText = labeled
       .map(
         (d) =>
-          `=== SOURCE documentId=${d.documentId} documentType=${d.documentType} ===\n${d.text}`,
+          `=== SOURCE documentId=${d.documentId} documentType=${d.documentType} ===\n${degreeReaderWindow(d.text)}`,
       )
       .join("\n\n");
-    const header = `Target degreeLevel=${degreeLevel}. Extract only fields for this level.`;
+    const header =
+      `Target degreeLevel=${degreeLevel}. Extract fields for this level. ` +
+      `If a TRANSCRIPT or CERTIFICATE prints only one award and it is a different level ` +
+      `(e.g. National Certificate, National Diploma), still copy that award and its issuer. ` +
+      `Priority fields: degreeTitle and institution, copied from the printed award and the issuing body. ` +
+      `Each source below is the opening and the closing of that file. ` +
+      `The unit list in the middle is omitted. A unit line is not a degree title.`;
 
     try {
-      const out = await generateJsonGroqSplit({
-        bodyText,
-        header,
-        systemPrompt: educationMultiSystemPrompt(),
-        responseSchema: educationMultiExtractSchema,
-        mergeParts: mergeEducationMultiParts,
-        maxTokens: 2048,
-      });
+      const keys = loadGroqKeys();
+      const apiKey = keys[0];
+      if (!apiKey) {
+        throw new Error("Groq is not configured (set GROQ_API_KEY / GROQ_API_KEY_1..N)");
+      }
+      const out = await generateJsonGroq(
+        `${header}\n\n${bodyText}`,
+        educationMultiSystemPrompt(),
+        {
+          apiKey,
+          maxTokens: 2048,
+          responseSchema: educationMultiExtractSchema,
+        },
+      );
       data = out.data;
       geminiMeta = { keyUsed: out.keyUsed, modelUsed: out.modelUsed };
     } catch (err) {
@@ -232,55 +249,21 @@ export async function parseEducation(
       fallback = true;
     }
 
-    const multi = educationMultiExtractSchema.safeParse(data);
-    const byId = new Map(
-      (multi.success ? multi.data.sources : []).map((s) => [s.documentId, s]),
-    );
-
-    sources = labeled.map((d) => {
-      const raw = byId.get(d.documentId);
-      if (!raw) {
-        return {
-          documentId: d.documentId,
-          documentType: d.documentType,
-          extract: emptyExtract(),
-          degreeLevel,
-        };
-      }
-      const parsed = educationExtractSchema.safeParse(raw);
-      const extract = parsed.success ? parsed.data : emptyExtract();
-      return {
-        documentId: d.documentId,
-        documentType: d.documentType,
-        extract: sanitizeEducationExtract(extract),
-        degreeLevel,
-      };
+    const resolved = resolveLevelSources({
+      labeled,
+      data,
+      degreeLevel,
+      groqFailed: fallback,
     });
-
-    const anyValue = sources.some((s) =>
-      Boolean(
-        s.extract.degreeTitle ||
-          s.extract.institution ||
-          s.extract.country ||
-          s.extract.start ||
-          s.extract.end,
-      ),
-    );
-    if (!anyValue) {
+    if (resolved.emptyFields) {
       console.warn(
         `[parse/education/${degreeLevel}] empty Groq fields — heuristics fallback`,
       );
-      sources = heuristicsPerSource(labeled).map((s) => ({
-        ...s,
-        extract: sanitizeEducationExtract(s.extract),
-        degreeLevel,
-      }));
-      data = heuristicsEducationMulti(labeled) as unknown as Record<
-        string,
-        unknown
-      >;
-      fallback = true;
     }
+    sources = resolved.sources;
+    data = resolved.data;
+    fallback = resolved.fallback;
+    levelMismatches = resolved.levelMismatches;
   }
 
   // CV contribution: multi-entry parse, keep only this degreeLevel
@@ -314,19 +297,11 @@ export async function parseEducation(
   }
 
   const merged = mergeEducation(sources);
-  const durationYears =
-    merged.fields.durationYears.value != null
-      ? Number(merged.fields.durationYears.value)
-      : null;
 
   const qualificationData = {
     degreeTitle: merged.fields.degreeTitle.value,
     institution: merged.fields.institution.value,
     country: merged.fields.country.value,
-    durationYears: Number.isFinite(durationYears as number)
-      ? (durationYears as number)
-      : null,
-    durationCalculated: merged.durationCalculated,
   };
 
   await prisma.qualification.upsert({
@@ -372,10 +347,7 @@ export async function parseEducation(
     });
   }
 
-  const block = {
-    ...qualificationData,
-    durationYears: qualificationData.durationYears,
-  };
+  const block = qualificationData;
 
   return {
     qualification: { degreeLevel, ...block },
@@ -384,7 +356,8 @@ export async function parseEducation(
     degreeLevel,
     fields: merged.fields,
     fromCvOnly: merged.fromCvOnly,
-    flags: fallback ? [...merged.flags, "heuristics_fallback"] : merged.flags,
+    flags: educationResultFlags(merged.flags, fallback, levelMismatches),
+    levelMismatches,
     geminiRaw: { levelDocs: data, cv: cvGeminiRaw },
     fallback,
     geminiMeta,
@@ -393,11 +366,6 @@ export async function parseEducation(
       documentType: s.documentType,
       degreeLevel: s.degreeLevel ?? degreeLevel,
       extract: s.extract,
-      duration: computeDuration({
-        statedDuration: s.extract.statedDuration,
-        start: s.extract.start,
-        end: s.extract.end,
-      }),
     })),
   };
 }
@@ -445,6 +413,11 @@ export async function parseExperience(caseId: string) {
   }
 
   let parsed = experienceExtractSchema.safeParse(data);
+  // Applicant name for the Clients page (kept even if rows fall back to heuristics).
+  const llmName =
+    !fallback && parsed.success
+      ? sanitizeClientName(parsed.data.applicantName ?? null)
+      : null;
   if (!parsed.success || !parsed.data.rows.length) {
     if (!fallback) {
       console.warn(
@@ -475,6 +448,12 @@ export async function parseExperience(caseId: string) {
       compareExperienceDates(b.start, b.end) -
       compareExperienceDates(a.start, a.end),
   );
+
+  if (llmName) {
+    await saveClientName(caseId, cv.id, llmName, "cv_llm");
+  } else {
+    await saveClientName(caseId, cv.id, clientNameFromCvText(cv.text), "cv_text");
+  }
 
   await prisma.experienceRow.deleteMany({ where: { caseId } });
 
@@ -514,7 +493,8 @@ export async function parseExperience(caseId: string) {
   return {
     rows: saved,
     sourceDocumentId: cv.id,
-    geminiRaw: data,
+    // The name is stored for the Clients page only — keep it out of the Step 2 read result.
+    geminiRaw: withoutApplicantName(data),
     fallback,
     geminiMeta,
   };
@@ -530,4 +510,10 @@ function compareExperienceDates(
     if (m) return Number(m[0]);
   }
   return 0;
+}
+
+function withoutApplicantName(data: Record<string, unknown>): Record<string, unknown> {
+  if (!data || typeof data !== "object" || !("applicantName" in data)) return data;
+  const { applicantName: _name, ...rest } = data;
+  return rest;
 }

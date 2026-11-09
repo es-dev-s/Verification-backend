@@ -3,15 +3,18 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import {
   highestDegree,
-  nameFromFileName,
+  resolveClientName,
   resolveOccupation,
   snippet,
   verificationOf,
   type ClientFilter,
 } from "../lib/clientSummary.js";
 import { deleteBlob } from "../lib/blob.js";
+import { CLIENT_NAME_FIELD } from "../lib/clientName.js";
 import { prisma } from "../lib/prisma.js";
 import { getExtractQueue } from "../lib/queues.js";
+import { withCurrentScoring } from "../risk/scoreRisk.js";
+import type { RiskAssessmentResult } from "../risk/schemas.js";
 
 /**
  * Clients list (one row per case for this browser's client id). Read-only:
@@ -22,6 +25,20 @@ import { getExtractQueue } from "../lib/queues.js";
 
 const MAX_CLIENTS = 300;
 
+/**
+ * Saved risk with the current overall score and category (same bands as Step 5;
+ * read-only). Rows too incomplete to re-score are shown as saved.
+ */
+function currentRisk(risk: StoredRisk | null): StoredRisk | null {
+  if (!risk || typeof (risk as { corePct?: unknown }).corePct !== "number") return risk;
+  try {
+    const r = withCurrentScoring(risk as unknown as RiskAssessmentResult);
+    return { ...risk, riskLevel: r.riskLevel, overallPct: r.overallPct };
+  } catch {
+    return risk;
+  }
+}
+
 const clientsQuery = z.object({
   // "verified" is kept as an alias for "approved" (older links).
   status: z
@@ -30,14 +47,16 @@ const clientsQuery = z.object({
     .transform((v): ClientFilter => (v === "verified" ? "approved" : v)),
 });
 
+type StoredRisk = {
+  anzscoCode?: string | null;
+  title?: string | null;
+  riskLevel?: string | null;
+  overallPct?: number | null;
+};
+
 type StoredAssessmentJson = {
   title?: string | null;
-  risk?: {
-    anzscoCode?: string | null;
-    title?: string | null;
-    riskLevel?: string | null;
-    overallPct?: number | null;
-  } | null;
+  risk?: StoredRisk | null;
 } | null;
 
 type ReviewRow = {
@@ -102,6 +121,13 @@ export const clientRoutes: FastifyPluginAsync = async (app) => {
           select: { type: true, originalName: true },
         },
         assessment: { select: { anzscoCode: true, resultJson: true } },
+        // Stored client name (CV or transcript text; see lib/clientName.ts).
+        fieldSources: {
+          where: { field: CLIENT_NAME_FIELD, degreeLevel: null },
+          orderBy: { id: "asc" },
+          take: 1,
+          select: { finalValue: true },
+        },
       },
     });
 
@@ -109,7 +135,7 @@ export const clientRoutes: FastifyPluginAsync = async (app) => {
 
     const rows = cases.map((c) => {
       const json = (c.assessment?.resultJson ?? null) as StoredAssessmentJson;
-      const risk = json?.risk ?? null;
+      const risk = currentRisk(json?.risk ?? null);
       const occupation = resolveOccupation({
         riskCode: risk?.anzscoCode,
         riskTitle: risk?.title,
@@ -118,16 +144,17 @@ export const clientRoutes: FastifyPluginAsync = async (app) => {
         assessmentTitle: json?.title,
       });
       const degree = highestDegree(c.qualifications, c.selectedDegreeLevels);
-      const cv = c.documents.find((d) => d.type === "CV");
-      const fromCv = nameFromFileName(cv?.originalName);
-      const fromOther = fromCv
-        ? null
-        : nameFromFileName(c.documents[0]?.originalName);
+      const clientName = resolveClientName({
+        caseId: c.id,
+        storedName: c.fieldSources[0]?.finalValue,
+        cvFileName: c.documents.find((d) => d.type === "CV")?.originalName,
+        firstFileName: c.documents[0]?.originalName,
+      });
       const review = reviews.byCase.get(c.id) ?? null;
       return {
         caseId: c.id,
-        name: fromCv ?? fromOther ?? `Client ${c.id.slice(-6)}`,
-        nameSource: fromCv ? "cv_file" : fromOther ? "document_file" : "case_id",
+        name: clientName.name,
+        nameSource: clientName.source,
         anzscoCode: occupation.anzscoCode,
         occupation: occupation.title,
         degreeLevel: degree.degreeLevel,

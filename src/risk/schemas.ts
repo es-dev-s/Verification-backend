@@ -26,6 +26,42 @@ export type HistoricalStats = {
   negative: number;
   banned: number;
   positivePct: number;
+  /**
+   * Score used for the Historical component (0–100): the positive % of past
+   * cases for the ANZSCO weighted by how similar each past case is to this
+   * applicant (see similarCases.ts). Absent on older results → positivePct.
+   */
+  scorePct?: number;
+  /** Similar past cases behind scorePct. */
+  similar?: SimilarCasesSummary;
+};
+
+/** Past cases (same ANZSCO) that resemble this applicant's qualification profile. */
+export type SimilarCasesSummary = {
+  /** Past cases with similarity ≥ the threshold. */
+  cases: number;
+  positive: number;
+  negative: number;
+  /** Similarity-weighted positive % over the similar cases (null when none). */
+  weightedPositivePct: number | null;
+  /** Short description of the method (shown as a tooltip / note). */
+  method: string;
+};
+
+/** Major / Supporting split of one risk component (doc 05 §5–6). */
+export type ComponentSplit = {
+  /** rubric = rubric marks Supporting rows; derived = Optional rows as Supporting (never lowers); plain = no split. */
+  method: "rubric" | "derived" | "plain";
+  /** Component score after the split (0–100). */
+  pct: number;
+  majorMatched: number;
+  majorTotal: number;
+  majorPct: number;
+  supportingMatched: number;
+  supportingTotal: number;
+  supportingPct: number | null;
+  missingMajor: string[];
+  missingSupporting: string[];
 };
 
 /** Per-case precedent risk reused from datasheet `outcomePossibility`. */
@@ -57,6 +93,37 @@ export type PrecedentCheck = {
   cases: PrecedentCaseRow[];
 };
 
+export type RiskComponentKey = "fundamental" | "core" | "historical";
+
+/** One component of the overall academic alignment score. */
+export type RiskComponentScore = {
+  key: RiskComponentKey;
+  /** Display label, e.g. "Fundamental subjects" / "Core units". */
+  label: string;
+  /** Component score (0–100); null when there is no data. */
+  pct: number | null;
+  /** Configured weight (0–1). */
+  weight: number;
+  /** Weight actually applied after re-normalisation (0 when not used). */
+  appliedWeight: number;
+  used: boolean;
+  /** Why the component was left out. */
+  reason?: string;
+};
+
+/** Weighted overall score and the governance settings used for it. */
+export type RiskScoringBreakdown = {
+  configVersion: string;
+  components: RiskComponentScore[];
+  overallPct: number;
+  riskLevel: RiskLevel;
+  bands: { noRisk: number; low: number; medium: number };
+  /** Older saved results only (the minimum-cases rule was removed). */
+  historicalMinCases?: number;
+  renormalised: boolean;
+  notes: string[];
+};
+
 export type RiskAssessmentResult = {
   anzscoCode: string;
   title: string;
@@ -70,18 +137,32 @@ export type RiskAssessmentResult = {
    * Separate from subject-weighted scoring.
    */
   precedent: PrecedentCheck;
-  /** Weighted overall before work-experience adjustment. */
-  overallPctBeforeWork: number;
+  /** Related work experience (a note only; it does not change the score). */
   workExperienceBoost: boolean;
-  /** Points added when related work experience is present. */
-  workExperienceDelta: number;
-  /** Final alignment score used for risk banding (0–100). */
+  /** Overall academic alignment score (0–100). */
   overallPct: number;
+  /** Risk category from the overall score and the governance thresholds. */
   riskLevel: RiskLevel;
+  /** Components, weights and thresholds behind the score (absent on older saved results). */
+  scoring?: RiskScoringBreakdown;
+  /** Older saved results only (band-based rating, no longer produced). */
+  baseRiskLevel?: RiskLevel;
+  /** Older saved results only (band-based rating, no longer produced). */
+  riskBasis?: string;
+  stepThreeDetermination?: "verified_no_risk" | "conditional" | "not_verified" | "no_match";
+  /** Older saved results only (band-based rating, no longer produced). */
+  historicalModifierApplied?: boolean;
+  /** Notes: components left out / re-normalised weights, work experience, competence conflict. */
+  riskNotes?: string[];
+  assessmentFlow?: "academic" | "vocational_units";
+  /** True when the competence check disagrees with the risk category (category stands). */
+  competenceConflict?: boolean;
   reducingRisk: string[];
   increasingRisk: string[];
   /** Single sentence on missing major core domains. */
   missingMajorDomains: string;
+  /** 70% Major / 30% Supporting detail behind the Fundamental and Core scores. */
+  componentSplits?: { fundamental: ComponentSplit; core: ComponentSplit };
   competence: Competence;
   competenceSource: "ai" | "manual";
   insight: string;

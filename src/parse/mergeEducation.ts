@@ -1,4 +1,3 @@
-import { computeDuration } from "./duration.js";
 import { isLikelyAcronymMatch } from "./institutionMatch.js";
 import type {
   DocumentTypeLabel,
@@ -9,8 +8,7 @@ import type {
 export type FieldName =
   | "degreeTitle"
   | "institution"
-  | "country"
-  | "durationYears";
+  | "country";
 
 export type Alternative = {
   value: string;
@@ -27,12 +25,10 @@ export type MergedField = {
   confidence: number | null;
   alternatives: Alternative[];
   conflict: boolean;
-  calculated?: boolean;
 };
 
 export type MergeResult = {
   fields: Record<FieldName, MergedField>;
-  durationCalculated: boolean;
   fromCvOnly: boolean;
   flags: string[];
 };
@@ -41,7 +37,6 @@ const PRIORITY: Record<FieldName, DocumentTypeLabel[]> = {
   degreeTitle: ["CERTIFICATE", "TRANSCRIPT", "CV"],
   institution: ["CERTIFICATE", "TRANSCRIPT", "CV"],
   country: ["CERTIFICATE", "TRANSCRIPT", "CV"],
-  durationYears: ["TRANSCRIPT", "CERTIFICATE", "CV"],
 };
 
 export function normalizeValue(value: string | null | undefined): string {
@@ -199,57 +194,16 @@ export function mergeEducation(sources: PerSourceEducation[]): MergeResult {
     "country",
   );
 
-  // Duration: compute per source, then pick by duration priority
-  const durationCandidates = sources.map((s) => {
-    const d = computeDuration({
-      statedDuration: s.extract.statedDuration,
-      start: s.extract.start,
-      end: s.extract.end,
-    });
-    return {
-      documentId: s.documentId,
-      documentType: s.documentType,
-      value: d.years != null ? String(d.years) : null,
-      confidence: s.extract.confidence?.statedDuration ?? null,
-      calculated: d.calculated,
-      years: d.years,
-    };
-  });
-
-  const durationField = pickField(
-    durationCandidates.map((c) => ({
-      documentId: c.documentId,
-      documentType: c.documentType,
-      value: c.value,
-      confidence: c.confidence,
-    })),
-    "durationYears",
-  );
-
-  const winnerDuration = durationCandidates.find(
-    (c) =>
-      c.documentId === durationField.sourceDocumentId &&
-      c.value === durationField.value,
-  );
-
-  const durationYears: MergedField = {
-    ...durationField,
-    value: winnerDuration?.years != null ? String(winnerDuration.years) : durationField.value,
-    calculated: winnerDuration?.calculated ?? false,
-  };
-
   for (const [name, f] of Object.entries({
     degreeTitle,
     institution,
     country,
-    durationYears,
   }) as Array<[FieldName, MergedField]>) {
     if (f.conflict) flags.push(`conflict:${name}`);
   }
 
   return {
-    fields: { degreeTitle, institution, country, durationYears },
-    durationCalculated: Boolean(durationYears.calculated),
+    fields: { degreeTitle, institution, country },
     fromCvOnly,
     flags,
   };

@@ -1,15 +1,19 @@
 export function subjectExtractSystemPrompt(): string {
-  return `You extract academic subject / unit / course NAMES from university transcript plain text.
+  return `You extract academic subject / unit / course NAMES (and unit codes when printed) from university or vocational (TAFE / RTO) transcript plain text.
 
 The response MUST be a single JSON object matching this exact schema (no markdown, no extra keys):
 {
   "subjects": [
-    { "name": string }
+    { "name": string, "code": string | null, "credits": number | null, "yearOrSemester": string | null, "entryStatus": "credited" | "exempt" | null }
   ]
 }
 
 Rules:
-- Output ONLY the subject / unit / course title in "name". Do NOT extract unit codes, credit hours, grades, marks, semesters, years, or degree level (bachelor/master).
+- "name" is ONLY the subject / unit / course title. Do NOT put credit hours, grades, marks, semesters, years, or degree level (bachelor/master) in it (credits and year / semester have their own fields).
+- "code" is the unit / course code printed next to that subject exactly as written (e.g. "UEECD0007", "BSBSMB402", "MATH1001"), or null when none is printed. Never invent a code and never put the code inside "name".
+- "credits" is the credit points / credit hours / units printed for that subject as a number (e.g. 3, 7.5), or null when no credit value is printed for it. Never compute, convert or guess credits.
+- "yearOrSemester" is the year / semester / term heading the subject is listed under, copied as printed (e.g. "Year 3 Semester 2", "Semester V", "SEM : 3", "3rd Semester", "Second Year", "Fall 2019"), or null when this text chunk shows no such heading for it. A heading line can carry other columns (e.g. "SEM : 3 | TRIAL : 2 | SPI : 3.61"): copy only the year / semester part ("SEM : 3") and give it to EVERY subject listed below that heading until the next heading, including subjects in a second column on the same lines. Never use an exam session, exam month / year or attempt code printed next to a subject (e.g. "W2019", "S2020", "Nov-2019", "TRIAL : 2") as "yearOrSemester". Never guess a year or semester from the subject name, its code or its position.
+- "entryStatus" is "credited" when the subject is marked as granted by credit transfer, advanced standing or recognised prior learning (e.g. grade "CT", "AS", "RPL", "Credit Transfer"), "exempt" when it is marked as exempted (e.g. grade "EX", "Exempt"), otherwise null. Use only what is printed for that subject; never guess.
 - Extract EVERY distinct subject name that appears in this text chunk. Do not invent or rename subjects.
 - Keep each name exactly as written on the transcript (minor whitespace cleanup only).
 - Include projects, theses, capstones, internships / industrial training when they appear as named entries.
@@ -20,7 +24,7 @@ Rules:
 }
 
 export function subjectExtractUserPrompt(chunk: string): string {
-  return `Extract subject names only from this transcript text.
+  return `Extract subject names (and their unit codes, credits and year / semester when printed) from this transcript text.
 ---
 ${chunk}
 ---`;

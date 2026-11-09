@@ -3,7 +3,9 @@ import { deleteBlob, loadBlob } from "../lib/blob.js";
 import { formatToExt, formatToMime } from "../lib/formats.js";
 import { prisma } from "../lib/prisma.js";
 import { correctOcrEducationText } from "../parse/ocrCorrect.js";
+import { ensureClientNameFromCv } from "../lib/clientName.js";
 import type { DocumentFormat } from "@prisma/client";
+import { LATERAL_FIELD, priorStudyDocumentIds } from "../assess/lateralEntry.js";
 
 export type ExtractorResult = {
   ok: boolean;
@@ -53,6 +55,12 @@ export async function processExtractJob(documentId: string): Promise<void> {
       return;
     }
 
+    // Per-page OCR warnings from the extractor (e.g. a page read with low
+    // confidence or skipped) are kept in the worker log.
+    for (const w of result.warnings ?? []) {
+      console.warn(`[extract] doc=${documentId} warning: ${w}`);
+    }
+
     const { text: cleaned } = correctOcrEducationText(
       result.raw_text ?? "",
       documentId,
@@ -70,7 +78,15 @@ export async function processExtractJob(documentId: string): Promise<void> {
       },
     });
 
-    await markReadsStale(doc.caseId);
+    // An earlier study's transcript (lateral entry) does not change the reads.
+    if (!(await isPriorStudyDoc(doc.caseId, documentId))) {
+      await markReadsStale(doc.caseId);
+    }
+
+    // Clients page name from CV or transcript/certificate OCR text (no LLM).
+    if (doc.type === "CV" || doc.type === "TRANSCRIPT" || doc.type === "CERTIFICATE") {
+      await ensureClientNameFromCv(doc.caseId);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await prisma.document.update({
@@ -124,6 +140,13 @@ async function callExtractor(
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function isPriorStudyDoc(caseId: string, documentId: string): Promise<boolean> {
+  const lateral = await prisma.fieldSource.findMany({
+    where: { caseId, field: LATERAL_FIELD },
+  });
+  return priorStudyDocumentIds(lateral).has(documentId);
 }
 
 export async function markReadsStale(caseId: string): Promise<void> {

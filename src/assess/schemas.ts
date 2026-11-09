@@ -1,12 +1,29 @@
 import { z } from "zod";
+import type { EtTierDetail } from "./etTiers.js";
+import type { SpecialisationResult } from "./specialisation.js";
+import type { LateralEntryView } from "./lateralEntry.js";
 
 export const qualificationTypeSchema = z.enum([
   "bachelor",
   "master",
+  "diploma",
+  "advanced_diploma",
+  "associate_degree",
   "unknown",
 ]);
 
 export type QualificationType = z.infer<typeof qualificationTypeSchema>;
+
+/** Sub-bachelor levels, scored as their own transcript group. */
+export const DIPLOMA_LEVELS: readonly QualificationType[] = [
+  "diploma",
+  "advanced_diploma",
+  "associate_degree",
+];
+
+export function isDiplomaLevel(q: string | null | undefined): boolean {
+  return (DIPLOMA_LEVELS as readonly string[]).includes(q ?? "");
+}
 
 export const extractedSubjectSchema = z.object({
   name: z.string().min(1),
@@ -17,13 +34,27 @@ export const extractedSubjectSchema = z.object({
   qualification: qualificationTypeSchema.default("unknown"),
   sourceSnippet: z.string().nullable().optional().default(null),
   isRepeat: z.boolean().optional().default(false),
+  /** Transcript Document id this row was extracted from (null when unknown). */
+  documentId: z.string().nullable().optional(),
+  /** Sortable term parsed from yearOrSemester (Year 3 Sem 2 → 6); in memory only. */
+  termIndex: z.number().nullable().optional(),
+  /** Unit of termIndex ("semester", "trimester", "quarter", "year", "calendar"). */
+  termUnit: z.string().nullable().optional(),
 });
 
 export type ExtractedSubjectRow = z.infer<typeof extractedSubjectSchema>;
 
-/** LLM response for subject extraction — names only. */
+/** LLM response for subject extraction — names (+ unit code when printed). */
 export const subjectExtractLlmItemSchema = z.object({
   name: z.string().min(1),
+  /** Unit / course code printed next to the name (vocational transcripts). */
+  code: z.string().nullable().optional(),
+  /** Credit points / hours printed for the subject (null when not printed). */
+  credits: z.union([z.number(), z.string()]).nullable().optional(),
+  /** Year / semester heading the subject sits under, as printed (null when not printed). */
+  yearOrSemester: z.union([z.string(), z.number()]).nullable().optional(),
+  /** Entry granted by credit transfer / advanced standing ("credited") or exemption ("exempt"). */
+  entryStatus: z.string().nullable().optional(),
 });
 
 export const subjectExtractLlmSchema = z.object({
@@ -38,18 +69,85 @@ export const subjectExtractSchema = z.object({
 
 export type SubjectExtract = z.infer<typeof subjectExtractSchema>;
 
-/** Normalize LLM name-only rows into full extracted subject rows. */
-export function subjectNameToExtractedRow(name: string): ExtractedSubjectRow {
+/**
+ * Training-package unit code (e.g. UEECD0007, BSBSMB402, and older 7-letter
+ * codes such as UEENEEE101A that training.gov.au lists as superseded):
+ * 3-letter package + 2–4 letter field + 3–4 digits + optional release letter.
+ */
+export const UNIT_CODE_RE = /\b[A-Z]{3}[A-Z]{2,4}\d{3,4}[A-Z]?\b/;
+
+/** Uppercase, no spaces or dashes ("uee-cd 0007" → "UEECD0007"). */
+export function normalizeUnitCode(code: string | null | undefined): string | null {
+  if (!code) return null;
+  const c = code.toUpperCase().replace(/[\s\-–_.]+/g, "");
+  return c || null;
+}
+
+/**
+ * Split a leading / trailing unit code off a subject name
+ * ("UEECD0007 Apply WHS…" → code UEECD0007, name "Apply WHS…").
+ * Names without a unit code are returned unchanged.
+ */
+export function splitUnitCode(name: string): { name: string; code: string | null } {
+  const trimmed = name.trim();
+  const lead = trimmed.match(
+    /^\(?([A-Z]{3}[A-Z]{2,4}\d{3,4}[A-Z]?)\)?\s*[-–:|]?\s*(.+)$/,
+  );
+  if (lead && lead[2] && /[a-z]/i.test(lead[2])) return { code: lead[1]!, name: lead[2].trim() };
+  const tail = trimmed.match(/^(.+?)\s*[-–:|]?\s*\(?([A-Z]{3}[A-Z]{2,4}\d{3,4}[A-Z]?)\)?$/);
+  if (tail && tail[1] && /[a-z]/i.test(tail[1])) return { code: tail[2]!, name: tail[1].trim() };
+  return { name: trimmed, code: null };
+}
+
+/** Credits as stored (DB column is a string): "3", "7.5"; null when not a number. */
+export function normalizeCredits(credits: number | string | null | undefined): string | null {
+  if (credits == null) return null;
+  const n = typeof credits === "number" ? credits : Number(String(credits).trim().match(/^\d+(?:\.\d+)?/)?.[0]);
+  return Number.isFinite(n) && n > 0 ? String(n) : null;
+}
+
+/** Year / semester label as printed (trimmed); null when empty. */
+export function normalizeYearOrSemester(v: string | number | null | undefined): string | null {
+  if (v == null) return null;
+  const s = String(v).replace(/\s+/g, " ").trim();
+  return s && !/^(null|n\/?a|none|-)$/i.test(s) ? s.slice(0, 60) : null;
+}
+
+/** Normalize LLM rows (name + optional code / credits / term) into full extracted subject rows. */
+export function subjectNameToExtractedRow(
+  name: string,
+  code?: string | null,
+  extra?: {
+    credits?: number | string | null;
+    yearOrSemester?: string | number | null;
+    entryStatus?: string | null;
+  },
+): ExtractedSubjectRow {
+  const split = splitUnitCode(name);
+  const given = normalizeUnitCode(code);
+  const unitCode = given && UNIT_CODE_RE.test(given) ? given : split.code;
   return extractedSubjectSchema.parse({
-    name: name.trim(),
-    code: null,
-    credits: null,
-    grade: null,
-    yearOrSemester: null,
+    name: unitCode ? split.name : name.trim(),
+    code: unitCode ?? (given || null),
+    credits: normalizeCredits(extra?.credits),
+    grade: entryStatusGrade(extra?.entryStatus),
+    yearOrSemester: normalizeYearOrSemester(extra?.yearOrSemester),
     qualification: "unknown",
     sourceSnippet: null,
     isRepeat: false,
   });
+}
+
+/**
+ * Credited / exempt entry → the `grade` value Gate 1 and the lateral-entry
+ * check read ("Credit transfer" / "Exempt"); anything else → null.
+ */
+export function entryStatusGrade(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (!s || s === "null" || s === "none") return null;
+  if (/exempt|exemption|\bex\b/.test(s)) return "Exempt";
+  if (/credit|advanced\s*standing|\bct\b|rpl|recogni[sz]ed/.test(s)) return "Credit transfer";
+  return null;
 }
 
 export const llmMatchDecisionSchema = z.object({
@@ -65,17 +163,6 @@ export const llmMatchDecisionSchema = z.object({
 });
 
 export type LlmMatchDecision = z.infer<typeof llmMatchDecisionSchema>;
-
-/** Legacy single-occupation shape (kept for older callers/tests). */
-export const workExperienceRelevanceSchema = z.object({
-  related: z.boolean(),
-  confidence: z.number().min(0).max(1),
-  reason: z.string(),
-});
-
-export type WorkExperienceRelevance = z.infer<
-  typeof workExperienceRelevanceSchema
->;
 
 export const workExperienceMatchedJobSchema = z.object({
   title: z.string(),
@@ -128,6 +215,8 @@ export type SubjectMatch = {
   method: MatchMethod;
   confidence: number;
   reason?: string;
+  /** Matched from the earlier study's transcript (lateral entry, Route 3). */
+  priorStudy?: boolean;
 };
 
 export type TierOutcome =
@@ -152,7 +241,7 @@ export type MissingSubjectsByTier = {
 
 export type TranscriptSourceInfo = {
   /** Which transcript pool drove matching. */
-  kind: "bachelor" | "master" | "master_fallback" | "mixed" | "unknown";
+  kind: "bachelor" | "master" | "master_fallback" | "mixed" | "diploma" | "unknown";
   /** Human-readable label for the Step 3 UI. */
   label: string;
 };
@@ -163,6 +252,100 @@ export type RubricSubjectCatalogEntry = {
   tier: "tier1" | "tier2" | "tier3";
   category: string;
   variants: string[];
+};
+
+/** How the case's qualifications were routed (Step 1). */
+export type QualificationRouteName =
+  | "vocational"
+  | "draftsperson_academic"
+  | "professional"
+  | "unknown";
+
+export type RoutingInfo = {
+  routes: QualificationRouteName[];
+  /** Route label, e.g. "professional engineer". */
+  label: string;
+  /** Qualification title(s) the route is based on. */
+  basedOn: string;
+  /** One-line Step 3 note: "Scored as: <route> — based on <title>". */
+  note: string;
+  /** Extra assessor notes (ignored qualifications, occupations not scored automatically). */
+  notes: string[];
+  qualifications: Array<{
+    title: string | null;
+    level: QualificationType | "unknown";
+    route: QualificationRouteName;
+    reason: string;
+  }>;
+};
+
+/** How a vocational core unit was matched (in the order tried). */
+export type UnitMatchType = "exact" | "release" | "equivalent" | "typo" | "title";
+
+export type VocationalUnitMatch = {
+  unitId: string;
+  /** Rubric unit code. */
+  code: string;
+  title: string;
+  /** Code as written on the transcript (null for a title-only match). */
+  transcriptCode: string | null;
+  transcriptName: string;
+  matchType: UnitMatchType;
+  /** Plain note, e.g. "matched via superseded code UEENEEE101A". */
+  note: string;
+  confidence: number;
+  /** training.gov.au page backing an equivalent-code match. */
+  source?: string;
+};
+
+export type VocationalAssessmentDetail = {
+  occupationId: string;
+  /** Accepted qualification code(s), e.g. ["UEE62122"]. */
+  qualificationCodes: string[];
+  coreMatched: number;
+  coreTotal: number;
+  /** Core band: No Risk / Low / Medium / High. */
+  coreBand: TierOutcome;
+  /** Band thresholds used (minimum matched units). */
+  thresholds: { noRisk: number; lowRisk: number; mediumRisk: number };
+  matchedCore: VocationalUnitMatch[];
+  missingCore: Array<{ unitId: string; code: string; title: string }>;
+  electivesFound: Array<{ code: string; name: string }>;
+  electiveStatus: "not_assessed" | "met" | "not_met";
+  electiveMinimum: number | null;
+  electiveNote: string;
+  qualificationMet: boolean;
+  qualificationNote: string;
+  /** Review flags (typo codes, title-only matches, non-equivalent successors …). */
+  flags: string[];
+  /** "pool": core units are a list to pick from (matched units count against coreTotal). */
+  coreMode?: "all" | "pool";
+  /** Foundational units (Tier 1). Absent when the rubric has none. */
+  foundationalMatched?: number;
+  foundationalTotal?: number;
+  foundationalBand?: TierOutcome;
+  foundationalThresholds?: { noRisk: number; lowRisk: number };
+  matchedFoundational?: VocationalUnitMatch[];
+  missingFoundational?: Array<{ unitId: string; code: string; title: string }>;
+};
+
+/** Draftsperson scoring path (312211 / 312311): AU unit codes, overseas subjects, or both (best kept). */
+export type DraftspersonPathId = "au_unit_codes" | "overseas_subjects" | "both_best";
+
+export type DraftspersonPath = {
+  path: DraftspersonPathId;
+  /** Qualification origin from Step 1 data. */
+  origin: "australian" | "overseas" | "unknown";
+  /** Why the origin was decided (country, AU qualification code, unit codes …). */
+  reason: string;
+  /** both_best: assessor note (origin unknown, which path was kept and why). */
+  note?: string;
+  /** both_best: the path that was also scored but not kept, with its result. */
+  alsoScored?: {
+    path: "au_unit_codes" | "overseas_subjects";
+    determination: Determination;
+    confidenceScore: number;
+  } | null;
 };
 
 /** One occupation evaluated against the transcript (top-N candidates). */
@@ -194,6 +377,37 @@ export type AnzscoCandidate = {
   }>;
   /** Tier 1 / Tier 2 subjects with naming variants for the breakdown popup. */
   subjectCatalog: RubricSubjectCatalogEntry[];
+  /** Assessor notes from the qualification check (Step 1); empty when none. */
+  qualificationNotes?: string[];
+  /** True when the qualification check capped this occupation at conditional. */
+  qualificationCapped?: boolean;
+  /** "academic" (subject tiers) or "vocational_units" (unit codes). */
+  assessmentFlow?: "academic" | "vocational_units";
+  /** Tier 1 band (academic only; null for vocational). */
+  tier1Outcome?: TierOutcome | null;
+  /** Tier 2 band (academic) or core-unit band (vocational). */
+  tier2Outcome?: TierOutcome | null;
+  /** Step 3 result before not-recommended is surfaced as no_match. */
+  bandDetermination?: Determination;
+  /** True when a missing Tier 3 gate turned verified into conditional. */
+  gateDowngraded?: boolean;
+  /** True when the qualification route (Step 1) capped this occupation. */
+  routeCapped?: boolean;
+  /** Unit-code detail (vocational occupations only). */
+  vocational?: VocationalAssessmentDetail | null;
+  /** Gate project / thesis title used (final year preferred); null when none. */
+  finalProjectTitle?: string | null;
+  /** Gate 1 track this occupation was scored under. */
+  track?: Gate1TrackId;
+  /** 312211 / 312311 only: which draftsperson path was scored and why. */
+  draftspersonPath?: DraftspersonPath | null;
+  /** False when the Tier 3 gate was not applied (Engineering Associate track, except 312411). */
+  capstoneApplies?: boolean;
+  /**
+   * Telecommunications group label. Set only for 313212 / 313213 / 313214
+   * when the qualification is ICT60220 and Engineering Associate is open.
+   */
+  suggestionStatus?: "recommended" | "eligible" | "rejected" | "review";
 };
 
 export type AssessmentResult = {
@@ -231,5 +445,292 @@ export type AssessmentResult = {
   candidates?: AnzscoCandidate[];
   /** Raw rows from transcript extraction (before rubric matching). */
   extractedSubjects: ExtractedSubjectRow[];
+  /** Qualification-check notes for the top occupation (see candidates[].qualificationNotes). */
+  qualificationNotes?: string[];
+  /** Legacy Step 1 routing (results saved before Gate 1; no longer written). */
+  routing?: RoutingInfo;
+  /** Gate 1 qualification eligibility (decides which tracks were scored). */
+  gate1?: Gate1Decision;
+  /** Lateral-entry check for the bachelor (route, reason and audit trail). */
+  lateralEntry?: LateralEntryView | null;
+  /** Flow of the top occupation. */
+  assessmentFlow?: "academic" | "vocational_units";
+  /** Step 3 result of the top occupation before no_match surfacing. */
+  bandDetermination?: Determination;
   explanation: string;
+  /** Subject-extraction bookkeeping used for caching (see assessCase). */
+  extraction?: ExtractionReport;
+  /** Duration (Gate 1), engineering decision and final-year project (Step 3 box). */
+  qualificationEvidence?: QualificationEvidence;
+  /** Gate project / thesis title of the top occupation (null when none). */
+  finalProjectTitle?: string | null;
+  /**
+   * Set when Gate 1 asked for manual review and the assessor picked the
+   * occupation: only that occupation was scored (gate1 stays manual_review).
+   */
+  assessorSelected?: AssessorSelected;
+  /** Family rules on the suggested ANZSCOs (primary, alternatives, ET Maybe Suitable). */
+  familyAdjustment?: FamilyAdjustment;
+  /**
+   * Work-experience judgements made on the last full run (whole shortlist,
+   * up to boostShortlist occupations), reused on cached loads for an
+   * occupation that is backfilled into the shown cards. Absent on older results.
+   */
+  workExperienceJudgements?: SavedWorkJudgement[];
+  /**
+   * Civil specialisation check (Structural / Geotechnical / Transport, doc 12):
+   * Civil core, Pathway A (Master's) or B (5 yrs work), risk tier and audit.
+   * Set only when a Civil-family occupation or a civil bachelor is on the case.
+   */
+  specialisation?: SpecialisationResult | null;
+  /**
+   * 312999 Building and Engineering Technicians nec (fallback only, no rubric).
+   * Set when Gate 1 opened the Engineering Associate track; suggested only when
+   * no specific Associate ANZSCO reaches 70%. Absent on older results.
+   */
+  associateFallback?: AssociateFallback | null;
+};
+
+/** One specific Associate ANZSCO in the 312999 near-miss list. */
+export type AssociateFallbackNearMiss = {
+  anzscoCode: string;
+  title: string;
+  /** Best score for the code (null when it was not scored). */
+  confidenceScore: number | null;
+  determination: string | null;
+  /** Missing units ("CODE Title") or rubric subjects. */
+  missing: string[];
+};
+
+/** 312999 fallback decision (never a first-pass match). */
+export type AssociateFallback = {
+  anzscoCode: string;
+  title: string;
+  suggested: boolean;
+  threshold: number;
+  reason: string;
+  nearMisses: AssociateFallbackNearMiss[];
+};
+
+/** One saved work-experience judgement (same shape as experienceBoost.ts). */
+export type SavedWorkJudgement = {
+  anzscoCode: string;
+  related: boolean;
+  matchedJobs: MatchedJob[];
+  analysis: string;
+};
+
+/** One occupation after the family rules (Step 4 ANZSCO cards). */
+export type FamilyAdjustedOccupation = {
+  anzscoCode: string;
+  title: string;
+  isPrimary: boolean;
+  /** Family ids from anzsco_families.json (ECE / CSI / MIP / CMM / OTHERS). */
+  families: string[];
+  skillLevel: 1 | 2 | null;
+  /** Families shared with the primary (empty when none / unknown). */
+  sharedFamilies: string[];
+  /** Subject-matching % before the family rules. */
+  originalConfidence: number;
+  adjustedConfidence: number;
+  changed: boolean;
+  /** True when it was capped one point below the primary. */
+  capped: boolean;
+  /** Short reason, e.g. "Same family (CSI)", "Different family −20 pp". */
+  reason: string;
+};
+
+/** Engineering Technologist added as "Maybe Suitable" (primary is PE and above 50%). */
+export type MaybeSuitableEntry = {
+  anzscoCode: string;
+  title: string;
+  label: "Maybe Suitable";
+  /** ET's own matching % when it was scored (null when not scored). */
+  originalConfidence: number | null;
+  /** primary − (10 − 0.1 × (primary − 50)). */
+  formulaConfidence: number;
+  /** Higher of own and formula, capped below the primary. */
+  adjustedConfidence: number;
+  source: "formula" | "own_score";
+  capped: boolean;
+  /** True when ET was one of the suggested candidates (detail view available). */
+  inCandidates: boolean;
+  /** ET's own Tier 1 / Tier 2 / Tier 3 detail (sheet parts A / B / C) when it was scored. */
+  tiers?: EtTierDetail;
+};
+
+/** Family rules applied to the suggested ANZSCOs (confidence = matching %). */
+export type FamilyAdjustment = {
+  primaryCode: string;
+  primaryConfidence: number;
+  primaryFamilies: string[];
+  /** Primary first, then alternatives by adjusted confidence (ET excluded when maybeSuitable is set). */
+  occupations: FamilyAdjustedOccupation[];
+  maybeSuitable: MaybeSuitableEntry | null;
+  /** E.g. occupations missing from the family list. */
+  notes: string[];
+};
+
+/** Occupation picked by the assessor for a manual-review case. */
+export type AssessorSelected = {
+  anzscoCode: string;
+  title: string;
+  occupationId: string;
+};
+
+/** Unit a printed year / semester was read in. */
+export type TermUnit = "semester" | "trimester" | "quarter" | "year" | "calendar";
+
+export type DurationStatus = "ok" | "below_minimum" | "mismatch" | "not_counted";
+
+/** Gate 1 duration check for one qualification. */
+export type DurationEvidence = {
+  level: QualificationType;
+  title: string | null;
+  /** Counted from the printed years / semesters (null when not countable). */
+  countedYears: number | null;
+  minimumYears: number | null;
+  /** Sum of printed credits (reference only). */
+  creditTotal: number | null;
+  /** Plain description of how the count was made. */
+  method: string;
+  unit: TermUnit | null;
+  confidence: ConfidenceLevel;
+  status: DurationStatus;
+  /** True when this check capped the occupation at conditional. */
+  capped: boolean;
+  note: string;
+};
+
+export type EngineeringDecision = {
+  decision: "yes" | "no" | "unclear";
+  reason: string;
+  /** What the qualification title says. */
+  titleSignal: "engineering" | "related" | "other" | "none";
+  /** Share of subjects that read as engineering (0–1; null when no subjects). */
+  subjectShare: number | null;
+  subjectsConsidered: number;
+  /** True when "no" capped professional / technologist occupations. */
+  capped: boolean;
+  note: string | null;
+};
+
+export type FinalProjectEvidence = {
+  title: string | null;
+  /** Term label of the project row, e.g. "semester 8" (null when not printed). */
+  term: string | null;
+  /** null when no term info. */
+  inFinalYear: boolean | null;
+  note: string | null;
+};
+
+export type QualificationEvidence = {
+  duration: DurationEvidence[];
+  engineering: EngineeringDecision;
+  finalProject: FinalProjectEvidence | null;
+};
+
+/** Gate 1 (qualification eligibility, checked before any scoring). */
+export type Gate1Result = "open" | "manual_review" | "not_eligible";
+
+/** Occupation tracks (categories in src/lib/anzsco_skill_levels.json). */
+export type Gate1TrackId = "professional_engineer" | "engineering_technologist" | "engineering_associate";
+
+export type Gate1Track = {
+  track: Gate1TrackId;
+  label: string;
+  open: boolean;
+  /** 1 = assess first; null when closed. */
+  priority: number | null;
+  /** Plain reason (why open / why closed). */
+  reason: string;
+  /** ANZSCO codes in this track. */
+  anzscoCodes: string[];
+  /** Occupations in this track that cannot be scored automatically (assess manually). */
+  notes: string[];
+};
+
+/** Award level read from the DB level, the title and any training-package code. */
+export type Gate1AwardLevel =
+  | "certificate"
+  | "diploma"
+  | "advanced_diploma"
+  | "associate_degree"
+  | "bachelor"
+  | "honours"
+  | "graduate_diploma"
+  | "master"
+  | "doctorate"
+  | "unknown";
+
+export type Gate1Qualification = {
+  title: string | null;
+  level: QualificationType | "unknown";
+  award: Gate1AwardLevel;
+  aqfLevel: number | null;
+  engineering: "yes" | "no" | "unclear";
+  engineeringReason: string;
+  /**
+   * Duration from Transcript data: entered by the assessor, else counted from
+   * printed years / semesters, else converted from credits (null when none).
+   */
+  countedYears: number | null;
+  /** Duration Gate 1 used (same as countedYears). */
+  durationYears: number | null;
+  /** "default": Advanced Diploma with no duration found, configured default used. */
+  durationSource: "counted" | "none" | "default";
+  /** How the count was made (or why it could not be). */
+  durationMethod: string;
+  /**
+   * Flag text when the counted duration was converted from the credit total,
+   * e.g. "Converted from credits (240 credits ÷ 60 per year)". Absent on older results.
+   */
+  creditConversion?: string | null;
+  /** Unusual-case flags (combined degree, part-time, credit transfer …). */
+  flags: string[];
+  /** True for the qualification that decided the gate. */
+  used: boolean;
+  /** Short outcome for this qualification. */
+  outcome: string;
+};
+
+export type Gate1Decision = {
+  result: Gate1Result;
+  /** Spec rule that matched (1 not eligible, 2 manual review, 3 PE + Technologist, 4 Technologist, 5 Associate). */
+  rule: 1 | 2 | 3 | 4 | 5;
+  ruleLabel: string;
+  /** Plain reason shown to the assessor. */
+  reason: string;
+  /** Title (or level) of the qualification that decided the gate; null when none. */
+  qualificationUsed: string | null;
+  tracks: Gate1Track[];
+  qualifications: Gate1Qualification[];
+  /** Credit-conversion flag of the qualification that decided the gate (absent on older results). */
+  creditConversionNote?: string | null;
+  /** Engineering decision for the qualification that decided the gate (null when none). */
+  engineering: EngineeringDecision | null;
+  notes: string[];
+};
+
+/** Which transcripts the saved subjects came from (subject-level cache key, see assessCase). */
+export type ExtractionReport = {
+  /** Hash of transcript ids/texts/degree levels the subjects were extracted from. */
+  subjectHash: string;
+  /** "llm" = freshly extracted, "persisted" = reused saved subjects, "injected" = tests. */
+  source: "llm" | "persisted" | "injected";
+  /**
+   * Set when some transcript chunks could not be read after every retry: the
+   * subjects are incomplete and are not saved as current (the next run reads
+   * the transcripts again). subjectHash is then "" so it never matches.
+   */
+  partial?: ExtractionPartial;
+};
+
+export type ExtractionPartial = {
+  /** Chunks that failed after all retries. */
+  failedChunks: number;
+  /** Transcript pages in those chunks (empty when the text has no page markers). */
+  pages: number[];
+  /** Failure reasons, e.g. rate_limited, cut_off, empty, invalid_json, timeout. */
+  reasons: string[];
 };

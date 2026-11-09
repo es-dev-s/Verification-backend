@@ -14,6 +14,13 @@ export type ScoreInput = {
   qualificationsUsed: QualificationType[];
   workExperienceBoost: boolean;
   rubric: Rubric;
+  /** Step 1 qualification check for this pool (omitted → no cap, no notes). */
+  qualificationCheck?: QualificationCheckResult;
+  /**
+   * Engineering Associate occupations do not use the capstone / major-project gate.
+   * Omitted or true keeps the gate. False leaves determination and the score unchanged by it.
+   */
+  applyCapstone?: boolean;
 };
 
 export type ScoreResult = {
@@ -31,11 +38,35 @@ export type ScoreResult = {
   confidence: ConfidenceLevel | null;
   /** 0–100 numeric confidence for ranking and UI display. */
   confidenceScore: number;
+  /** False when this occupation is Engineering Associate: capstone is not used. */
+  capstoneApplies: boolean;
   anzscoCode: string | null;
   title: string | null;
+  /** Step 1 qualification-check notes for the assessor (empty when none). */
+  qualificationNotes: string[];
+  /** True when the qualification check turned verified into conditional. */
+  qualificationCapped: boolean;
+  /**
+   * Step 3 result before a not-recommended result is surfaced as no_match
+   * (verified_no_risk / conditional / not_verified). Step 4 risk reads this.
+   */
+  bandDetermination: Determination;
+  /** True when a missing Tier 3 gate turned verified into conditional. */
+  gateDowngraded: boolean;
+  /** True when the cap came from the qualification route (Step 1 routing). */
+  routeCapped: boolean;
 };
 
-function outcomeFromThresholds(
+/** Step 1 qualification check result (see qualificationCheck.ts). */
+export type QualificationCheckResult = {
+  /** Never auto-verify: verified_no_risk is capped at conditional. */
+  capAtConditional: boolean;
+  notes: string[];
+  /** True when the cap comes (also) from the qualification route. */
+  routeCapped?: boolean;
+};
+
+export function outcomeFromThresholds(
   matched: number,
   thresholds: Array<{ matchedRange: [number, number]; outcome: string }>,
 ): TierOutcome {
@@ -126,14 +157,54 @@ function mapConfidence(
  * Numeric 0–100 confidence from determination + coverage + gate + CV boost.
  * Always computed (including non-recommended) so candidates can be ranked.
  */
+/**
+ * Coverage % for ranking: blends matched/total with an absolute matched count
+ * (see assessConfig.coverage) so tiny denominators do not dominate.
+ */
+export function blendedCoveragePct(
+  matched: number,
+  total: number,
+  ref: number,
+  absWeight = assessConfig.coverage.absWeight,
+): number {
+  if (total <= 0) return 0;
+  const w = Math.min(1, Math.max(0, absWeight));
+  const rate = Math.min(1, matched / total);
+  const abs = ref > 0 ? Math.min(1, matched / ref) : rate;
+  return 100 * ((1 - w) * rate + w * abs);
+}
+
 export function computeConfidenceScore(input: {
   rawDetermination: Determination;
   foundationalPct: number;
   corePct: number;
   tier3GateMet: boolean;
   workExperienceBoost: boolean;
+  /** False for Engineering Associate: the capstone does not change the score. */
+  applyCapstone?: boolean;
+  /** When provided with totals, coverage uses the blended (size-aware) formula. */
+  foundationalMatched?: number;
+  foundationalExpected?: number;
+  coreMatched?: number;
+  coreExpected?: number;
 }): number {
-  const coverage = input.corePct * 0.65 + input.foundationalPct * 0.35;
+  const corePct =
+    input.coreMatched != null && input.coreExpected
+      ? blendedCoveragePct(
+          input.coreMatched,
+          input.coreExpected,
+          assessConfig.coverage.coreRef,
+        )
+      : input.corePct;
+  const foundationalPct =
+    input.foundationalMatched != null && input.foundationalExpected
+      ? blendedCoveragePct(
+          input.foundationalMatched,
+          input.foundationalExpected,
+          assessConfig.coverage.foundationRef,
+        )
+      : input.foundationalPct;
+  const coverage = corePct * 0.65 + foundationalPct * 0.35;
   let score: number;
 
   switch (input.rawDetermination) {
@@ -154,12 +225,14 @@ export function computeConfidenceScore(input: {
   }
 
   if (input.workExperienceBoost) score += 4;
-  if (input.tier3GateMet) score += 3;
-  else if (
-    input.rawDetermination === "verified_no_risk" ||
-    input.rawDetermination === "conditional"
-  ) {
-    score -= 6;
+  if (input.applyCapstone !== false) {
+    if (input.tier3GateMet) score += 3;
+    else if (
+      input.rawDetermination === "verified_no_risk" ||
+      input.rawDetermination === "conditional"
+    ) {
+      score -= 6;
+    }
   }
 
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -208,12 +281,27 @@ export function scoreAssessment(input: ScoreInput): ScoreResult {
     rubric.riskScoring.tier2.thresholds,
   );
 
-  const determination = combineDetermination(
+  const applyCapstone = input.applyCapstone !== false;
+  const tier3ForBand = applyCapstone ? tier3GateMet : true;
+
+  const tableDetermination = combineDetermination(
     tier1Outcome,
     tier2Outcome,
-    tier3GateMet,
+    tier3ForBand,
     rubric,
   );
+  const gateDowngraded =
+    applyCapstone &&
+    !tier3GateMet &&
+    tableDetermination !== "verified_no_risk" &&
+    combineDetermination(tier1Outcome, tier2Outcome, true, rubric) === "verified_no_risk";
+  // Step 1 qualification check: a doubtful qualification is never auto-verified.
+  const qualificationCapped =
+    Boolean(input.qualificationCheck?.capAtConditional) &&
+    tableDetermination === "verified_no_risk";
+  const determination: Determination = qualificationCapped
+    ? "conditional"
+    : tableDetermination;
 
   // CV boost never rescues not_verified → verified; only affects confidence on conditional
   const recommended = (
@@ -234,7 +322,12 @@ export function scoreAssessment(input: ScoreInput): ScoreResult {
     foundationalPct,
     corePct,
     tier3GateMet,
+    applyCapstone,
     workExperienceBoost,
+    foundationalMatched,
+    foundationalExpected,
+    coreMatched,
+    coreExpected,
   });
 
   // Prefer determination-based label when recommended; otherwise derive from score
@@ -261,8 +354,14 @@ export function scoreAssessment(input: ScoreInput): ScoreResult {
     recommended,
     confidence: recommended ? confidence : null,
     confidenceScore,
+    capstoneApplies: applyCapstone,
     anzscoCode: recommended ? rubric.anzscoCode : null,
     title: recommended ? rubric.title : null,
+    qualificationNotes: [...(input.qualificationCheck?.notes ?? [])],
+    qualificationCapped,
+    bandDetermination: determination,
+    gateDowngraded,
+    routeCapped: qualificationCapped && Boolean(input.qualificationCheck?.routeCapped),
   };
 }
 

@@ -7,6 +7,13 @@ import { prisma } from "../lib/prisma.js";
 import { getExtractQueue } from "../lib/queues.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
 import { markReadsStale } from "../workers/extract.js";
+import { PRIOR_STUDY_ROLE } from "../assess/lateralEntry.js";
+import {
+  addPriorStudyDocument,
+  isPriorStudyDocument,
+  removePriorStudyDocument,
+  watchPriorStudyDocument,
+} from "../assess/lateralEntryStore.js";
 
 const DEGREE_LEVELS = new Set<string>(Object.values(DegreeLevel));
 
@@ -59,7 +66,10 @@ export const documentRoutes: FastifyPluginAsync = async (app) => {
         .send({ error: "Too many jobs in flight for this case" });
     }
 
-    const query = req.query as { type?: string; degreeLevel?: string };
+    const query = req.query as { type?: string; degreeLevel?: string; role?: string };
+    // Earlier study's transcript (lateral entry): kept apart from the
+    // bachelor's own transcripts and never changes the saved reads.
+    const priorStudy = String(query.role ?? "") === PRIOR_STUDY_ROLE;
     const queryType = String(query.type ?? "").toUpperCase();
     const queryDegreeLevel = String(query.degreeLevel ?? "");
 
@@ -108,6 +118,11 @@ export const documentRoutes: FastifyPluginAsync = async (app) => {
           selectedDegreeLevels: selected,
         });
       }
+    }
+    if (priorStudy && (type !== "TRANSCRIPT" || degreeLevel !== "bachelor")) {
+      return reply.code(400).send({
+        error: "Earlier-study uploads must be a transcript for the bachelor",
+      });
     }
 
     const chunks: Buffer[] = [];
@@ -162,13 +177,16 @@ export const documentRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
+    if (priorStudy) await addPriorStudyDocument(caseId, doc.id);
     await storeBlob(doc.id, bytes);
-    await markReadsStale(caseId);
+    if (!priorStudy) await markReadsStale(caseId);
     await getExtractQueue().add(
       "extract",
       { documentId: doc.id },
       { jobId: doc.id },
     );
+    // Read the earlier study's subjects as soon as the file is processed.
+    if (priorStudy) watchPriorStudyDocument(caseId, doc.id);
 
     return reply.code(201).send({ documentId: doc.id, document: doc });
   });
@@ -188,8 +206,10 @@ export const documentRoutes: FastifyPluginAsync = async (app) => {
     });
     if (!doc) return reply.code(404).send({ error: "Document not found" });
 
+    const priorStudyDoc = await isPriorStudyDocument(caseId, docId);
     await prisma.document.delete({ where: { id: docId } });
-    await markReadsStale(caseId);
+    if (priorStudyDoc) await removePriorStudyDocument(caseId, docId);
+    else await markReadsStale(caseId);
     return { ok: true };
   });
 };

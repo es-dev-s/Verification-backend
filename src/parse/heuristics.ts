@@ -15,7 +15,7 @@ import type {
 import { sanitizeDegreeTitle } from "./sanitizeExtracted.js";
 
 const COUNTRY_NAMES =
-  "Australia|Canada|China|France|Germany|India|Ireland|Japan|Nepal|New Zealand|Philippines|Singapore|South Korea|United Kingdom|United States|United Arab Emirates|USA|UAE|Pakistan|Bangladesh|Sri Lanka|Malaysia|Indonesia|Thailand|Vietnam|Brazil|Mexico|Spain|Italy|Netherlands|Sweden|Norway|Denmark|Finland|Switzerland|Austria|Belgium|Portugal|Poland|Turkey|Egypt|South Africa|Nigeria|Kenya|Ghana|Qatar|Saudi Arabia";
+  "Australia|Canada|China|France|Germany|India|Ireland|Japan|Nepal|New Zealand|Philippines|Singapore|South Korea|United Kingdom|United States|United Arab Emirates|USA|UAE|Pakistan|Bangladesh|Sri Lanka|Malaysia|Indonesia|Thailand|Vietnam|Brazil|Mexico|Spain|Italy|Netherlands|Sweden|Norway|Denmark|Finland|Switzerland|Austria|Belgium|Portugal|Poland|Turkey|Egypt|South Africa|Nigeria|Kenya|Ghana|Qatar|Saudi Arabia|Zimbabwe|Zambia|Botswana|Uganda|Tanzania|Malawi|Namibia";
 
 /** Short codes last; filtered when adjacent to ECTS noise. */
 const COUNTRY_RE = new RegExp(
@@ -174,11 +174,34 @@ function cleanProgramField(raw: string | null | undefined): string | null {
  * (common on VET/RTO/TAFE records of results).
  */
 function extractLabeledQualification(text: string): string | null {
+  const awardGranted = extractAwardGranted(text);
+  if (awardGranted) return awardGranted;
+
   const m = text.match(
     /(?:^|\n)\s*(?:Qualification|Award|Course|Program)\s*:\s*([^\n\r]+)/i,
   );
+  if (m?.[1]) return sanitizeDegreeTitle(cleanProgramField(m[1]));
+
+  // "PROGRAMME ATTENDED: National Diploma in ..." (OCR may glue it after a date).
+  const attended = text.match(/\bProgra(?:mme|m)\s+Attended\s*:\s*([^\n\r]+)/i);
+  const fromAttended = attended?.[1] ? sanitizeDegreeTitle(cleanProgramField(attended[1])) : null;
+  if (fromAttended && AWARD_WORD.test(fromAttended)) return fromAttended;
+  return null;
+}
+
+/** Award words that make a label value an award, not a stray line. */
+const AWARD_WORD =
+  /\b(?:certificate|diploma|degree|bachelor|master|doctor|b\.?\s?(?:sc|eng|tech|a)|m\.?\s?(?:sc|eng|tech|a))\b/i;
+
+/** "AWARD GRANTED" block with the award on the same or the next line. */
+function extractAwardGranted(text: string): string | null {
+  const m = text.match(
+    /(?:^|\n)\s*Award\s*(?:\r?\n\s*)?Granted\s*:?\s*(?:\r?\n\s*)*([^\n\r]+)/i,
+  );
   if (!m?.[1]) return null;
-  return sanitizeDegreeTitle(cleanProgramField(m[1]));
+  const cand = sanitizeDegreeTitle(cleanProgramField(m[1]));
+  if (!cand || !AWARD_WORD.test(cand)) return null;
+  return cand;
 }
 
 /**
@@ -292,7 +315,7 @@ function extractTranscriptDegreeTitle(text: string): string | null {
   // Field-only when the transcript never prints Bachelor/B.Tech/Diploma wording
   // (otherwise prefer extractDegreeTitle, then enrich with Branch).
   const hasExplicitDegreeWording =
-    /\bbachelor|b\.?\s*tech|b\.?\s*sc|b\.?\s*eng|\bbs\b|diploma\s+of|advanced\s+diploma|degree\s+of\b/i.test(
+    /\bbachelor|b\.?\s*tech|b\.?\s*sc|b\.?\s*eng|\bbs\b|diploma\s+(?:of|in)\b|advanced\s+diploma|certificate\s+(?:of|in)\b|degree\s+of\b/i.test(
       text,
     );
   if (
@@ -310,6 +333,9 @@ function extractDiplomaTitle(text: string): string | null {
   const patterns: RegExp[] = [
     /\b((?:Advanced\s+)?Diploma\s+of\s+[A-Za-z][A-Za-z0-9\s&\-(),./]{2,80})/i,
     /\b((?:Adv\.?\s*)?Diploma\s+in\s+[A-Za-z][A-Za-z0-9\s&\-(),./]{2,80})/i,
+    // One line only: "National Diploma in ...", "National Certificate in ...".
+    /\b((?:Higher\s+)?National\s+(?:Diploma|Certificate)\s+(?:of|in)\s+[A-Za-z][A-Za-z0-9 \t&\-(),./]{2,80})/i,
+    /\b(Certificate\s+(?:IV|III|II|I|[1-4])?\s*(?:of|in)\s+[A-Za-z][A-Za-z0-9 \t&\-(),./]{2,80})/i,
   ];
   let best: string | null = null;
   for (const re of patterns) {
@@ -366,7 +392,22 @@ function scoreDegree(s: string): number {
   return score;
 }
 
+/** "Institution:" / "Issued by:" style lines, including providers that are not a University. */
+function extractLabeledInstitution(text: string): string | null {
+  const labeled = text.match(
+    /(?:^|\n)\s*(?:Name\s+of\s+(?:the\s+)?(?:institution|provider|college|university)|Institution|University|College|Institute|Issued\s+by|Awarded\s+by|Provider|RTO|Registered\s+Training\s+Organi[sz]ation|Training\s+Organi[sz]ation)\s*[:\-]\s*([^\n\r]+)/i,
+  );
+  const value = cleanProgramField(labeled?.[1]);
+  if (!value || value.length < 4 || value.length > 100) return null;
+  if (JUNK_INSTITUTION.test(value)) return null;
+  if (/high\s+school|secondary|livestock|research\s+institute/i.test(value)) return null;
+  return value;
+}
+
 function extractInstitution(text: string): string | null {
+  const labeled = extractLabeledInstitution(text);
+  if (labeled) return labeled;
+
   const space = educationSearchText(text);
   const patterns: RegExp[] = [
     /\b((?:APJ|A\.P\.J\.)\s+Abdul\s+Kalam\s+Technological\s+University)/i,
@@ -405,6 +446,40 @@ function extractInstitution(text: string): string | null {
     if (cand && !JUNK_INSTITUTION.test(cand)) {
       return cand.replace(/,\s*(India|Pakistan|Turkey|Kenya|Egypt|Australia)\b.*$/i, "").trim();
     }
+  }
+  return extractLetterheadInstitution(text);
+}
+
+/** Letterhead lines that name a ministry, office, or address, not the issuer. */
+const LETTERHEAD_JUNK =
+  /\b(?:ministry|department\s+of|government\s+of|council|board|authority|box|street|road|avenue|tel(?:ephone)?|phone|fax|e-?mail|www|web\s*site|head\s+of|principal|signature)\b/i;
+
+const INSTITUTION_LEAD_STOP = /^(?:the|a|an|of|and|at|in|from|this|that|seal|name|is|was)$/i;
+
+/**
+ * Any-case issuer in the first lines ("HARARE POLYTECHNIC", "Sample college of
+ * technology"). Runs last, so known and Title Case matches keep priority.
+ */
+function extractLetterheadInstitution(text: string): string | null {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !/^---\s*page\b/i.test(l))
+    .slice(0, 12);
+  const re =
+    /((?:[A-Za-z][A-Za-z.&'`\-]+\s+){0,5}(?:University|College|Polytechnic|Institute)(?:\s+(?:of|for)\s+[A-Za-z][A-Za-z.&'`\-]+(?:\s+(?:and\s+)?[A-Za-z][A-Za-z.&'`\-]+){0,4})?)\b/i;
+  for (const line of lines) {
+    if (LETTERHEAD_JUNK.test(line)) continue;
+    const m = line.match(re);
+    if (!m?.[1]) continue;
+    const words = m[1].split(/\s+/);
+    while (words.length > 1 && INSTITUTION_LEAD_STOP.test(words[0]!)) words.shift();
+    const cand = clean(words.join(" "));
+    if (!cand || cand.length < 5 || cand.length > 100) continue;
+    if (!/\s/.test(cand)) continue; // a bare "College" is not a name
+    if (JUNK_INSTITUTION.test(cand)) continue;
+    if (/high\s+school|secondary|livestock|research\s+institute/i.test(cand)) continue;
+    return cand;
   }
   return null;
 }
@@ -574,7 +649,7 @@ export function heuristicsEducationFromText(text: string): EducationExtract {
   extract.degreeTitle = extractTranscriptDegreeTitle(text);
 
   const isDiplomaOnly =
-    /\badvanced\s+diploma\b|\bdiploma\s+of\b/i.test(text) &&
+    /\badvanced\s+diploma\b|\bdiploma\s+(?:of|in)\b|\bcertificate\s+(?:IV\s+|III\s+|II\s+|I\s+)?(?:of|in)\b/i.test(text) &&
     !/\bbachelor|b\.?\s*sc|b\.?\s*tech|b\.?\s*eng|\bbs\b/i.test(text);
 
   if (!extract.degreeTitle) {

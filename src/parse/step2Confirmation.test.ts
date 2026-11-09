@@ -43,7 +43,6 @@ function buildConfirmationQualifications(
         degreeTitle: string | null;
         institution: string | null;
         country: string | null;
-        durationYears: number | null;
       }
     >
   >,
@@ -56,10 +55,6 @@ function buildConfirmationQualifications(
       degreeTitle: (q?.degreeTitle || "").trim() || "—",
       institution: (q?.institution || "").trim() || "—",
       country: (q?.country || "").trim() || "—",
-      durationYears:
-        q?.durationYears != null && Number.isFinite(q.durationYears)
-          ? String(q.durationYears)
-          : "—",
     };
   });
 }
@@ -80,7 +75,6 @@ describe("Step 2 confirmation qualification lists", () => {
         degreeTitle: "B.Sc. CS",
         institution: "Monash University",
         country: "Australia",
-        durationYears: 3,
       },
     });
     assert.equal(blocks.length, 1);
@@ -97,19 +91,16 @@ describe("Step 2 confirmation qualification lists", () => {
           degreeTitle: "B.Sc.",
           institution: "McGill",
           country: "Canada",
-          durationYears: 4,
         },
         master: {
           degreeTitle: "M.Sc.",
           institution: "Stanford",
           country: "United States",
-          durationYears: 2,
         },
         phd: {
           degreeTitle: "PhD",
           institution: "MIT",
           country: "United States",
-          durationYears: 5,
         },
       },
     );

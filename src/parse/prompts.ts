@@ -104,29 +104,23 @@ Return JSON only matching this schema exactly:
   ]
 }
 
-Per-source hints:
-- CERTIFICATE: Prefer awarded title and issuing institution as printed for the target level.
-- TRANSCRIPT: Prefer program name, institution, and enrollment/session years near the header.
-  Also covers VET/RTO/TAFE records of results — not only university transcripts.
-  Degree/program titles appear under many label spellings — treat all of these as stated degreeTitle
-  (do not leave null when present): Qualification, Award, Course, Program, Programme, Branch,
-  Department, Department/Program, Program/Department, Degrees Awarded, Type of Academic Degree.
-  Combine a degree type/abbrev with the program/branch field when both appear
-  (e.g. "B.S." + "Petroleum and Natural Gas Engineering" → "B.S. Petroleum and Natural Gas Engineering";
-  "Bachelor's Degree" + "Materials Science And Engineering" → "Bachelor's Degree in Materials Science And Engineering";
-  "BACHELOR OF TECHNOLOGY (B.Tech)" + Branch "CIVIL ENGINEERING" → include the branch).
-  On bilingual transcripts, prefer the English parenthetical after Program/Department or Type of Academic Degree.
-- CV: Prefer the education line that matches the target degree level if present.
+The two fields that must be right are degreeTitle and institution. Copy them from the printed header or the closing award block of THAT source. The text you see is the opening and the closing of the document; a line that says "later pages omitted" is not content.
 
-Explicit qualification labels (stated, not inferred) — especially for TRANSCRIPT sources:
-- If a line is labeled "Qualification:", "Award:", "Course:", "Program:", "Programme:", "Branch:",
-  or "Department:" followed by a value, that value is stated (not inferred). Never return degreeTitle
-  null when such a labeled line exists for the target level.
-- Australian qualifications often prefix a training package / national code (e.g. "ICT60220", "BSB50420")
-  immediately before the title. Strip that leading code and return only the name:
-  "ICT60220 Advanced Diploma of Information Technology" → degreeTitle "Advanced Diploma of Information Technology".
-- Do NOT confuse qualification codes with per-unit codes in a subject/results table (e.g. "BSBCRT611", "ICTNWK612") — those are unrelated.
-- Do NOT invent a title from course/unit lists alone when no award/program/branch line is printed.
+degreeTitle — the name of the award, not a subject:
+- Use a labeled award line when one is printed: Qualification, Award, Course, Program, Programme, Programme Attended, Award Granted (the award may be on the next line), Degree, Award Name, Name of the Degree, Degrees Awarded, Type of Academic Degree.
+- Copy the words after the label. Strip one leading Australian training-package code only (ICT60220, BSB50420, and the same pattern of 3–4 letters plus 5 digits). "ICT60220 Advanced Diploma of Information Technology" → "Advanced Diploma of Information Technology".
+- A unit code in a results table (BSBCRT611, ICTNWK546, ICTSAD612) is never the degree title. A unit name ("Apply critical thinking") is never the degree title.
+- If the source has no award line and no program name, return degreeTitle null. Do not build a title from the unit list, and do not copy the title from a different documentId.
+- Branch, Major, Specialisation, Specialization, Stream, or Department is the field of study. Append it to the award when both are printed: "BACHELOR OF TECHNOLOGY (B.Tech)" plus Branch "CIVIL ENGINEERING" → "Bachelor of Technology in Civil Engineering". If only the branch is printed and no award word (Bachelor, Master, Diploma, Certificate, Degree, B.Sc, B.Tech, B.Eng) appears anywhere in that source, return degreeTitle null.
+- On a bilingual transcript, use the English text in parentheses after Program/Department and Type of Academic Degree. Drop a trailing "Pr.".
+- Keep honours in the title when printed: "Bachelor of Engineering (Honours)".
+
+institution — the body that issued this document:
+- Use a labeled line when one is printed: Institution, University, College, Institute, Issued by, Awarded by, Provider, RTO, Registered Training Organisation, Training Organisation, Name of Institution, Name of Provider. Copy the value after the label.
+- If there is no label, use the organisation in the letterhead, usually the first lines, when it is a university, institute, college, polytechnic, TAFE, or RTO. Join a name that is split over two lines ("Government College University" / "Faisalabad" → "Government College University Faisalabad").
+- Do not use a street address, a suburb, a person's name, a signature, a "seal of the University" line, or the placeholder "Name of the College".
+- Do not use the employer from a work line. One institution per source: the issuer of this file.
+- Copy the name as printed. Do not translate it and do not shorten "Middle East Technical University" to "METU" unless only the short form is printed.
 
 Program duration (critical):
 - Near the degree/program title header, look for SESSION YYYY-YYYY, BATCH YYYY-YYYY, or YYYY-YYYY / YYYY – YYYY.
@@ -223,12 +217,28 @@ Expected:
   degreeTitle ≈ "B.S. Petroleum and Natural Gas Engineering"
   (combine awarded abbrev with the program name printed before COURSE NAME)
 
+Example H — labeled institution, title is not a unit (target advanced_diploma):
+Text:
+  Issued by: Bella College Australia
+  Qualification: ICT60220 Advanced Diploma of Information Technology
+  ICTNWK546 Manage network security
+Expected for that source:
+  degreeTitle = "Advanced Diploma of Information Technology"
+  institution = "Bella College Australia"
+  Do NOT set degreeTitle to "Manage network security" or "ICTNWK546".
+
 Rules:
 - Include one entry in "sources" for every documentId provided in the user message (even if all fields are null).
 - Echo documentId and documentType exactly as given.
-- Target only the degree level requested in the user message (default bachelor if unspecified). Ignore other levels on the same document.
+- Target the degree level requested in the user message (default bachelor if unspecified). On a TRANSCRIPT or CERTIFICATE, first look for an award at that level.
+- If a TRANSCRIPT or CERTIFICATE prints only one award and it is a different level (e.g. "National Certificate in ...", "National Diploma in ..."), still copy that award as degreeTitle and its issuer as institution. Do not change the level words in the title.
+- If a TRANSCRIPT or CERTIFICATE prints several awards, take the one at the target level and ignore the others. If none is at the target level, return degreeTitle null.
+- On a CV, ignore education lines at other levels.
 - If several awards of the same target level appear in one source, take the first and set multipleBachelors to true when the target is bachelor.
-- Every value is nullable. Never guess, invent, or normalize institution/degree wording — copy as written (after OCR cleanup already applied).
+- CERTIFICATE: the awarded title and the issuing institution on the certificate.
+- TRANSCRIPT: the award and the institution in the header or the degrees-awarded block. This includes VET/RTO/TAFE records of results.
+- CV: the education line that matches the target degree level.
+- Every value is nullable. Never guess. Copy degreeTitle and institution as written, after stripping one leading training-package code.
 - Never leave truncated titles (e.g. cut off mid-word or with an unclosed parenthesis like "(Pow"). Prefer the longest complete phrase that appears in the text; if the source is cut off, stop at the last complete word and omit dangling "(".
 - Do not include curly braces {}, JSON artifacts, or markdown in any field.
 - country only if that source states a country near the education/institution header (or address on the award). Do NOT pull a country from work-experience locations or profile marketing text.
@@ -287,6 +297,7 @@ export function experienceSystemPrompt(): string {
 
 Return JSON only matching this schema exactly:
 {
+  "applicantName": string|null,
   "rows": [
     {
       "employer": string|null,
@@ -323,6 +334,7 @@ Rules:
 - Do not compare roles against any target occupation. domainMatch is engineering-related only.
 - Sort is not required; the server will sort. Prefer most recent roles first if you can.
 - Skip Education / Skills / Projects / Certifications sections — only paid or professional roles under Experience / Work History / Employment (or a short Experience: line on a CV/profile).
-- If no jobs found, return {"rows": []}.
+- applicantName: the CV owner's full personal name as written at the top of the CV (or after "Name:"). Never a heading such as "Curriculum Vitae", "Resume" or "CV", never a job title, employer, referee or address. Use null if it is not clearly shown.
+- If no jobs found, return {"applicantName": <name or null>, "rows": []}.
 - confidence 0.0–1.0 when set.`;
 }

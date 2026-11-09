@@ -2,6 +2,9 @@ import type { FastifyPluginAsync } from "fastify";
 import { DegreeLevel } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { CLIENT_NAME_FIELD } from "../lib/clientName.js";
+import { TRANSCRIPT_FIELD_PREFIX } from "../assess/transcriptData.js";
+import { LATERAL_FIELD, priorStudyDocumentIds } from "../assess/lateralEntry.js";
 
 const degreeLevelSchema = z.nativeEnum(DegreeLevel);
 
@@ -16,8 +19,6 @@ const qualificationDraftSchema = z.object({
   degreeTitle: z.string().nullable().optional(),
   institution: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
-  durationYears: z.number().nullable().optional(),
-  durationCalculated: z.boolean().optional(),
 });
 
 const draftBody = z.object({
@@ -27,8 +28,6 @@ const draftBody = z.object({
       degreeTitle: z.string().nullable().optional(),
       institution: z.string().nullable().optional(),
       country: z.string().nullable().optional(),
-      durationYears: z.number().nullable().optional(),
-      durationCalculated: z.boolean().optional(),
     })
     .optional(),
   qualifications: z.array(qualificationDraftSchema).optional(),
@@ -68,6 +67,8 @@ async function upsertFieldFinals(
 ) {
   if (body.fieldFinalEntries?.length) {
     for (const entry of body.fieldFinalEntries) {
+      // Transcript data values are saved by their own endpoint only.
+      if (entry.field.startsWith(TRANSCRIPT_FIELD_PREFIX)) continue;
       await prisma.fieldSource.upsert({
         where: {
           caseId_field_degreeLevel: {
@@ -131,15 +132,11 @@ async function upsertQualifications(
         degreeTitle: q.degreeTitle ?? null,
         institution: q.institution ?? null,
         country: q.country ?? null,
-        durationYears: q.durationYears ?? null,
-        durationCalculated: q.durationCalculated ?? false,
       },
       update: {
         degreeTitle: q.degreeTitle ?? null,
         institution: q.institution ?? null,
         country: q.country ?? null,
-        durationYears: q.durationYears ?? null,
-        durationCalculated: q.durationCalculated ?? false,
       },
     });
   }
@@ -150,13 +147,32 @@ function caseInclude() {
     documents: { orderBy: { createdAt: "asc" as const } },
     qualifications: { orderBy: { degreeLevel: "asc" as const } },
     experienceRows: { orderBy: { sortOrder: "asc" as const } },
-    fieldSources: true,
+    // The CV client name is for the Clients page only, not the engine.
+    // Transcript data rows ("transcript.*") have their own endpoint.
+    fieldSources: {
+      where: {
+        field: { not: CLIENT_NAME_FIELD },
+        NOT: { field: { startsWith: TRANSCRIPT_FIELD_PREFIX } },
+      },
+    },
     assessment: true,
     readJobs: {
       orderBy: { updatedAt: "desc" as const },
       take: 20,
     },
   };
+}
+
+/** Prior-study transcripts (lateral entry) are shown in their own card, not in the case documents. */
+async function withoutPriorStudy<T extends { id: string; documents: Array<{ id: string }> }>(
+  row: T,
+): Promise<T> {
+  const lateral = await prisma.fieldSource.findMany({
+    where: { caseId: row.id, field: LATERAL_FIELD },
+  });
+  const prior = priorStudyDocumentIds(lateral);
+  if (!prior.size) return row;
+  return { ...row, documents: row.documents.filter((d) => !prior.has(d.id)) };
 }
 
 /** Temporary compat: expose bachelor Qualification as `bachelors` for existing UI. */
@@ -166,8 +182,6 @@ function withLegacyBachelors<T extends {
     degreeTitle: string | null;
     institution: string | null;
     country: string | null;
-    durationYears: number | null;
-    durationCalculated: boolean;
   }>;
   assessment?: {
     resultJson: unknown;
@@ -181,8 +195,6 @@ function withLegacyBachelors<T extends {
           degreeTitle: bachelor.degreeTitle,
           institution: bachelor.institution,
           country: bachelor.country,
-          durationYears: bachelor.durationYears,
-          durationCalculated: bachelor.durationCalculated,
         }
       : null,
     assessment: (row.assessment?.resultJson as object | null) ?? null,
@@ -205,7 +217,7 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
       include: caseInclude(),
     });
     if (!row) return reply.code(404).send({ error: "Case not found" });
-    return withLegacyBachelors(row);
+    return withLegacyBachelors(await withoutPriorStudy(row));
   });
 
   app.patch("/cases/:id", async (req, reply) => {
@@ -330,6 +342,6 @@ export const caseRoutes: FastifyPluginAsync = async (app) => {
       where: { id },
       include: caseInclude(),
     });
-    return updated ? withLegacyBachelors(updated) : updated;
+    return updated ? withLegacyBachelors(await withoutPriorStudy(updated)) : updated;
   });
 };
