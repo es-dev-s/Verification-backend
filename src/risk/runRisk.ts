@@ -73,8 +73,14 @@ async function persistRisk(
  * Gate 1 must be open, or manual review with an assessor-selected occupation.
  */
 export function riskGateBlockReason(
-  assessment: Pick<AssessmentResult, "gate1" | "assessorSelected">,
+  assessment: Pick<AssessmentResult, "gate1" | "assessorSelected" | "workflowRouting">,
 ): string | null {
+  if (assessment.workflowRouting && !assessment.workflowRouting.allowRisk) {
+    return (
+      assessment.workflowRouting.message ||
+      "Risk analysis is not available: this case needs manual intervention."
+    );
+  }
   const gate = assessment.gate1;
   if (!gate || gate.result === "open") return null;
   if (gate.result === "manual_review" && assessment.assessorSelected) return null;

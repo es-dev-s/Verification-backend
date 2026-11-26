@@ -96,6 +96,7 @@ describe("manual occupation options", () => {
       { field: MANUAL_ANZSCO_FIELD, degreeLevel: null, finalValue: "mechanical-engineer" },
     ]);
     assert.equal(sel?.anzscoCode, "233512");
+    assert.equal(sel?.source, "assessor");
     // A level-scoped row or an unknown value is ignored.
     assert.equal(
       manualSelectionFrom([{ field: MANUAL_ANZSCO_FIELD, degreeLevel: "bachelor", finalValue: "mechanical-engineer" }]),
@@ -119,7 +120,9 @@ describe("assessor-selected occupation (Gate 1 manual review)", () => {
   it("scores only the chosen occupation, keeps the gate as manual review and marks the result", () => {
     const r = assessExtractedSubjects(ENG, { qualifications: MANUAL_REVIEW, manualSelection: mech.selection });
     assert.equal(r.gate1?.result, "manual_review");
-    assert.deepEqual(r.assessorSelected, mech.selection);
+    assert.equal(r.assessorSelected?.occupationId, mech.selection.occupationId);
+    assert.equal(r.assessorSelected?.anzscoCode, "233512");
+    assert.equal(r.assessorSelected?.source, "assessor");
     assert.deepEqual(
       (r.candidates ?? []).map((c) => c.anzscoCode),
       ["233512"],
@@ -148,6 +151,20 @@ describe("riskGateBlockReason", () => {
     assert.match(riskGateBlockReason({ gate1: gate("manual_review") }) ?? "", /manual review/);
     assert.equal(riskGateBlockReason({ gate1: gate("manual_review"), assessorSelected: sel }), null);
     assert.match(riskGateBlockReason({ gate1: gate("not_eligible"), assessorSelected: sel }) ?? "", /not eligible/);
+    assert.match(
+      riskGateBlockReason({
+        gate1: gate("open"),
+        workflowRouting: {
+          kind: "manual_intervention",
+          code: "closed_track",
+          message: "Needs manual intervention.",
+          minConfidence: 50,
+          highestConfidence: 80,
+          allowRisk: false,
+        },
+      }) ?? "",
+      /manual intervention/,
+    );
   });
 });
 

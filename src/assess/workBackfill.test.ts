@@ -46,7 +46,9 @@ const ROWS = [
   "Project Management",
   "Final Year Project",
 ].map(sub);
-const QUALS = [{ level: "bachelor" as const, title: "Bachelor of Engineering", countedYearsOverride: 4 }];
+const QUALS = [
+  { level: "bachelor" as const, title: "Bachelor of Engineering in Electrical Engineering", countedYearsOverride: 4 },
+];
 
 const related = (anzscoCode: string): OccupationWorkJudgement => ({
   anzscoCode,
@@ -70,7 +72,8 @@ const failJudge: WorkJudge = async () => {
 describe("backfilled card: work-experience judgement", () => {
   it("reuses a saved judgement (+4) without asking the judge", async () => {
     const all = scoreAllOccupations(ROWS, undefined, { workExperienceBoost: false, qualifications: QUALS });
-    const fill = all[4]!;
+    // Use the field-matched occupation so the −15 pp penalty is not in this check.
+    const fill = all.find((s) => s.rubric.anzscoCode.replace(/\s+/g, "") === "233311") ?? all[0]!;
     const before = fill.scored.confidenceScore;
     const fresh = await judgeBackfill([fill], {
       saved: [related(fill.rubric.anzscoCode)],

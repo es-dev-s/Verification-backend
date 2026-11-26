@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { EtTierDetail } from "./etTiers.js";
+import type { DegreeFieldSelection } from "./degreeField.js";
 import type { SpecialisationResult } from "./specialisation.js";
 import type { LateralEntryView } from "./lateralEntry.js";
 
@@ -472,6 +473,11 @@ export type AssessmentResult = {
   /** Family rules on the suggested ANZSCOs (primary, alternatives, ET Maybe Suitable). */
   familyAdjustment?: FamilyAdjustment;
   /**
+   * Degree-title field of study used to filter / penalise Professional Engineer
+   * occupations (ET Plus Degree Logic). Absent on older saved results.
+   */
+  degreeField?: DegreeFieldSelection;
+  /**
    * Work-experience judgements made on the last full run (whole shortlist,
    * up to boostShortlist occupations), reused on cached loads for an
    * occupation that is backfilled into the shown cards. Absent on older results.
@@ -489,6 +495,11 @@ export type AssessmentResult = {
    * no specific Associate ANZSCO reaches 70%. Absent on older results.
    */
   associateFallback?: AssociateFallback | null;
+  /**
+   * After scoring: 50% floor, closed-track Continue, specialisation Master's.
+   * Absent on older saved results.
+   */
+  workflowRouting?: WorkflowRouting;
 };
 
 /** One specific Associate ANZSCO in the 312999 near-miss list. */
@@ -571,11 +582,29 @@ export type FamilyAdjustment = {
   notes: string[];
 };
 
-/** Occupation picked by the assessor for a manual-review case. */
+/** Occupation picked by the assessor (manual review) or by Continue after a check. */
 export type AssessorSelected = {
   anzscoCode: string;
   title: string;
   occupationId: string;
+  /** `user` = Continue with this ANZSCO after a check. */
+  source?: "assessor" | "user";
+};
+
+/** Post-scoring routing (confidence floor, closed track, specialisation Master's). */
+export type WorkflowRoutingKind = "ok" | "manual_review" | "manual_intervention";
+export type WorkflowRoutingCode =
+  | "below_min_confidence"
+  | "closed_track"
+  | "specialisation_masters";
+
+export type WorkflowRouting = {
+  kind: WorkflowRoutingKind;
+  code: WorkflowRoutingCode | null;
+  message: string;
+  minConfidence: number;
+  highestConfidence: number;
+  allowRisk: boolean;
 };
 
 /** Unit a printed year / semester was read in. */
