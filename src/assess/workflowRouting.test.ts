@@ -4,7 +4,7 @@ import { assessExtractedSubjects } from "./assessCase.js";
 import { resolveManualOccupation } from "./manualOccupation.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
 import { riskGateBlockReason } from "../risk/runRisk.js";
-import type { AssessmentResult, ExtractedSubjectRow } from "./schemas.js";
+import type { AssessmentResult, ExtractedSubjectRow, Gate1Decision } from "./schemas.js";
 import {
   applyWorkflowRouting,
   specialisationMastersCheck,
@@ -88,7 +88,7 @@ function stubResult(over: Partial<AssessmentResult>): AssessmentResult {
         subjectCatalog: [],
       },
     ],
-    gate1: { result: "open", tracks: [], notes: [] } as AssessmentResult["gate1"],
+    gate1: { result: "open" } as Gate1Decision,
     ...over,
   };
 }
