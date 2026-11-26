@@ -14,6 +14,8 @@ import { listAcademicOccupations, listVocationalOccupations } from "./loadRubric
 import { TELECOM_ANZSCO, TELECOM_ANZSCO_CODES } from "./telecomGroup.js";
 
 export const MANUAL_ANZSCO_FIELD = "manualAnzsco";
+/** `user` | `assessor` — Continue with this ANZSCO vs Gate 1 picker. */
+export const MANUAL_ANZSCO_SOURCE_FIELD = "manualAnzsco.source";
 
 export type ManualOccupationOption = {
   /** Rubric occupation id (null when there is no rubric for the code). */
@@ -31,6 +33,7 @@ export type ManualSelection = {
   occupationId: string;
   anzscoCode: string;
   title: string;
+  source?: "assessor" | "user";
 };
 
 const TRACKS = ["professional_engineer", "engineering_technologist", "engineering_associate"] as const;
@@ -163,6 +166,15 @@ export const EM_CHECK_ONLY = "Engineering Manager has its own eligibility check.
 
 type FieldSourceLike = { field: string; degreeLevel?: unknown; finalValue?: string | null };
 
+export function manualSelectionSourceFrom(
+  fieldSources: readonly FieldSourceLike[],
+): "assessor" | "user" {
+  const row = fieldSources.find(
+    (f) => f.field === MANUAL_ANZSCO_SOURCE_FIELD && (f.degreeLevel ?? null) === null,
+  );
+  return row?.finalValue === "user" ? "user" : "assessor";
+}
+
 /** The saved assessor choice (null when none, or when it no longer resolves). */
 export function manualSelectionFrom(fieldSources: readonly FieldSourceLike[]): ManualSelection | null {
   const row = fieldSources.find((f) => f.field === MANUAL_ANZSCO_FIELD && (f.degreeLevel ?? null) === null);
@@ -170,16 +182,40 @@ export function manualSelectionFrom(fieldSources: readonly FieldSourceLike[]): M
   if (!value) return null;
   const r = resolveManualOccupation(value);
   // Engineering Manager has its own check; it is never a manual-review choice.
-  return r.ok && !isEngineeringManager(r.selection.occupationId) ? r.selection : null;
+  if (!r.ok || isEngineeringManager(r.selection.occupationId)) return null;
+  return { ...r.selection, source: manualSelectionSourceFrom(fieldSources) };
 }
 
-/** Save (or clear with null) the assessor choice for a case. */
-export async function saveManualSelection(caseId: string, selection: ManualSelection | null): Promise<void> {
+async function saveSourceRow(caseId: string, source: "assessor" | "user" | null): Promise<void> {
+  const existing = await prisma.fieldSource.findFirst({
+    where: { caseId, field: MANUAL_ANZSCO_SOURCE_FIELD, degreeLevel: null },
+  });
+  if (!source) {
+    if (existing) await prisma.fieldSource.delete({ where: { id: existing.id } });
+    return;
+  }
+  const data = { extractedValue: source, finalValue: source };
+  if (existing) {
+    await prisma.fieldSource.update({ where: { id: existing.id }, data });
+  } else {
+    await prisma.fieldSource.create({
+      data: { caseId, field: MANUAL_ANZSCO_SOURCE_FIELD, degreeLevel: null, ...data },
+    });
+  }
+}
+
+/** Save (or clear with null) the assessor / user-continue choice for a case. */
+export async function saveManualSelection(
+  caseId: string,
+  selection: ManualSelection | null,
+  source: "assessor" | "user" = "assessor",
+): Promise<void> {
   const existing = await prisma.fieldSource.findFirst({
     where: { caseId, field: MANUAL_ANZSCO_FIELD, degreeLevel: null },
   });
   if (!selection) {
     if (existing) await prisma.fieldSource.delete({ where: { id: existing.id } });
+    await saveSourceRow(caseId, null);
     return;
   }
   const data = { extractedValue: selection.anzscoCode, finalValue: selection.occupationId };
@@ -190,6 +226,7 @@ export async function saveManualSelection(caseId: string, selection: ManualSelec
       data: { caseId, field: MANUAL_ANZSCO_FIELD, degreeLevel: null, ...data },
     });
   }
+  await saveSourceRow(caseId, selection.source ?? source);
 }
 
 /** Raised by a saved-subjects-only run when the case has no saved subjects. */

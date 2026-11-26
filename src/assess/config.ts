@@ -103,4 +103,9 @@ export const assessConfig = {
   },
   /** Only recommend ANZSCO when determination is verified_no_risk or conditional. */
   recommendOn: ["verified_no_risk", "conditional"] as const,
+  /**
+   * Auto-recommend only when the highest ANZSCO confidence is at least this
+   * (percentage). Override with ASSESS_MIN_CONFIDENCE.
+   */
+  minConfidence: floatEnv("ASSESS_MIN_CONFIDENCE", 50),
 };

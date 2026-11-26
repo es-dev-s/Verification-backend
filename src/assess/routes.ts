@@ -43,6 +43,8 @@ const assessRunBody = z.object({
   force: z.boolean().optional(),
   /** Manual review: occupation id or ANZSCO code to score; null clears it. */
   manualOccupation: z.string().trim().max(120).nullable().optional(),
+  /** After a check: lock this ANZSCO even when Gate 1 is open (User-selected). */
+  continueOccupation: z.string().trim().max(120).nullable().optional(),
 });
 
 /** Assessor check of one ANZSCO (read-only). */
@@ -78,11 +80,13 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
     });
     if (!existing) return reply.code(404).send({ error: "Case not found" });
 
-    if (body.manualOccupation !== undefined) {
-      if (body.manualOccupation === null || body.manualOccupation === "") {
+    const occupationPick = body.continueOccupation !== undefined ? body.continueOccupation : body.manualOccupation;
+    const occupationSource = body.continueOccupation !== undefined ? "user" : "assessor";
+    if (occupationPick !== undefined) {
+      if (occupationPick === null || occupationPick === "") {
         await saveManualSelection(id, null);
       } else {
-        const resolved = resolveManualOccupation(body.manualOccupation);
+        const resolved = resolveManualOccupation(occupationPick);
         if (!resolved.ok) return reply.code(400).send({ error: resolved.error });
         if (isEngineeringManager(resolved.selection.occupationId)) {
           return reply.code(400).send({ error: EM_CHECK_ONLY });
@@ -97,7 +101,7 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
             }
           }
         }
-        await saveManualSelection(id, resolved.selection);
+        await saveManualSelection(id, resolved.selection, occupationSource);
       }
     }
 
@@ -108,7 +112,12 @@ export const assessRoutes: FastifyPluginAsync = async (app) => {
     try {
       const result = await assessCase(id, {
         subjectsOnly: true,
-        rescore: Boolean(body.rescore || body.force || body.manualOccupation !== undefined),
+        rescore: Boolean(
+          body.rescore ||
+            body.force ||
+            body.manualOccupation !== undefined ||
+            body.continueOccupation !== undefined,
+        ),
       });
       return result;
     } catch (err) {

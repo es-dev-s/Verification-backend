@@ -3127,12 +3127,12 @@
         {
           "severity": "medium",
           "field": "coreUnits.mode",
-          "message": "The sheet lists 132 Group A-E units (UEE62122 elective groups). They are scored as a pool: matched units counted against 24 with bands 21 / 15 / 9. Confirm the required count."
+          "message": "The sheet lists 182 Group A-E units (UEE62122 elective groups; foundational codes that also appear in core columns are kept foundational-only). Scored as a pool against 24 with bands 21 / 15 / 9."
         },
         {
           "severity": "medium",
           "field": "coreUnits.units",
-          "message": "Previous core units not on the updated sheet and no longer counted: UEECD0007, UEECD0030, UEECD0031, UEECD0032, UEECD0038, UEECD0044, UEECD0046, UEECD0051, UEECD0064, UEEEL0006, UEEEL0014, UEEEL0079, UEEEL0080, UEEIC0048, BSBSMB401, BSBSMB402."
+          "message": "Sheet refresh 2026-11: foundational 17→27, core pool 132→182. Overlap codes on both sheet columns (UEECD0017, UEECS0033) stay foundational-only so Tier 1 matching is not consumed by the core pool."
         },
         {
           "severity": "low",
@@ -3142,7 +3142,7 @@
         {
           "severity": "low",
           "field": "foundationalUnits.thresholds",
-          "message": "Tier 1 Foundational bands 14 / 11 of 17 (about 85% / 65%, rounded). Below 11 = flag (verified capped at conditional)."
+          "message": "Tier 1 Foundational bands 22 / 17 of 27 (about 85% / 65%, rounded from prior 14 / 11 of 17). Below 17 = flag (verified capped at conditional)."
         }
       ],
       "qualification": {
@@ -3182,33 +3182,33 @@
           },
           {
             "id": "U2",
-            "code": "BSBINN502",
-            "title": "Build and sustain an innovative work environment",
-            "cluster": "Group A: Imported and common elective units"
-          },
-          {
-            "id": "U3",
-            "code": "BSBMGT502",
-            "title": "Manage people performance",
-            "cluster": "Group A: Imported and common elective units"
-          },
-          {
-            "id": "U4",
-            "code": "BSBMGT516",
-            "title": "Facilitate continuous improvement",
-            "cluster": "Group A: Imported and common elective units"
-          },
-          {
-            "id": "U5",
-            "code": "BSBWOR502",
-            "title": "Lead and manage team effectiveness",
-            "cluster": "Group A: Imported and common elective units"
-          },
-          {
-            "id": "U6",
             "code": "UEEAS0007",
             "title": "Assemble, mount and connect control gear and switchgear",
             "cluster": "Group B"
+          },
+          {
+            "id": "U3",
+            "code": "UEECD0013",
+            "title": "Develop and implement energy sector maintenance programs",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U4",
+            "code": "UEECO0014",
+            "title": "Prepare tender submissions for electrotechnology projects",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U5",
+            "code": "UEECD0049",
+            "title": "Use advanced computational processes to provide solutions to energy sector engineering problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U6",
+            "code": "BSBINN502",
+            "title": "Build and sustain an innovative work environment",
+            "cluster": "Group A: Imported and common elective units"
           },
           {
             "id": "U7",
@@ -3218,54 +3218,280 @@
           },
           {
             "id": "U8",
+            "code": "UEECO0001",
+            "title": "Estimate electrotechnology projects",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U9",
+            "code": "UEECS0016",
+            "title": "Develop energy sector directory services",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U10",
+            "code": "UEECO0003",
+            "title": "Manage contract variations",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U11",
+            "code": "BSBMGT502",
+            "title": "Manage people performance",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U12",
             "code": "UEEAS0009",
             "title": "Mount and wire control panel equipment",
             "cluster": "Group B"
           },
           {
-            "id": "U9",
+            "id": "U13",
+            "code": "UEEEL0007",
+            "title": "Develop detailed electrical drawings",
+            "cluster": "Group C",
+            "tgaStatus": "current",
+            "equivalentCodes": [
+              {
+                "code": "UEENEEG179A",
+                "relation": "older code this unit supersedes",
+                "title": "Develop detailed electrical drawings",
+                "mappingDate": "2020-10-04",
+                "source": "https://training.gov.au/training/details/UEEEL0007/unitdetails"
+              }
+            ]
+          },
+          {
+            "id": "U14",
+            "code": "UEEEL0011",
+            "title": "Evaluate performance of low voltage electrical apparatus",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U15",
+            "code": "UEECS0012",
+            "title": "Design embedded controller control systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U16",
+            "code": "BSBMGT516",
+            "title": "Facilitate continuous improvement",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U17",
             "code": "UEECD0028",
             "title": "Plan an integrated cabling installation system",
             "cluster": "Group B"
           },
           {
-            "id": "U10",
+            "id": "U18",
+            "code": "UEEEL0027",
+            "title": "Carry out low voltage electrical field testing and report findings",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U19",
+            "code": "UEEEL0037",
+            "title": "Design electrical installations with a low voltage demand greater than 400 A per phase",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U20",
+            "code": "UEECS0015",
+            "title": "Develop energy sector computer network applications infrastructure",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U21",
+            "code": "BSBWOR502",
+            "title": "Lead and manage team effectiveness",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U22",
             "code": "UEEDV0005",
             "title": "Install and maintain cabling for multiple access to telecommunication services",
             "cluster": "Group B"
           },
           {
-            "id": "U11",
+            "id": "U23",
+            "code": "UEEEL0029",
+            "title": "Conduct compliance inspection of LV electrical installations with demand exceeding 100 A per phase",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U24",
+            "code": "UEEHA0007",
+            "title": "Plan electrical installations for hazardous areas",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U25",
+            "code": "UEECS0017",
+            "title": "Develop industrial control programs for microcomputer equipped devices",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U26",
+            "code": "BSBINS501",
+            "title": "Implement information and knowledge management systems",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U27",
             "code": "UEEDV0008",
             "title": "Install, modify and verify coaxial and structured communication copper cabling",
             "cluster": "Group B"
           },
           {
-            "id": "U12",
+            "id": "U28",
+            "code": "UEEEL0030",
+            "title": "Conduct compliance inspection of single phase LV electrical installations",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U29",
+            "code": "UEEIC0001",
+            "title": "Analyse complex electronic circuits controlling fluids",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U30",
+            "code": "UEECS0027",
+            "title": "Provide programming solution for computer systems engineering problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U31",
+            "code": "BSBLDR522",
+            "title": "Manage people performance",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U32",
             "code": "UEEEC0003",
             "title": "Assemble and set up basic security systems",
             "cluster": "Group B"
           },
           {
-            "id": "U13",
+            "id": "U33",
+            "code": "UEEEL0031",
+            "title": "Conduct compliance inspection of special LV electrical installations",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U34",
+            "code": "UEEIC0005",
+            "title": "Configure and maintain industrial control system networks",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U35",
+            "code": "UEEEL0038",
+            "title": "Design switchboards rated for high fault levels (greater than 400 A)",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U36",
+            "code": "BSBOPS203",
+            "title": "Deliver a service to customers",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U37",
             "code": "UEEEC0060",
             "title": "Repairs basic electronic apparatus faults by replacement of components",
             "cluster": "Group B"
           },
           {
-            "id": "U14",
+            "id": "U38",
+            "code": "UEEEL0032",
+            "title": "Conduct electrical tests on HV electrical machines",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U39",
+            "code": "UEERE0012",
+            "title": "Develop effective engineering strategies for energy reduction in buildings",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U40",
+            "code": "UEEEL0043",
+            "title": "Develop engineering solutions for induction machine and control problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U41",
+            "code": "BSBSTR501",
+            "title": "Establish innovative work environments",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U42",
             "code": "UEEEC0075",
             "title": "Troubleshoot single phase input d.c power supplies",
             "cluster": "Group B"
           },
           {
-            "id": "U15",
+            "id": "U43",
+            "code": "UEEEL0036",
+            "title": "Design effective and efficient lighting for residential and commercial buildings",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U44",
+            "code": "UETTDRIS69",
+            "title": "Diagnose and rectify faults in energy supply apparatus",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U45",
+            "code": "UEEIC0006",
+            "title": "Design and configure human-machine interface (HMI) networks",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U46",
+            "code": "BSBSTR502",
+            "title": "Facilitate continuous improvement",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U47",
             "code": "UEEEL0004",
             "title": "Carry out basic repairs to electrical components and equipment",
             "cluster": "Group B"
           },
           {
-            "id": "U16",
+            "id": "U48",
+            "code": "UEEEL0040",
+            "title": "Develop compliance policies and plans to conduct an electrical contracting business",
+            "cluster": "Group C"
+          },
+          {
+            "id": "U49",
+            "code": "UETTDRIS70",
+            "title": "Diagnose and rectify faults in electrical energy distribution systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U50",
+            "code": "UEEIC0007",
+            "title": "Design and use advanced programming tools, PC networks and HMI Interfacing",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U51",
+            "code": "BSBTWK502",
+            "title": "Manage team effectiveness",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U52",
             "code": "UEEEL0013",
             "title": "Install, set up and commission interval metering",
             "cluster": "Group B",
@@ -3290,547 +3516,631 @@
             ]
           },
           {
-            "id": "U17",
-            "code": "UEEEL0016",
-            "title": "Provide advice on effective and energy efficient lighting products",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U18",
-            "code": "UEEEL0017",
-            "title": "Repair and maintain mechanical components of electrical machines",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U19",
-            "code": "UEEEL0022",
-            "title": "Supply effective and efficient lighting products for domestic and small commercial applications",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U20",
-            "code": "UEEEL0026",
-            "title": "Align and install traction lift equipment",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U21",
-            "code": "UEEEL0033",
-            "title": "Conduct electrical tests on LV electrical machines",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U22",
-            "code": "UEEEL0034",
-            "title": "Conduct mechanical tests on electrical machines and components",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U23",
-            "code": "UEEEL0045",
-            "title": "Diagnose and rectify faults in traction lift systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U24",
-            "code": "UEEEL0046",
-            "title": "Find and repair faults in LV d.c. electrical apparatus and circuits",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U25",
-            "code": "UEEEL0048",
-            "title": "Install and maintain emergency lighting systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U26",
-            "code": "UEEEL0049",
-            "title": "Install and maintain emergency safety systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U27",
-            "code": "UEEEL0052",
-            "title": "Maintain and service traction lift systems and equipment",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U28",
-            "code": "UEEEL0053",
-            "title": "Maintain operation of electrical marine equipment and systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U29",
-            "code": "UEEEL0054",
-            "title": "Maintain operation of electrical mining equipment and systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U30",
-            "code": "UEEEL0055",
-            "title": "Overhaul and repair major switchgear and control gear",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U31",
-            "code": "UEEEL0056",
-            "title": "Place and connect electrical coils",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U32",
-            "code": "UEEEL0061",
-            "title": "Provide advice on the application of energy efficient lighting for ambient and aesthetic effect",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U33",
-            "code": "UEEEL0066",
-            "title": "Rewind LV direct current machines",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U34",
-            "code": "UEEEL0067",
-            "title": "Rewind single phase machines",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U35",
-            "code": "UEEEL0068",
-            "title": "Rewind three phase low voltage induction machines",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U36",
-            "code": "UEEEL0069",
-            "title": "Select and arrange equipment for special LV electrical installations",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U37",
-            "code": "UEEEL0074",
-            "title": "Wind electrical coils",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U38",
-            "code": "UEEHA0001",
-            "title": "Conduct detailed inspection of electrical installations for hazardous areas",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U39",
-            "code": "UEEHA0003",
-            "title": "Determine the explosion-protection requirements to meet a specified classified hazardous area",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U40",
-            "code": "UEEHA0005",
-            "title": "Install explosion-protected equipment and associated apparatus and wiring systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U41",
-            "code": "UEEHA0006",
-            "title": "Maintain equipment associated with hazardous areas",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U42",
-            "code": "UEEIC0002",
-            "title": "Assemble, enter and verify operating instructions in microprocessor equipped devices",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U43",
-            "code": "UEEIC0011",
-            "title": "Develop electrical integrated systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U44",
-            "code": "UEEIC0013",
-            "title": "Develop, enter and verify discrete control programs for programmable controllers",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U45",
-            "code": "UEEIC0024",
-            "title": "Plan the electrical installation of integrated systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U46",
-            "code": "UEEIC0025",
-            "title": "Provide solutions to extra-low voltage (ELV) electro-pneumatic control systems and drives",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U47",
-            "code": "UEEIC0038",
-            "title": "Solve problems in density/level measurement components and systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U48",
-            "code": "UEEIC0039",
-            "title": "Solve problems in flow measurement components and systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U49",
-            "code": "UEEIC0041",
-            "title": "Solve problems in pressure measurement components and systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U50",
-            "code": "UEEIC0043",
-            "title": "Solve problems in temperature measurement components and systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U51",
-            "code": "UEEIC0047",
-            "title": "Use instrumentation drawings, specifications, standards and equipment manuals",
-            "cluster": "Group B",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEI101A",
-                "relation": "older code this unit supersedes",
-                "title": "Use instrumentation drawings, specification, standards and equipment manuals",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEEIC0047/unitdetails"
-              }
-            ]
-          },
-          {
-            "id": "U52",
-            "code": "UEERA0035",
-            "title": "Establish the basic operating conditions of air conditioning systems",
-            "cluster": "Group B"
-          },
-          {
             "id": "U53",
-            "code": "UEERA0036",
-            "title": "Establish the basic operating conditions of vapour compression systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U54",
-            "code": "UEERA0059",
-            "title": "Prepare and connect refrigerant tubing and fittings",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U55",
-            "code": "UEERE0001",
-            "title": "Apply environmentally and sustainable procedures in the energy sector",
-            "cluster": "Group B",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEK142A",
-                "relation": "older code this unit supersedes",
-                "title": "Apply environmentally and sustainable procedures in the energy sector",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEERE0001/unitdetails"
-              }
-            ]
-          },
-          {
-            "id": "U56",
-            "code": "UEERE0016",
-            "title": "Install, configure and commission LV grid-connected photovoltaic power systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U57",
-            "code": "UEERE0022",
-            "title": "Solve basic problems in photovoltaic energy apparatus and systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U58",
-            "code": "UETTDRIS44",
-            "title": "Perform HV field switching operation to a given schedule",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U59",
-            "code": "UETTDRIS67",
-            "title": "Solve problems in energy supply network equipment",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U60",
-            "code": "UETTDRIS68",
-            "title": "Solve problems in energy supply network protection equipment and systems",
-            "cluster": "Group B"
-          },
-          {
-            "id": "U61",
-            "code": "UEECD0013",
-            "title": "Develop and implement energy sector maintenance programs",
-            "cluster": "Group C"
-          },
-          {
-            "id": "U62",
-            "code": "UEECO0001",
-            "title": "Estimate electrotechnology projects",
-            "cluster": "Group C"
-          },
-          {
-            "id": "U63",
-            "code": "UEEEL0007",
-            "title": "Develop detailed electrical drawings",
-            "cluster": "Group C",
-            "tgaStatus": "current",
-            "equivalentCodes": [
-              {
-                "code": "UEENEEG179A",
-                "relation": "older code this unit supersedes",
-                "title": "Develop detailed electrical drawings",
-                "mappingDate": "2020-10-04",
-                "source": "https://training.gov.au/training/details/UEEEL0007/unitdetails"
-              }
-            ]
-          },
-          {
-            "id": "U64",
-            "code": "UEEEL0027",
-            "title": "Carry out low voltage electrical field testing and report findings",
-            "cluster": "Group C"
-          },
-          {
-            "id": "U65",
-            "code": "UEEEL0029",
-            "title": "Conduct compliance inspection of LV electrical installations with demand exceeding 100 A per phase",
-            "cluster": "Group C"
-          },
-          {
-            "id": "U66",
-            "code": "UEEEL0030",
-            "title": "Conduct compliance inspection of single phase LV electrical installations",
-            "cluster": "Group C"
-          },
-          {
-            "id": "U67",
-            "code": "UEEEL0031",
-            "title": "Conduct compliance inspection of special LV electrical installations",
-            "cluster": "Group C"
-          },
-          {
-            "id": "U68",
-            "code": "UEEEL0032",
-            "title": "Conduct electrical tests on HV electrical machines",
-            "cluster": "Group C"
-          },
-          {
-            "id": "U69",
-            "code": "UEEEL0036",
-            "title": "Design effective and efficient lighting for residential and commercial buildings",
-            "cluster": "Group C"
-          },
-          {
-            "id": "U70",
-            "code": "UEEEL0040",
-            "title": "Develop compliance policies and plans to conduct an electrical contracting business",
-            "cluster": "Group C"
-          },
-          {
-            "id": "U71",
             "code": "UEEEL0044",
             "title": "Diagnose and rectify faults in complex lift systems",
             "cluster": "Group C"
           },
           {
-            "id": "U72",
+            "id": "U54",
+            "code": "UETTDRIS71",
+            "title": "Diagnose and rectify faults in electrical energy supply transmission systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U55",
+            "code": "UEEIC0010",
+            "title": "Develop and test code for microcontroller devices",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U56",
+            "code": "ICTICT214",
+            "title": "Operate application software packages",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U57",
+            "code": "UEEEL0016",
+            "title": "Provide advice on effective and energy efficient lighting products",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U58",
             "code": "UEEEL0050",
             "title": "Install and replace low voltage current transformer metering",
             "cluster": "Group C"
           },
           {
-            "id": "U73",
+            "id": "U59",
+            "code": "UETTDRIS72",
+            "title": "Diagnose and rectify faults in distributed generation systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U60",
+            "code": "UEEIC0016",
+            "title": "Diagnose and rectify faults in a.c. motor drive systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U61",
+            "code": "ICTPRG440",
+            "title": "Apply introductory programming skills in different languages",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U62",
+            "code": "UEEEL0017",
+            "title": "Repair and maintain mechanical components of electrical machines",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U63",
             "code": "UEEEL0051",
             "title": "Investigate and report on electrical incidents and causes",
             "cluster": "Group C"
           },
           {
-            "id": "U74",
+            "id": "U64",
+            "code": "ICTNWK426",
+            "title": "Install and configure client-server applications and services",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U65",
+            "code": "UEEIC0017",
+            "title": "Diagnose and rectify faults in d.c. motor drive systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U66",
+            "code": "ICTPRG443",
+            "title": "Apply intermediate programming skills in different languages",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U67",
+            "code": "UEEEL0022",
+            "title": "Supply effective and efficient lighting products for domestic and small commercial applications",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U68",
             "code": "UEEEL0057",
             "title": "Plan electrical installations with a low voltage demand up to 400 A per phase",
             "cluster": "Group C"
           },
           {
-            "id": "U75",
+            "id": "U69",
+            "code": "UEEIC0019",
+            "title": "Diagnose and rectify faults in servo drive systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U70",
+            "code": "UEECD0019",
+            "title": "Fabricate, assemble and dismantle utilities industry components",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U71",
+            "code": "UEEEL0026",
+            "title": "Align and install traction lift equipment",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U72",
             "code": "UEEEL0059",
             "title": "Plan low voltage switchboard and control panel layouts",
             "cluster": "Group C"
           },
           {
+            "id": "U73",
+            "code": "UEECD0032",
+            "title": "Produce detailed electrotechnology/utilities drawings using CAD equipment and software",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U74",
+            "code": "UETTDRIS73",
+            "title": "Develop engineering solutions for energy supply power transformer problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U75",
+            "code": "UEECD0020",
+            "title": "Fix and secure electrotechnology equipment",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
             "id": "U76",
+            "code": "UEEEL0033",
+            "title": "Conduct electrical tests on LV electrical machines",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U77",
             "code": "UEEEL0060",
             "title": "Prepare quotations for the supply of effective and efficient lighting products for lighting projects",
             "cluster": "Group C"
           },
           {
-            "id": "U77",
+            "id": "U78",
+            "code": "UEECS0004",
+            "title": "Commission industrial computer systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U79",
+            "code": "UETTDRIS74",
+            "title": "Develop engineering solutions for energy supply system protection problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U80",
+            "code": "UEECD0035",
+            "title": "Provide basic instruction in the use of electrotechnology apparatus",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U81",
+            "code": "UEEEL0034",
+            "title": "Conduct mechanical tests on electrical machines and components",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U82",
             "code": "UEEEL0063",
             "title": "Provide photometric data for illumination system design",
             "cluster": "Group C"
           },
           {
-            "id": "U78",
+            "id": "U83",
+            "code": "UEECS0025",
+            "title": "Modify/redesign industrial computer systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U84",
+            "code": "UEECD0037",
+            "title": "Provide engineering solutions for uses of materials and thermodynamic effects",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U85",
+            "code": "UEECD0051",
+            "title": "Use drawings, diagrams, schedules, standards, codes and specifications",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U86",
+            "code": "UEEEL0045",
+            "title": "Diagnose and rectify faults in traction lift systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U87",
             "code": "UEEEL0064",
             "title": "Rewind HV three phase induction machines rated for voltages above 3.3 kV",
             "cluster": "Group C"
           },
           {
-            "id": "U79",
+            "id": "U88",
+            "code": "UEEEL0006",
+            "title": "Develop detailed and complex drawings for electrical systems using CAD systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U89",
+            "code": "UEEEC0005",
+            "title": "Assess electronic apparatus compliance",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U90",
+            "code": "UEECO0002",
+            "title": "Maintain documentation",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U91",
+            "code": "UEEEL0046",
+            "title": "Find and repair faults in LV d.c. electrical apparatus and circuits",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U92",
             "code": "UEEEL0065",
             "title": "Rewind HV three phase induction machines rated for voltages to 3.3 kV",
             "cluster": "Group C"
           },
           {
-            "id": "U80",
+            "id": "U93",
+            "code": "UEEEL0035",
+            "title": "Design effective and efficient lighting for public, open and sports areas",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U94",
+            "code": "UEEEC0011",
+            "title": "Design and develop electronics/computer systems projects",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U95",
+            "code": "UEECO0015",
+            "title": "Provide quotations for installation or service jobs",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U96",
+            "code": "UEEEL0048",
+            "title": "Install and maintain emergency lighting systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U97",
             "code": "UEEEL0070",
             "title": "Select effective and efficient light sources and luminaries for given locations and designs",
             "cluster": "Group C"
           },
           {
-            "id": "U81",
+            "id": "U98",
+            "code": "UEEEC0014",
+            "title": "Design signal-conditioning sub-systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U99",
+            "code": "UEECO0017",
+            "title": "Source and purchase material/parts for installation or service jobs",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U100",
+            "code": "UEEEL0049",
+            "title": "Install and maintain emergency safety systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U101",
             "code": "UEEEL0071",
             "title": "Select low voltage power factor correction equipment",
             "cluster": "Group C"
           },
           {
-            "id": "U82",
+            "id": "U102",
+            "code": "UEEIC0051",
+            "title": "Evaluate motor drive systems and diagnose faults",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U103",
+            "code": "UEEEC0045",
+            "title": "Modify digital signal processing (DSP) based sub-systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U104",
+            "code": "UEECD0002",
+            "title": "Analyse static and dynamic parameters of electrical equipment",
+            "cluster": "Group A: Imported and common elective units"
+          },
+          {
+            "id": "U105",
+            "code": "UEEEL0052",
+            "title": "Maintain and service traction lift systems and equipment",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U106",
             "code": "UEEEL0072",
             "title": "Set up and place LV electrical apparatus and associated circuits into service",
             "cluster": "Group C"
           },
           {
-            "id": "U83",
+            "id": "U107",
+            "code": "UEERE0062",
+            "title": "Design micro-hydro systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U108",
+            "code": "UEEEL0041",
+            "title": "Develop engineering solution for synchronous machine and control problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U109",
+            "code": "UEEEL0053",
+            "title": "Maintain operation of electrical marine equipment and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U110",
             "code": "UEEEL0073",
             "title": "Verify compliance and functionality of special LV electrical installations",
             "cluster": "Group C"
           },
           {
-            "id": "U84",
+            "id": "U111",
+            "code": "UEERE0064",
+            "title": "Design renewable energy heating systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U112",
+            "code": "UEEEL0042",
+            "title": "Develop engineering solutions for d.c. machine and control problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U113",
+            "code": "UEEEL0054",
+            "title": "Maintain operation of electrical mining equipment and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U114",
             "code": "UEEHA0002",
             "title": "Conduct visual and close inspection of electrical installations for hazardous areas",
             "cluster": "Group C"
           },
           {
-            "id": "U85",
+            "id": "U115",
+            "code": "UEERE0065",
+            "title": "Design wind energy systems",
+            "cluster": "Group D"
+          },
+          {
+            "id": "U116",
+            "code": "UEEHA0017",
+            "title": "Classify areas where a combustible dust hazard may arise",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U117",
+            "code": "UEEEL0055",
+            "title": "Overhaul and repair major switchgear and control gear",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U118",
             "code": "UEEHA0004",
             "title": "Enter a classified hazardous area to undertake work related to electrical equipment",
             "cluster": "Group C"
           },
           {
-            "id": "U86",
+            "id": "U119",
+            "code": "UEEHA0018",
+            "title": "Classify areas where flammable gas or vapour hazards may arise",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U120",
+            "code": "UEEEL0056",
+            "title": "Place and connect electrical coils",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U121",
             "code": "UEEHA0009",
             "title": "Develop and manage periodic electrical inspection and maintenance programs for hazardous areas",
             "cluster": "Group C"
           },
           {
-            "id": "U87",
+            "id": "U122",
+            "code": "UEERE0059",
+            "title": "Design energy management controls for electrical installations in buildings",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U123",
+            "code": "UEEEL0061",
+            "title": "Provide advice on the application of energy efficient lighting for ambient and aesthetic effect",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U124",
             "code": "UEEIC0009",
             "title": "Develop an electrical integrated system interface for access through a touch screen",
             "cluster": "Group C"
           },
           {
-            "id": "U88",
+            "id": "U125",
+            "code": "UEERE0066",
+            "title": "Develop effective engineering strategies for energy reduction in buildings",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U126",
+            "code": "UEEEL0066",
+            "title": "Rewind LV direct current machines",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U127",
             "code": "UEEIC0012",
             "title": "Develop structured programs to control external devices",
             "cluster": "Group C"
           },
           {
-            "id": "U89",
+            "id": "U128",
+            "code": "UEERE0063",
+            "title": "Design off-grid photovoltaic/generating set systems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U129",
+            "code": "UEEEL0067",
+            "title": "Rewind single phase machines",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U130",
             "code": "UEEIC0014",
             "title": "Develop, enter and verify programs in supervisory control and data acquisition systems",
             "cluster": "Group C"
           },
           {
-            "id": "U90",
+            "id": "U131",
+            "code": "UEERE0067",
+            "title": "Develop engineering solutions to renewable energy (RE) problems",
+            "cluster": "Group E"
+          },
+          {
+            "id": "U132",
+            "code": "UEEEL0068",
+            "title": "Rewind three phase low voltage induction machines",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U133",
             "code": "UEEIC0015",
             "title": "Develop, enter and verify word and analogue control programs for programmable logic controllers",
             "cluster": "Group C"
           },
           {
-            "id": "U91",
+            "id": "U134",
+            "code": "UEEEL0069",
+            "title": "Select and arrange equipment for special LV electrical installations",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U135",
             "code": "UEEIC0018",
             "title": "Diagnose and rectify faults in digital controls systems",
             "cluster": "Group C"
           },
           {
-            "id": "U92",
+            "id": "U136",
+            "code": "UEEEL0074",
+            "title": "Wind electrical coils",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U137",
             "code": "UEEIC0020",
             "title": "Fault find and repair analogue circuits and components in electronic control systems",
             "cluster": "Group C"
           },
           {
-            "id": "U93",
+            "id": "U138",
+            "code": "UEEHA0001",
+            "title": "Conduct detailed inspection of electrical installations for hazardous areas",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U139",
             "code": "UEEIC0026",
             "title": "Provide solutions to fluid circuit operations",
             "cluster": "Group C"
           },
           {
-            "id": "U94",
+            "id": "U140",
+            "code": "UEEHA0003",
+            "title": "Determine the explosion-protection requirements to meet a specified classified hazardous area",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U141",
             "code": "UEEIC0027",
             "title": "Provide solutions to pneumatic-hydraulic system operations",
             "cluster": "Group C"
           },
           {
-            "id": "U95",
+            "id": "U142",
+            "code": "UEEHA0005",
+            "title": "Install explosion-protected equipment and associated apparatus and wiring systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U143",
             "code": "UEEIC0028",
             "title": "Provide solutions to problems in industrial control systems",
             "cluster": "Group C"
           },
           {
-            "id": "U96",
+            "id": "U144",
+            "code": "UEEHA0006",
+            "title": "Maintain equipment associated with hazardous areas",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U145",
             "code": "UEEIC0034",
             "title": "Set up industrial field control devices",
             "cluster": "Group C"
           },
           {
-            "id": "U97",
+            "id": "U146",
+            "code": "UEEIC0002",
+            "title": "Assemble, enter and verify operating instructions in microprocessor equipped devices",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U147",
             "code": "UEEIC0040",
             "title": "Solve problems in polyphase electronic power control circuits",
             "cluster": "Group C"
           },
           {
-            "id": "U98",
+            "id": "U148",
+            "code": "UEEIC0011",
+            "title": "Develop electrical integrated systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U149",
             "code": "UEEIC0042",
             "title": "Solve problems in single phase electronic power control circuits",
             "cluster": "Group C"
           },
           {
-            "id": "U99",
+            "id": "U150",
+            "code": "UEEIC0013",
+            "title": "Develop, enter and verify discrete control programs for programmable controllers",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U151",
             "code": "UEERE0003",
             "title": "Assess energy loads and uses for energy efficiency in commercial facilities",
             "cluster": "Group C"
           },
           {
-            "id": "U100",
+            "id": "U152",
+            "code": "UEEIC0024",
+            "title": "Plan the electrical installation of integrated systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U153",
             "code": "UEERE0004",
             "title": "Assess energy loads and uses for energy efficiency in industrial properties and enterprises",
             "cluster": "Group C"
           },
           {
-            "id": "U101",
+            "id": "U154",
+            "code": "UEEIC0025",
+            "title": "Provide solutions to extra-low voltage (ELV) electro-pneumatic control systems and drives",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U155",
             "code": "UEERE0005",
             "title": "Assess energy loads and uses for energy efficiency in residential, office and retail premises",
             "cluster": "Group C"
           },
           {
-            "id": "U102",
+            "id": "U156",
+            "code": "UEEIC0038",
+            "title": "Solve problems in density/level measurement components and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U157",
             "code": "UEERE0011",
             "title": "Design grid-connected photovoltaic power supply systems",
             "cluster": "Group C",
@@ -3855,184 +4165,174 @@
             ]
           },
           {
-            "id": "U103",
+            "id": "U158",
+            "code": "UEEIC0039",
+            "title": "Solve problems in flow measurement components and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U159",
             "code": "UEERE0014",
             "title": "Develop strategies to address sustainability issues for electrical installations",
             "cluster": "Group C"
           },
           {
-            "id": "U104",
+            "id": "U160",
+            "code": "UEEIC0041",
+            "title": "Solve problems in pressure measurement components and systems",
+            "cluster": "Group B"
+          },
+          {
+            "id": "U161",
             "code": "UEERE0015",
             "title": "Implement and monitor energy sector environmental and sustainable policies and procedures",
             "cluster": "Group C"
           },
           {
-            "id": "U105",
-            "code": "UEECO0014",
-            "title": "Prepare tender submissions for electrotechnology projects",
-            "cluster": "Group D"
+            "id": "U162",
+            "code": "UEEIC0043",
+            "title": "Solve problems in temperature measurement components and systems",
+            "cluster": "Group B"
           },
           {
-            "id": "U106",
-            "code": "UEECS0016",
-            "title": "Develop energy sector directory services",
-            "cluster": "Group D"
+            "id": "U163",
+            "code": "UEERE0061",
+            "title": "Design grid-connected photovoltaic power supply systems",
+            "cluster": "Group C"
           },
           {
-            "id": "U107",
-            "code": "UEEEL0011",
-            "title": "Evaluate performance of low voltage electrical apparatus",
-            "cluster": "Group D"
+            "id": "U164",
+            "code": "UEEIC0047",
+            "title": "Use instrumentation drawings, specifications, standards and equipment manuals",
+            "cluster": "Group B",
+            "tgaStatus": "current",
+            "equivalentCodes": [
+              {
+                "code": "UEENEEI101A",
+                "relation": "older code this unit supersedes",
+                "title": "Use instrumentation drawings, specification, standards and equipment manuals",
+                "mappingDate": "2020-10-04",
+                "source": "https://training.gov.au/training/details/UEEIC0047/unitdetails"
+              }
+            ]
           },
           {
-            "id": "U108",
-            "code": "UEEEL0037",
-            "title": "Design electrical installations with a low voltage demand greater than 400 A per phase",
-            "cluster": "Group D"
+            "id": "U165",
+            "code": "UEERE0060",
+            "title": "Design grid-connected battery storage systems",
+            "cluster": "Group C"
           },
           {
-            "id": "U109",
-            "code": "UEEHA0007",
-            "title": "Plan electrical installations for hazardous areas",
-            "cluster": "Group D"
+            "id": "U166",
+            "code": "UEERA0035",
+            "title": "Establish the basic operating conditions of air conditioning systems",
+            "cluster": "Group B"
           },
           {
-            "id": "U110",
-            "code": "UEEIC0001",
-            "title": "Analyse complex electronic circuits controlling fluids",
-            "cluster": "Group D"
+            "id": "U167",
+            "code": "UEERA0036",
+            "title": "Establish the basic operating conditions of vapour compression systems",
+            "cluster": "Group B"
           },
           {
-            "id": "U111",
-            "code": "UEEIC0005",
-            "title": "Configure and maintain industrial control system networks",
-            "cluster": "Group D"
+            "id": "U168",
+            "code": "UEERA0059",
+            "title": "Prepare and connect refrigerant tubing and fittings",
+            "cluster": "Group B"
           },
           {
-            "id": "U112",
-            "code": "UEERE0012",
-            "title": "Develop effective engineering strategies for energy reduction in buildings",
-            "cluster": "Group D"
+            "id": "U169",
+            "code": "UEERE0001",
+            "title": "Apply environmentally and sustainable procedures in the energy sector",
+            "cluster": "Group B",
+            "tgaStatus": "current",
+            "equivalentCodes": [
+              {
+                "code": "UEENEEK142A",
+                "relation": "older code this unit supersedes",
+                "title": "Apply environmentally and sustainable procedures in the energy sector",
+                "mappingDate": "2020-10-04",
+                "source": "https://training.gov.au/training/details/UEERE0001/unitdetails"
+              }
+            ]
           },
           {
-            "id": "U113",
-            "code": "UETTDRIS69",
-            "title": "Diagnose and rectify faults in energy supply apparatus",
-            "cluster": "Group D"
+            "id": "U170",
+            "code": "UEERE0016",
+            "title": "Install, configure and commission LV grid-connected photovoltaic power systems",
+            "cluster": "Group B"
           },
           {
-            "id": "U114",
-            "code": "UETTDRIS70",
-            "title": "Diagnose and rectify faults in electrical energy distribution systems",
-            "cluster": "Group D"
+            "id": "U171",
+            "code": "UEERE0022",
+            "title": "Solve basic problems in photovoltaic energy apparatus and systems",
+            "cluster": "Group B"
           },
           {
-            "id": "U115",
-            "code": "UETTDRIS71",
-            "title": "Diagnose and rectify faults in electrical energy supply transmission systems",
-            "cluster": "Group D"
+            "id": "U172",
+            "code": "UETTDRIS44",
+            "title": "Perform HV field switching operation to a given schedule",
+            "cluster": "Group B"
           },
           {
-            "id": "U116",
-            "code": "UETTDRIS72",
-            "title": "Diagnose and rectify faults in distributed generation systems",
-            "cluster": "Group D"
+            "id": "U173",
+            "code": "UETTDRIS67",
+            "title": "Solve problems in energy supply network equipment",
+            "cluster": "Group B"
           },
           {
-            "id": "U117",
-            "code": "UEECD0049",
-            "title": "Use advanced computational processes to provide solutions to energy sector engineering problems",
-            "cluster": "Group E"
+            "id": "U174",
+            "code": "UETTDRIS68",
+            "title": "Solve problems in energy supply network protection equipment and systems",
+            "cluster": "Group B"
           },
           {
-            "id": "U118",
-            "code": "UEECO0003",
-            "title": "Manage contract variations",
-            "cluster": "Group E"
+            "id": "U175",
+            "code": "ICTPRG302",
+            "title": "Apply introductory programming techniques",
+            "cluster": "Group B"
           },
           {
-            "id": "U119",
-            "code": "UEECS0012",
-            "title": "Design embedded controller control systems",
-            "cluster": "Group E"
+            "id": "U176",
+            "code": "MEM30027A",
+            "title": "Prepare basic programs for programmable logic controllers",
+            "cluster": "Group B"
           },
           {
-            "id": "U120",
-            "code": "UEECS0015",
-            "title": "Develop energy sector computer network applications infrastructure",
-            "cluster": "Group E"
+            "id": "U177",
+            "code": "UEECD0016",
+            "title": "Document and apply measures to control WHS risks associated with electrotechnology work",
+            "cluster": "Group B"
           },
           {
-            "id": "U121",
-            "code": "UEECS0017",
-            "title": "Develop industrial control programs for microcomputer equipped devices",
-            "cluster": "Group E"
+            "id": "U178",
+            "code": "UEECD0025",
+            "title": "Lay wiring/cabling and terminate accessories for extra-low voltage (ELV) circuits",
+            "cluster": "Group B"
           },
           {
-            "id": "U122",
-            "code": "UEECS0027",
-            "title": "Provide programming solution for computer systems engineering problems",
-            "cluster": "Group E"
+            "id": "U179",
+            "code": "UEECD0030",
+            "title": "Prepare electrotechnology/utilities drawings using manual drafting and CAD equipment and software",
+            "cluster": "Group B"
           },
           {
-            "id": "U123",
-            "code": "UEEEL0038",
-            "title": "Design switchboards rated for high fault levels (greater than 400 A)",
-            "cluster": "Group E"
+            "id": "U180",
+            "code": "UEECD0031",
+            "title": "Prepare engineering drawings using manual drafting and CAD for electrotechnology applications",
+            "cluster": "Group B"
           },
           {
-            "id": "U124",
-            "code": "UEEEL0043",
-            "title": "Develop engineering solutions for induction machine and control problems",
-            "cluster": "Group E"
+            "id": "U181",
+            "code": "UEERE0054",
+            "title": "Conduct site survey for grid-connected photovoltaic and battery storage systems",
+            "cluster": "Group B"
           },
           {
-            "id": "U125",
-            "code": "UEEIC0006",
-            "title": "Design and configure human-machine interface (HMI) networks",
-            "cluster": "Group E"
-          },
-          {
-            "id": "U126",
-            "code": "UEEIC0007",
-            "title": "Design and use advanced programming tools, PC networks and HMI Interfacing",
-            "cluster": "Group E"
-          },
-          {
-            "id": "U127",
-            "code": "UEEIC0010",
-            "title": "Develop and test code for microcontroller devices",
-            "cluster": "Group E"
-          },
-          {
-            "id": "U128",
-            "code": "UEEIC0016",
-            "title": "Diagnose and rectify faults in a.c. motor drive systems",
-            "cluster": "Group E"
-          },
-          {
-            "id": "U129",
-            "code": "UEEIC0017",
-            "title": "Diagnose and rectify faults in d.c. motor drive systems",
-            "cluster": "Group E"
-          },
-          {
-            "id": "U130",
-            "code": "UEEIC0019",
-            "title": "Diagnose and rectify faults in servo drive systems",
-            "cluster": "Group E"
-          },
-          {
-            "id": "U131",
-            "code": "UETTDRIS73",
-            "title": "Develop engineering solutions for energy supply power transformer problems",
-            "cluster": "Group E"
-          },
-          {
-            "id": "U132",
-            "code": "UETTDRIS74",
-            "title": "Develop engineering solutions for energy supply system protection problems",
-            "cluster": "Group E"
+            "id": "U182",
+            "code": "UEERE0055",
+            "title": "Conduct site survey for off-grid photovoltaic/generating set systems",
+            "cluster": "Group B"
           }
         ]
       },
@@ -4054,10 +4354,10 @@
       },
       "scoringEnabled": true,
       "foundationalUnits": {
-        "total": 17,
+        "total": 27,
         "thresholds": {
-          "noRisk": 14,
-          "lowRisk": 11
+          "noRisk": 22,
+          "lowRisk": 17
         },
         "units": [
           {
@@ -4191,10 +4491,70 @@
             "code": "UEERE0013",
             "title": "Develop strategies to address environmental and sustainability issues in the energy sector",
             "cluster": "Foundational Units"
+          },
+          {
+            "id": "F18",
+            "code": "UEECD0007",
+            "title": "Apply work health and safety regulations, codes and practices in the workplace",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F19",
+            "code": "UEECD0044",
+            "title": "Solve problems in multiple path circuits",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F20",
+            "code": "UEECD0046",
+            "title": "Solve problems in single path circuits",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F21",
+            "code": "UEECD0064",
+            "title": "Interpret, produce and modify electrotechnology drawings",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F22",
+            "code": "UEEEL0019",
+            "title": "Solve problems in direct current (d.c.) machines",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F23",
+            "code": "UEEEL0020",
+            "title": "Solve problems in low voltage a.c. circuits",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F24",
+            "code": "UEEEL0021",
+            "title": "Solve problems in magnetic and electromagnetic devices",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F25",
+            "code": "UEEEL0077",
+            "title": "Evaluate and report on the performance of LV machines",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F26",
+            "code": "UEEEL0079",
+            "title": "Plan and analyse LV electrical apparatus",
+            "cluster": "Foundational Units"
+          },
+          {
+            "id": "F27",
+            "code": "UEEEL0080",
+            "title": "Plan and analyse wiring systems, circuits, control and protection for electrical installations",
+            "cluster": "Foundational Units"
           }
         ]
       },
-      "dataNote": "Units from the updated sheet. Tier 1 = the 17 Foundational units (bands 14 / 11). Core = a pool of the 132 Group A-E units: matched pool units are counted against 24 required units with the existing bands 21 / 15 / 9 (the sheet lists far more units than any one student takes). Australian qualifications only; overseas Electrical diplomas are matched on subjects (electrical-engineering-draftsperson-os)."
+      "dataNote": "Units from Electrical Engineering Draftsperson Subjects.xlsx (2026-11). Tier 1 = the 27 Foundational units (bands 22 / 17). Core = a pool of the 182 Group A-E units (foundational-overlap codes excluded from the pool): matched pool units counted against 24 required with bands 21 / 15 / 9. Australian qualifications only; overseas Electrical diplomas are matched on subjects (electrical-engineering-draftsperson-os)."
     },
     {
       "id": "electrical-engineering-draftsperson-os",

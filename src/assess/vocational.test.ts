@@ -32,7 +32,7 @@ const codes = ELEC.coreUnits.units.map((u) => u.code!);
 function unitRows(n: number): ExtractedSubjectRow[] {
   return ELEC.coreUnits.units.slice(0, n).map((u) => row(u.title, u.code));
 }
-/** The first n Tier 1 Foundational units (all 17 when n is omitted). */
+/** The first n Tier 1 Foundational units (all 27 when n is omitted). */
 function foundRows(n?: number): ExtractedSubjectRow[] {
   return ELEC.foundationalUnits!.units.slice(0, n).map((u) => row(u.title, u.code));
 }
@@ -52,14 +52,14 @@ function score(rows: ExtractedSubjectRow[], extra: Partial<Parameters<typeof sco
 }
 
 describe("312311 rubric", () => {
-  it("is switched on: any 24 of a 132-unit core pool, 17 Foundational units; 312211 is on, 313213 stays off", () => {
+  it("is switched on: any 24 of a 182-unit core pool, 27 Foundational units; 312211 is on, 313213 stays off", () => {
     assert.equal(ELEC.scoringEnabled, true);
     assert.equal(ELEC.coreUnits.mode, "pool");
     assert.equal(ELEC.coreUnits.total, 24);
-    assert.equal(ELEC.coreUnits.units.length, 132);
+    assert.equal(ELEC.coreUnits.units.length, 182);
     assert.deepEqual(ELEC.coreUnits.thresholds, { noRisk: 21, lowRisk: 15, medium: 9 });
-    assert.equal(ELEC.foundationalUnits?.units.length, 17);
-    assert.deepEqual(ELEC.foundationalUnits?.thresholds, { noRisk: 14, lowRisk: 11 });
+    assert.equal(ELEC.foundationalUnits?.units.length, 27);
+    assert.deepEqual(ELEC.foundationalUnits?.thresholds, { noRisk: 22, lowRisk: 17 });
     // UEE / BSB style, plus MEM (3 letters + 5 digits) and UETTDRIS (8 letters + 2 digits) pool units.
     assert.ok(codes.every((c) => /^[A-Z]{3,8}\d{2,5}[A-Z]?$/.test(c)), codes.join(","));
     assert.equal(new Set(codes).size, codes.length);
@@ -165,7 +165,7 @@ describe("bands and determination", () => {
     assert.equal(score(fullRows(5)).scored.recommended, false);
   });
 
-  it("core pool: any 24 of the 132 count, nothing is listed as missing, extra units cap at 100%", () => {
+  it("core pool: any 24 of the 182 count, nothing is listed as missing, extra units cap at 100%", () => {
     const tail = score([...foundRows(), ...ELEC.coreUnits.units.slice(-24).map((u) => row(u.title, u.code))]);
     assert.equal(tail.detail.coreMatched, 24);
     assert.equal(tail.detail.coreMode, "pool");
@@ -176,19 +176,19 @@ describe("bands and determination", () => {
     assert.ok(many.scored.corePct <= 100);
   });
 
-  it("Tier 1 Foundational bands 14 / 11 of 17; a flag caps verified at conditional", () => {
+  it("Tier 1 Foundational bands 22 / 17 of 27; a flag caps verified at conditional", () => {
     const at = (n: number) => score([...foundRows(n), ...unitRows(24)]);
-    assert.equal(at(17).detail.foundationalBand, "no_risk");
-    assert.equal(at(14).detail.foundationalBand, "no_risk");
-    assert.equal(at(13).detail.foundationalBand, "low_risk");
-    assert.equal(at(11).detail.foundationalBand, "low_risk");
-    assert.equal(at(14).scored.tier1Outcome, "no_risk");
-    assert.equal(at(11).scored.determination, "verified_no_risk");
-    const low = at(10);
+    assert.equal(at(27).detail.foundationalBand, "no_risk");
+    assert.equal(at(22).detail.foundationalBand, "no_risk");
+    assert.equal(at(21).detail.foundationalBand, "low_risk");
+    assert.equal(at(17).detail.foundationalBand, "low_risk");
+    assert.equal(at(22).scored.tier1Outcome, "no_risk");
+    assert.equal(at(17).scored.determination, "verified_no_risk");
+    const low = at(16);
     assert.equal(low.detail.foundationalBand, "flag");
     assert.equal(low.scored.tier1Outcome, "flag");
-    assert.equal(low.detail.foundationalMatched, 10);
-    assert.equal(low.detail.missingFoundational?.length, 7);
+    assert.equal(low.detail.foundationalMatched, 16);
+    assert.equal(low.detail.missingFoundational?.length, 11);
     assert.equal(low.scored.determination, "conditional");
     assert.ok(low.detail.flags.some((f) => /Foundational/.test(f)));
     // Foundational matches are reported as Tier 1 rows, core as Tier 2.
@@ -250,7 +250,7 @@ describe("assessExtractedSubjects (vocational route)", () => {
     const c = res.candidates!.find((x) => x.anzscoCode === "312311")!;
     assert.equal(c.vocational?.coreMatched, 22);
     assert.equal(c.vocational?.coreBand, "no_risk");
-    assert.equal(c.vocational?.foundationalMatched, 17);
+    assert.equal(c.vocational?.foundationalMatched, 27);
     assert.equal(c.draftspersonPath?.path, "au_unit_codes");
     // 312511 is in the same (Associate) track; its title check caps it without a drafting title.
     const drafts = res.candidates!.find((x) => x.anzscoCode === "312511");

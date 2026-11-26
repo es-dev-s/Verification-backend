@@ -45,6 +45,14 @@ import {
   type RankedCandidate,
 } from "./familyAdjust.js";
 import { evaluateGate1, gateIsOpen, openTracks, TRACK_LABELS, trackForAnzsco } from "./gate1.js";
+import {
+  applyFieldMatchPenalty,
+  etOfferedForQualifications,
+  FIELD_MATCH_PENALTY_PP,
+  keepProfessionalEngineer,
+  selectDegreeField,
+  type DegreeFieldSelection,
+} from "./degreeField.js";
 import { associateFallbackFor } from "./associateFallback.js";
 import { isDiplomaLevel } from "./schemas.js";
 import {
@@ -53,6 +61,7 @@ import {
   TelecomNeedsIct60220Error,
   type ManualSelection,
 } from "./manualOccupation.js";
+import { applyWorkflowRouting, previewContinueRouting } from "./workflowRouting.js";
 import { applyTextPeriods, preferFinalYearGate, withTermIndex } from "./qualificationEvidence.js";
 import {
   hasLateralState,
@@ -199,6 +208,8 @@ export type ScoringContext = {
   lateralEntryConfirmed?: boolean;
   /** Lateral entry Route 3: earlier-study rows (degree path only, Foundational only). */
   priorStudyRows?: ExtractedSubjectRow[];
+  /** Continue with this ANZSCO after a check (lock even when Gate 1 is open). */
+  userSelectedContinue?: boolean;
 };
 
 /**
@@ -291,7 +302,9 @@ export async function assessCase(
     engineeringTitledDegree: caseRow.engineeringTitledDegree,
     // Only when set, so cases without assessor values keep their cache key.
     ...(gateOverrides ? { gateOverrides } : {}),
-    ...(manualSelection ? { manualOccupation: manualSelection.occupationId } : {}),
+    ...(manualSelection
+      ? { manualOccupation: manualSelection.occupationId, manualSource: manualSelection.source ?? "assessor" }
+      : {}),
     // lateralGate: bumped when the Gate 1 lateral-entry rules change, so saved
     // lateral cases re-score once (other cases keep their cache key).
     ...(hasLateralState(lateralState) ? { lateralEntry: lateralHashOf(lateralState), lateralGate: 3 } : {}),
@@ -300,6 +313,9 @@ export async function assessCase(
     ...(caseRow.qualifications.some((q) => isDiplomaLevel(q.degreeLevel)) ? { associateGate: 1 } : {}),
     rubric: rubricFingerprint(),
     config: scoringConfigFingerprint(),
+    // ET plus degree-title field filter / −15 pp penalty (20 Nov 2026).
+    etDegreeField: 1,
+    workflowRouting: 1,
   });
 
   const previous = (caseRow.assessment?.resultJson ?? null) as
@@ -360,6 +376,10 @@ export async function assessCase(
     if (cached.specialisation === undefined || (cached.specialisation && cached.specialisation.version !== SPECIALISATION_VERSION)) {
       cached.specialisation = specialisationFor(cached, cachedRows, caseRow, cvText);
     }
+    applyWorkflowRouting(cached, {
+      qualifications: qualificationInfos,
+      userSelected: manualSelection?.source === "user",
+    });
     return cached;
   }
 
@@ -420,7 +440,7 @@ export async function assessCase(
 
   // Gate 1 decides which tracks are scored (before any scoring); each
   // occupation in an open track is then sync-matched (no work experience in ranking).
-  const { scored: scoredAll, gate, assessorSelected } = scoreWithManualSelection(
+  const { scored: scoredAll, gate, assessorSelected, degreeField } = scoreWithManualSelection(
     extracted,
     {
       workExperienceBoost: false,
@@ -431,6 +451,7 @@ export async function assessCase(
       lateralEntryDecided: lateralEntryDecided(lateral),
       lateralEntryConfirmed: lateralEntryConfirmed(lateral),
       priorStudyRows,
+      userSelectedContinue: manualSelection?.source === "user",
     },
     manualSelection,
   );
@@ -574,6 +595,7 @@ export async function assessCase(
     finalProjectTitle: winner.finalProject?.title ?? null,
     ...(assessorSelected ? { assessorSelected } : {}),
     ...(workJudgements.length ? { workExperienceJudgements: workJudgements } : {}),
+    degreeField,
   };
   result.familyAdjustment = familyAdjustmentForResult(
     result,
@@ -587,6 +609,11 @@ export async function assessCase(
     });
     if (fallback) result.associateFallback = fallback;
   }
+
+  applyWorkflowRouting(result, {
+    qualifications: qualificationInfos,
+    userSelected: assessorSelected?.source === "user",
+  });
 
   // When nothing is recommended, still surface best coverage numbers from the top card
   if (!result.recommended) {
@@ -974,7 +1001,7 @@ export function scoreDraftsperson(
 export function scoreRoutedOccupations(
   extracted: ExtractedSubjectRow[],
   ctx: ScoringContext,
-): { scored: ScoredOccupation[]; gate: Gate1Decision } {
+): { scored: ScoredOccupation[]; gate: Gate1Decision; degreeField: DegreeFieldSelection } {
   const vocational = listVocationalOccupations();
   const academicAll = loadAllAcademicRubrics();
   const gate = evaluateGate1({
@@ -988,6 +1015,9 @@ export function scoreRoutedOccupations(
   });
   const routing = routeQualifications(ctx.qualifications ?? [], vocational);
   const out: ScoredOccupation[] = [];
+  const quals = ctx.qualifications ?? [];
+  const degreeField = selectDegreeField(quals);
+  const etOffered = etOfferedForQualifications(quals);
 
   const target = ctx.occupationId?.trim();
   if (target) {
@@ -1003,7 +1033,7 @@ export function scoreRoutedOccupations(
       if (card) {
         out.push({ ...telecomOccupation(card, ctx), track: "engineering_associate" });
       }
-      return { scored: out, gate };
+      return { scored: out, gate, degreeField };
     }
     const vocTarget = vocational.find((o) => o.id === target || o.anzsco === target);
     if (vocTarget) {
@@ -1022,15 +1052,22 @@ export function scoreRoutedOccupations(
         track,
       });
     }
-    return { scored: out, gate };
+    return { scored: out, gate, degreeField };
   }
 
-  if (!gateIsOpen(gate)) return { scored: [], gate };
+  if (!gateIsOpen(gate)) return { scored: [], gate, degreeField };
 
   const priority = new Map(openTracks(gate).map((t) => [t.track, t.priority]));
   for (const rubric of academicAll) {
     const track = trackForAnzsco(rubric.anzscoCode);
     if (!track || !priority.has(track)) continue;
+    if (track === "engineering_technologist" && !etOffered) continue;
+    if (
+      track === "professional_engineer" &&
+      !keepProfessionalEngineer(rubric.anzscoCode, rubric.title, degreeField)
+    ) {
+      continue;
+    }
     const excludeDiplomaRows = track !== "engineering_associate";
     out.push({
       ...scoreOccupation(extracted, rubric, {
@@ -1070,23 +1107,54 @@ export function scoreRoutedOccupations(
       });
     }
   }
-  out.sort(compareScoredOccupations);
-  return { scored: out, gate };
+  const penalized = target
+    ? out
+    : out.map((s) => withDegreeFieldPenalty(s, degreeField));
+  penalized.sort(compareScoredOccupations);
+  return { scored: penalized, gate, degreeField };
+}
+
+function withDegreeFieldPenalty(
+  s: ScoredOccupation,
+  field: DegreeFieldSelection,
+): ScoredOccupation {
+  if (s.track !== "professional_engineer") return s;
+  const next = applyFieldMatchPenalty(s.scored, s.rubric.anzscoCode, field);
+  if (next === s.scored) return s;
+  const note = field.matchedTitle
+    ? `Field of study (${field.label}) matches ${field.matchedTitle}: −${FIELD_MATCH_PENALTY_PP} pp (Engineering Technologist exempt).`
+    : `Field of study penalty −${FIELD_MATCH_PENALTY_PP} pp.`;
+  return {
+    ...s,
+    scored: {
+      ...next,
+      qualificationNotes: [...(next.qualificationNotes ?? []), note],
+    },
+    // Keep the pre-boost baseline in step with the penalised score.
+    confidenceScoreBefore: next.confidenceScore,
+  };
 }
 
 /**
- * Routed scoring plus the assessor-selected occupation: when Gate 1 asks for
- * manual review and the assessor picked an occupation, that occupation alone
- * is scored (targeted path, gate block bypassed). The gate decision is kept
- * as manual_review; `assessorSelected` marks the result.
+ * Routed scoring plus a locked occupation: Gate 1 manual review (assessor pick)
+ * or Continue with this ANZSCO after a check (user-selected, Gate 1 may be open).
  */
 export function scoreWithManualSelection(
   extracted: ExtractedSubjectRow[],
   ctx: ScoringContext,
   manual: ManualSelection | null | undefined,
-): { scored: ScoredOccupation[]; gate: Gate1Decision; assessorSelected: AssessorSelected | null } {
+): {
+  scored: ScoredOccupation[];
+  gate: Gate1Decision;
+  assessorSelected: AssessorSelected | null;
+  degreeField: DegreeFieldSelection;
+} {
   const routed = scoreRoutedOccupations(extracted, ctx);
-  if (!manual || ctx.occupationId?.trim() || routed.gate.result !== "manual_review") {
+  const userContinue = Boolean(ctx.userSelectedContinue || manual?.source === "user");
+  if (!manual || ctx.occupationId?.trim()) {
+    return { ...routed, assessorSelected: null };
+  }
+  if (routed.gate.result !== "manual_review" && !userContinue) {
     return { ...routed, assessorSelected: null };
   }
   let targeted: { scored: ScoredOccupation[]; gate: Gate1Decision };
@@ -1101,7 +1169,13 @@ export function scoreWithManualSelection(
   return {
     scored: targeted.scored,
     gate: routed.gate,
-    assessorSelected: { anzscoCode: manual.anzscoCode, title: manual.title, occupationId: manual.occupationId },
+    degreeField: routed.degreeField,
+    assessorSelected: {
+      anzscoCode: manual.anzscoCode,
+      title: manual.title,
+      occupationId: manual.occupationId,
+      source: userContinue ? "user" : "assessor",
+    },
   };
 }
 
@@ -1113,6 +1187,8 @@ export type OccupationCheck = {
   /** False when Gate 1 did not open this occupation's track for the case. */
   trackOpen: boolean;
   gateResult: Gate1Result;
+  /** What Continue with this ANZSCO would do (closed track, Master's, 50% floor). */
+  continueRouting?: ReturnType<typeof previewContinueRouting>;
 };
 
 /**
@@ -1171,6 +1247,13 @@ export function checkOccupation(
     trackLabel: track ? TRACK_LABELS[track] : null,
     trackOpen,
     gateResult: routed.gate.result,
+    continueRouting: previewContinueRouting({
+      anzscoCode: candidate.anzscoCode,
+      confidenceScore: candidate.confidenceScore ?? 0,
+      trackOpen,
+      gateResult: routed.gate.result,
+      qualifications: ctx.qualifications,
+    }),
   };
 }
 
@@ -1981,10 +2064,12 @@ export function assessExtractedSubjects(
     lateralEntryConfirmed?: boolean;
     /** Lateral entry Route 3: earlier-study rows. */
     priorStudyRows?: ExtractedSubjectRow[];
+    /** Continue with this ANZSCO after a check (lock even when Gate 1 is open). */
+    userSelectedContinue?: boolean;
   },
 ): AssessmentResult {
   // Work-experience boost (opts, tests) is applied in scoring, before the cut.
-  const { scored: scoredAll, gate, assessorSelected } = scoreWithManualSelection(
+  const { scored: scoredAll, gate, assessorSelected, degreeField } = scoreWithManualSelection(
     extracted.map(withTermIndex),
     {
       workExperienceBoost: opts?.workExperienceBoost ?? false,
@@ -1995,6 +2080,7 @@ export function assessExtractedSubjects(
       lateralEntryDecided: opts?.lateralEntryDecided,
       lateralEntryConfirmed: opts?.lateralEntryConfirmed,
       priorStudyRows: opts?.priorStudyRows,
+      userSelectedContinue: opts?.userSelectedContinue || opts?.manualSelection?.source === "user",
     },
     opts?.manualSelection,
   );
@@ -2066,12 +2152,18 @@ export function assessExtractedSubjects(
     qualificationEvidence: buildQualificationEvidence(winner, gate),
     finalProjectTitle: winner.finalProject?.title ?? null,
     ...(assessorSelected ? { assessorSelected } : {}),
+    degreeField,
   };
   result.familyAdjustment = familyAdjustmentForResult(result, etOwnScore(scoredAll), etTiersOf(scoredAll));
   if (!opts?.occupationId && !assessorSelected) {
     const fallback = associateFallbackOf(gate, [scoredAll, shown], opts);
     if (fallback) result.associateFallback = fallback;
   }
+
+  applyWorkflowRouting(result, {
+    qualifications: opts?.qualifications,
+    userSelected: assessorSelected?.source === "user",
+  });
 
   if (!result.recommended) {
     result.anzscoCode = null;
@@ -2159,6 +2251,7 @@ export function scoringConfigFingerprint() {
     maxCandidates: assessConfig.maxCandidates,
     boostShortlist: assessConfig.boostShortlist,
     coverage: assessConfig.coverage,
+    minConfidence: assessConfig.minConfidence,
     evidence: evidenceConfigFingerprint(),
     engine: "assess-v5-gate1",
   };
