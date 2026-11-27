@@ -1,4 +1,5 @@
 import { isLikelyAcronymMatch } from "./institutionMatch.js";
+import { stripExamBoilerplate } from "./sanitizeExtracted.js";
 import type {
   DocumentTypeLabel,
   EducationExtract,
@@ -70,6 +71,10 @@ function valuesEquivalent(
   a: string,
   b: string,
 ): { match: boolean; abbreviation?: boolean } {
+  if (field === "degreeTitle") {
+    a = stripExamBoilerplate(a);
+    b = stripExamBoilerplate(b);
+  }
   if (normalizeValue(a) === normalizeValue(b)) {
     return { match: true };
   }

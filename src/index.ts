@@ -5,6 +5,7 @@ import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { config } from "./config.js";
+import { publicErrorMessage } from "./lib/publicError.js";
 import clientIdPlugin from "./plugins/clientId.js";
 import { assessRoutes } from "./assess/routes.js";
 import { riskRoutes } from "./risk/routes.js";
@@ -58,6 +59,14 @@ async function main() {
     limits: { fileSize: config.maxUploadBytes, files: 1 },
   });
   await app.register(clientIdPlugin);
+
+  app.setErrorHandler((err, req, reply) => {
+    const error = err instanceof Error ? err : new Error(String(err));
+    const statusCode = (err as { statusCode?: number }).statusCode;
+    const status = typeof statusCode === "number" && statusCode >= 400 ? statusCode : 500;
+    req.log.error({ err, method: req.method, url: req.url }, "request failed");
+    reply.code(status).send({ error: publicErrorMessage(error, status) });
+  });
 
   app.get("/health", async () => ({ ok: true }));
 

@@ -63,6 +63,13 @@ export function fieldOfStudyFromTexts(texts: string[]): string | null {
     const value = cleanFieldLine(match?.[1]);
     if (value) return value;
   }
+  for (const text of texts) {
+    const tech = text.match(/\b([A-Za-z]{3,})\s+technology\b/i);
+    if (!tech?.[1] || /^technical$/i.test(tech[1])) continue;
+    const word = tech[1].toLowerCase();
+    const value = cleanFieldLine(`${word.charAt(0).toUpperCase()}${word.slice(1)} Technology`);
+    if (value) return value;
+  }
   return null;
 }
 
@@ -105,6 +112,11 @@ export function fieldOfStudyFromTitle(title: string | null | undefined): string 
     if (v.length < 3 || AWARD_WORDS.test(v)) return null;
     return v;
   };
+  const daeField = /^(?:DAE)\s+(.+)$/i.exec(t);
+  if (daeField) {
+    const v = pick(daeField[1]);
+    if (v) return v;
+  }
   const inMatch = /\b(?:majoring in|major in|specialis(?:ation|ed) in|speciali[sz]ation in|in)\s+(.+)$/i.exec(t);
   if (inMatch) {
     const v = pick(inMatch[1]);
@@ -122,7 +134,8 @@ export function fieldOfStudyFromTitle(title: string | null | undefined): string 
     const broad = v ? /^(?:applied science|science|arts|engineering)\s+(.+)$/i.exec(v) : null;
     const rest = broad ? pick(broad[1]) : null;
     if (rest && !/^(?:technology|studies)$/i.test(rest)) return rest;
-    if (v) return v;
+    // "Associate Engineer" is the award, not the technology.
+    if (v && !/^associate engineer$/i.test(v)) return v;
   }
   const abbr =
     /^(?:B\.?\s?(?:E|Eng|Tech|Sc|S|A|Arch)|M\.?\s?(?:E|Eng|Tech|Sc|S|A)|BEng|MEng|BSc|MSc|BTech|MTech|BE|ME)\.?\s+(?:in\s+)?(.+)$/i.exec(t);

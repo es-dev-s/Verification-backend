@@ -44,13 +44,32 @@ function stripTrailingCutoffStub(value: string): string {
 }
 
 /**
+ * Drop exam session, sitting, and candidate-name text that PBTE result cards
+ * print on the same line as the award.
+ * "DIPLOMA OF ASSOCIATE ENGINEER, FIRST ANNUAL EXAMINATION, 2015 Name of the Candidate"
+ * → "DIPLOMA OF ASSOCIATE ENGINEER".
+ */
+export function stripExamBoilerplate(value: string): string {
+  return value
+    .replace(
+      /,?\s*(?:\b(?:first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\s+)?annual\s+examination\b[\s\S]*$/i,
+      "",
+    )
+    .replace(/,?\s*name\s+of\s+the\s+candidate\b[\s\S]*$/i, "")
+    .replace(/,?\s*\bsession\b\s*[:\-]?\s*(?:19|20)\d{2}\b[\s\S]*$/i, "")
+    .replace(/[,\s]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
  * Sanitize a degree title (or similar education string) from model/OCR output.
  */
 export function sanitizeDegreeTitle(
   value: string | null | undefined,
 ): string | null {
   if (value == null) return null;
-  let s = stripJunkChars(String(value));
+  let s = stripExamBoilerplate(stripJunkChars(String(value)));
   if (!s) return null;
 
   // Australian VET national / training package code prefix (e.g. ICT60220, BSB50420)

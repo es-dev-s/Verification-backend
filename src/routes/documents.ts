@@ -6,6 +6,7 @@ import { detectFormatFromBytes } from "../lib/formats.js";
 import { prisma } from "../lib/prisma.js";
 import { getExtractQueue } from "../lib/queues.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
+import { isUniqueViolation } from "../lib/publicError.js";
 import { markReadsStale } from "../workers/extract.js";
 import { PRIOR_STUDY_ROLE } from "../assess/lateralEntry.js";
 import {
@@ -165,17 +166,32 @@ export const documentRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    const doc = await prisma.document.create({
-      data: {
-        caseId,
-        type,
-        degreeLevel,
-        originalName: file.filename || `upload.${format.toLowerCase()}`,
-        format,
-        sha256: hash,
-        status: "QUEUED",
-      },
+    const existing = await prisma.document.findFirst({
+      where: { caseId, sha256: hash },
     });
+    if (existing) {
+      return reply.code(200).send({ documentId: existing.id, document: existing, duplicate: true });
+    }
+
+    let doc;
+    try {
+      doc = await prisma.document.create({
+        data: {
+          caseId,
+          type,
+          degreeLevel,
+          originalName: file.filename || `upload.${format.toLowerCase()}`,
+          format,
+          sha256: hash,
+          status: "QUEUED",
+        },
+      });
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      const raced = await prisma.document.findFirst({ where: { caseId, sha256: hash } });
+      if (!raced) throw err;
+      return reply.code(200).send({ documentId: raced.id, document: raced, duplicate: true });
+    }
 
     if (priorStudy) await addPriorStudyDocument(caseId, doc.id);
     await storeBlob(doc.id, bytes);

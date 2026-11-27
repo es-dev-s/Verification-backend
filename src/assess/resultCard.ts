@@ -142,6 +142,14 @@ function subjectsIn(text: string, opts: {
   return rows;
 }
 
+/** Award title for one card. Yearly cards are combined separately. */
+export function resultCardTitle(card: ResultCard): string | null {
+  if (card.dae && card.program) return `DAE ${card.program}`;
+  if (card.program) return card.program;
+  if (card.dae) return "Diploma of Associate Engineer";
+  return null;
+}
+
 /** One yearly marks sheet. Null when the page has no subject / marks table. */
 export function parseResultCard(
   text: string,

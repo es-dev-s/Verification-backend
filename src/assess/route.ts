@@ -97,6 +97,26 @@ export function isEngineeringTitle(title: string): boolean {
   return /\b(?:bachelor|master)'?s?\s+of\s+technology\b/i.test(title);
 }
 
+/**
+ * Same engineering-title signal Step 4 prints ("title names engineering"):
+ * the degree title, plus the field of study when the title does not already
+ * contain it.
+ */
+export function titleNamesEngineering(
+  title: string | null | undefined,
+  fieldOfStudy?: string | null,
+): boolean {
+  const t = (title ?? "").trim();
+  const field = (fieldOfStudy ?? "").trim();
+  const combined =
+    field && !t.toLowerCase().includes(field.toLowerCase())
+      ? t
+        ? `${t} (${field})`
+        : field
+      : t;
+  return combined.length > 0 && isEngineeringTitle(combined);
+}
+
 function isEngineeringTechnologyBachelor(title: string): boolean {
   return /\bengineering\s+technolog/i.test(title) || /\bb\.?\s?eng\.?\s?tech\b/i.test(title);
 }

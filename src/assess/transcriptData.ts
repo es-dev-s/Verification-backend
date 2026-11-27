@@ -37,6 +37,7 @@ import {
   subjectsFromMarksTables,
 } from "./resultCard.js";
 import { awardLevelOf, rowsFor } from "./gate1.js";
+import { titleNamesEngineering } from "./route.js";
 import {
   lateralEntryView,
   lateralStateOf,
@@ -710,10 +711,21 @@ export type TranscriptFinalProject = {
   inFinalYear: boolean | null;
 };
 
+/**
+ * Subjects listed on Transcript data and on the assessment screen.
+ * A name printed on more than one yearly card is stored once. That row can
+ * be flagged isRepeat; both screens still count it.
+ */
+export function listedSubjectCount(rows: readonly unknown[]): number {
+  return rows.length;
+}
+
 export type QualificationTranscriptSummary = {
   degreeLevel: string;
   title: string | null;
   fieldOfStudy: string | null;
+  /** Same rule as the assessment line "title names engineering". */
+  titleNamesEngineering: boolean;
   award: Gate1AwardLevel;
   awardLabel: string;
   aqfLevel: number | null;
@@ -900,16 +912,18 @@ export function buildQualificationSummaries(
     const finalProject: TranscriptFinalProject | null = overrides.finalProject
       ? { title: overrides.finalProject, term: null, inFinalYear: null }
       : project;
+    const fieldOfStudy = q.fieldOfStudy ?? fieldOfStudyFromTitle(q.title);
     return {
       degreeLevel: raw,
       title: q.title,
-      fieldOfStudy: q.fieldOfStudy ?? fieldOfStudyFromTitle(q.title),
+      fieldOfStudy,
+      titleNamesEngineering: titleNamesEngineering(q.title, fieldOfStudy),
       award,
       awardLabel: awardLabel(award),
       aqfLevel,
       awardManual: Boolean(q.awardOverride),
       detectedAward: detected.award,
-      subjectCount: levelRows.filter((r) => !r.isRepeat).length,
+      subjectCount: listedSubjectCount(levelRows),
       transcript: {
         countedYears: countedAuto,
         terms: countedAuto != null && tpy ? Math.round(countedAuto * tpy) : null,
@@ -1042,7 +1056,7 @@ export async function getTranscriptData(
       : null;
   return {
     transcriptCount: transcripts.length,
-    subjectCount: rows.filter((r) => !r.isRepeat).length,
+    subjectCount: listedSubjectCount(rows),
     subjectsCurrent,
     source,
     durationOk: qualifications.every((q) => q.durationCheck.ok),

@@ -10,7 +10,7 @@
 import { evidenceConfig } from "./evidenceConfig.js";
 import { hasTopicWord } from "./matchSubjects.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
-import { isEngineeringTitle } from "./route.js";
+import { titleNamesEngineering } from "./route.js";
 import type {
   EngineeringDecision,
   ExtractedSubjectRow,
@@ -1135,7 +1135,7 @@ function titleSignal(
   relatedField?: boolean,
 ): EngineeringDecision["titleSignal"] {
   const titles = qualifications.map((q) => q.title?.trim() ?? "").filter(Boolean);
-  if (titles.some((t) => isEngineeringTitle(t))) return "engineering";
+  if (qualifications.some((q) => titleNamesEngineering(q.title, q.fieldOfStudy))) return "engineering";
   if (relatedField || titles.some((t) => hasTopicWord(t, ENGINEERING_FIELD_WORDS))) return "related";
   if (titles.length) return "other";
   return "none";

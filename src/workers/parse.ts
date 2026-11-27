@@ -16,6 +16,10 @@ import {
 } from "../parse/heuristics.js";
 import { mergeEducation } from "../parse/mergeEducation.js";
 import {
+  alignResultCardSources,
+  completionYearFromSources,
+} from "../parse/resultCardEducation.js";
+import {
   educationResultFlags,
   type LevelMismatch,
 } from "../parse/levelMismatch.js";
@@ -36,7 +40,6 @@ import {
   type PerSourceEducation,
 } from "../parse/schemas.js";
 import { correctOcrEducationText } from "../parse/ocrCorrect.js";
-import { parseCompletionYear } from "../assess/qualificationYear.js";
 import {
   clientNameFromCvText,
   saveClientName,
@@ -297,16 +300,16 @@ export async function parseEducation(
     };
   }
 
+  sources = alignResultCardSources(
+    sources,
+    new Map(labeled.map((d) => [d.documentId, d.text])),
+  );
+
   const merged = mergeEducation(sources);
 
-  const yearPriority: DocumentTypeLabel[] = ["CERTIFICATE", "TRANSCRIPT", "CV"];
-  const completionYear = [...sources]
-    .sort(
-      (a, b) =>
-        yearPriority.indexOf(a.documentType) - yearPriority.indexOf(b.documentType),
-    )
-    .map((s) => parseCompletionYear(s.extract.end))
-    .find((y): y is number => y != null) ?? null;
+  const completionYear = completionYearFromSources(
+    sources.map((s) => ({ documentType: s.documentType, end: s.extract.end })),
+  );
 
   const qualificationData = {
     degreeTitle: merged.fields.degreeTitle.value,

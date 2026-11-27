@@ -12,6 +12,7 @@ import type {
   ExperienceExtract,
   PerSourceEducation,
 } from "./schemas.js";
+import { parseResultCard, resultCardTitle } from "../assess/resultCard.js";
 import { sanitizeDegreeTitle } from "./sanitizeExtracted.js";
 
 const COUNTRY_NAMES =
@@ -676,6 +677,12 @@ export function heuristicsEducationFromText(text: string): EducationExtract {
   extract.start = years.start;
   extract.end = years.end;
   extract.statedDuration = years.statedDuration;
+
+  const card = parseResultCard(text);
+  const cardTitle = card ? resultCardTitle(card) : null;
+  if (cardTitle) extract.degreeTitle = cardTitle;
+  if (card?.examYear) extract.end = String(card.examYear);
+  if (card?.board && !extract.institution) extract.institution = card.board;
 
   return extract;
 }
