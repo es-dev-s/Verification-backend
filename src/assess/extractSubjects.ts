@@ -446,7 +446,8 @@ export function degreeLevelFromTitle(
   }
   // Graduate / postgraduate diplomas sit above a bachelor: not a diploma-level group.
   if (/\b(?:post\s*-?\s*graduate|graduate)\s+diploma\b/.test(t)) return null;
-  if (/\bdiploma\b/.test(t)) return "diploma";
+  // PBTE "DAE" is Diploma of Associate Engineer (a diploma, not a degree).
+  if (/\bdae\b/.test(t) || /\bdiploma\b/.test(t)) return "diploma";
   return null;
 }
 

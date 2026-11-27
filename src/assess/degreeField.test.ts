@@ -7,8 +7,10 @@ import {
   etOfferedForQualifications,
   FIELD_MATCH_PENALTY_PP,
   identifyDegreeField,
+  keepAssociateOccupation,
   keepProfessionalEngineer,
   selectDegreeField,
+  selectDiplomaField,
   type DegreeFieldSelection,
 } from "./degreeField.js";
 import { ENGINEERING_TECHNOLOGIST_CODE } from "./familyAdjust.js";
@@ -88,13 +90,13 @@ describe("bachelor title and ET eligibility", () => {
 });
 
 describe("keepProfessionalEngineer + 15% penalty", () => {
-  it("Electrical field keeps all PE and penalises everyone except Electrical and ET", () => {
+  it("Electrical field keeps only Electrical PE; remaining unmatched occupations lose 15 pp", () => {
     const sel = selFromTitle("Bachelor of Engineering in Electrical Engineering");
     assert.equal(sel.penaltyApplies, true);
     assert.equal(sel.matchedAnzsco, "233311");
     assert.equal(keepProfessionalEngineer("233311", "Electrical Engineer", sel), true);
-    assert.equal(keepProfessionalEngineer("233411", "Electronics Engineer", sel), true);
-    assert.equal(keepProfessionalEngineer("233512", "Mechanical Engineer", sel), true);
+    assert.equal(keepProfessionalEngineer("233411", "Electronics Engineer", sel), false);
+    assert.equal(keepProfessionalEngineer("233512", "Mechanical Engineer", sel), false);
     const electronics = applyFieldMatchPenalty({ confidenceScore: 60 }, "233411", sel);
     const et = applyFieldMatchPenalty({ confidenceScore: 70 }, ENGINEERING_TECHNOLOGIST_CODE, sel);
     const electrical = applyFieldMatchPenalty({ confidenceScore: 82 }, "233311", sel);
@@ -137,7 +139,7 @@ describe("assessExtractedSubjects (ET plus degree logic)", () => {
     );
   });
 
-  it("Electrical bachelor: Electrical Engineer is not penalised; other PE lose 15 pp", () => {
+  it("Electrical bachelor: Electrical Engineer remains; other PE are filtered out; ET stays", () => {
     const res = assessExtractedSubjects(ENG_ROWS, {
       qualifications: [
         { level: "bachelor", title: "Bachelor of Engineering in Electrical Engineering", countedYearsOverride: 4 },
@@ -154,12 +156,7 @@ describe("assessExtractedSubjects (ET plus degree logic)", () => {
     );
     assert.ok(electrical, "Electrical Engineer should remain");
     assert.ok(et, "ET stays in the list");
-    if (otherPe) {
-      assert.ok(
-        (otherPe.qualificationNotes ?? []).some((n) => /−15 pp/.test(n) || /-15 pp/.test(n)),
-        otherPe.qualificationNotes?.join("; "),
-      );
-    }
+    assert.equal(otherPe, undefined, "other PE occupations are removed by §3");
   });
 
   it("Advanced Diploma: ET is not offered", () => {
@@ -175,5 +172,134 @@ describe("assessExtractedSubjects (ET plus degree logic)", () => {
     assert.equal(etOfferedForQualifications(res.gate1 ? [{ level: "advanced_diploma", title: "x" }] : []), false);
     const codes = (res.candidates ?? []).map((c) => c.anzscoCode.replace(/\s+/g, ""));
     assert.ok(!codes.includes(ENGINEERING_TECHNOLOGIST_CODE), `ET should be absent: ${codes.join(",")}`);
+  });
+
+  it("§7 Software Engineering BSc → ET only", () => {
+    const res = assessExtractedSubjects(ENG_ROWS, {
+      qualifications: [
+        { level: "bachelor", title: "Bachelor of Science in Software Engineering", countedYearsOverride: 4 },
+      ],
+    });
+    const codes = (res.candidates ?? []).map((c) => c.anzscoCode.replace(/\s+/g, ""));
+    assert.equal(res.degreeField?.fieldId, "computer_science");
+    assert.ok(codes.includes(ENGINEERING_TECHNOLOGIST_CODE));
+    assert.ok(codes.every((c) => c === ENGINEERING_TECHNOLOGIST_CODE), codes.join(","));
+  });
+
+  it("§7 Computer Engineering BE / B.Tech → ET only", () => {
+    for (const title of [
+      "Bachelor of Engineering in Computer Engineering",
+      "Bachelor of Technology in Computer Engineering",
+      "Bachelor of Computer Engineering",
+    ]) {
+      const res = assessExtractedSubjects(ENG_ROWS, {
+        qualifications: [{ level: "bachelor", title, countedYearsOverride: 4 }],
+      });
+      const codes = (res.candidates ?? []).map((c) => c.anzscoCode.replace(/\s+/g, ""));
+      assert.equal(res.degreeField?.fieldId, null, title);
+      assert.ok(codes.includes(ENGINEERING_TECHNOLOGIST_CODE), title);
+      assert.ok(codes.every((c) => c === ENGINEERING_TECHNOLOGIST_CODE), `${title}: ${codes.join(",")}`);
+    }
+  });
+
+  it("§7 Bachelor of Engineering in Computer Science → ET only", () => {
+    const res = assessExtractedSubjects(ENG_ROWS, {
+      qualifications: [
+        { level: "bachelor", title: "Bachelor of Engineering in Computer Science", countedYearsOverride: 4 },
+      ],
+    });
+    const codes = (res.candidates ?? []).map((c) => c.anzscoCode.replace(/\s+/g, ""));
+    assert.equal(res.degreeField?.fieldId, "computer_science");
+    assert.ok(codes.includes(ENGINEERING_TECHNOLOGIST_CODE));
+    assert.ok(codes.every((c) => c === ENGINEERING_TECHNOLOGIST_CODE), codes.join(","));
+  });
+
+  it("§7 Bachelor of Information Technology → ET only", () => {
+    const res = assessExtractedSubjects(ENG_ROWS, {
+      qualifications: [{ level: "bachelor", title: "Bachelor of Information Technology", countedYearsOverride: 4 }],
+    });
+    const codes = (res.candidates ?? []).map((c) => c.anzscoCode.replace(/\s+/g, ""));
+    assert.equal(res.degreeField?.fieldId, "information_technology");
+    assert.ok(codes.includes(ENGINEERING_TECHNOLOGIST_CODE));
+    assert.ok(codes.every((c) => c === ENGINEERING_TECHNOLOGIST_CODE), codes.join(","));
+  });
+
+  it("§7 Electronics BE → Electronics Engineer listed, ET still listed, other PE gone", () => {
+    const res = assessExtractedSubjects(ENG_ROWS, {
+      qualifications: [
+        { level: "bachelor", title: "Bachelor of Engineering in Electronics", countedYearsOverride: 4 },
+      ],
+    });
+    const pe = (res.candidates ?? []).filter((c) => c.track === "professional_engineer");
+    const et = (res.candidates ?? []).find((c) => c.anzscoCode.replace(/\s+/g, "") === ENGINEERING_TECHNOLOGIST_CODE);
+    assert.equal(res.degreeField?.fieldId, "electronic");
+    assert.ok(et, "ET stays in the list");
+    assert.ok(pe.some((c) => c.anzscoCode.replace(/\s+/g, "") === "233411"));
+    assert.ok(pe.every((c) => c.anzscoCode.replace(/\s+/g, "") === "233411"));
+  });
+
+  it("§7 Electrical BE → Electrical Engineer listed, ET still listed", () => {
+    const res = assessExtractedSubjects(ENG_ROWS, {
+      qualifications: [
+        { level: "bachelor", title: "Bachelor of Engineering in Electrical Engineering", countedYearsOverride: 4 },
+      ],
+    });
+    const pe = (res.candidates ?? []).filter((c) => c.track === "professional_engineer");
+    assert.ok(pe.some((c) => c.anzscoCode.replace(/\s+/g, "") === "233311"));
+    assert.ok(pe.every((c) => c.anzscoCode.replace(/\s+/g, "") === "233311"));
+    assert.ok((res.candidates ?? []).some((c) => c.anzscoCode.replace(/\s+/g, "") === ENGINEERING_TECHNOLOGIST_CODE));
+    const noneRecommended = (res.candidates ?? []).every((c) => !c.recommended);
+    if (noneRecommended) {
+      const scores = (res.candidates ?? []).map((c) => c.confidenceScore);
+      const sorted = [...scores].sort((a, b) => b - a);
+      assert.deepEqual(scores, sorted, "unrecommended list is score-descending");
+    }
+  });
+
+  it("§7 Civil BE → Civil Engineer listed, ET still listed", () => {
+    const res = assessExtractedSubjects(ENG_ROWS, {
+      qualifications: [
+        { level: "bachelor", title: "Bachelor of Engineering in Civil Engineering", countedYearsOverride: 4 },
+      ],
+    });
+    const pe = (res.candidates ?? []).filter((c) => c.track === "professional_engineer");
+    assert.ok(pe.some((c) => c.anzscoCode.replace(/\s+/g, "") === "233211"));
+    assert.ok(pe.every((c) => c.anzscoCode.replace(/\s+/g, "") === "233211"));
+    assert.ok((res.candidates ?? []).some((c) => c.anzscoCode.replace(/\s+/g, "") === ENGINEERING_TECHNOLOGIST_CODE));
+  });
+
+  it("an electrical diploma keeps Electrical Draftsperson and 312999, and drops Electronic", () => {
+    const field = selectDiplomaField([
+      { level: "diploma", title: "DAE Electrical Technology" },
+    ]);
+    assert.equal(field?.fieldId, "electrical");
+    assert.equal(keepAssociateOccupation("312311", "Electrical Engineering Draftsperson", field), true);
+    assert.equal(keepAssociateOccupation("312411", "Electronic Engineering Draftsperson", field), false);
+    assert.equal(keepAssociateOccupation("312511", "Mechanical Engineering Draftsperson", field), false);
+    assert.equal(keepAssociateOccupation("312999", "Building and Engineering Technicians nec", field), true);
+    assert.equal(keepAssociateOccupation("312411", "Electronic Engineering Draftsperson", null), true);
+    const res = assessExtractedSubjects(ENG_ROWS, {
+      qualifications: [{ level: "diploma", rawLevel: "diploma", title: "DAE Electrical Technology", countedYearsOverride: 3 }],
+    });
+    const codes = (res.candidates ?? []).map((c) => c.anzscoCode.replace(/\s+/g, ""));
+    assert.ok(codes.includes("312311"), codes.join(","));
+    assert.ok(!codes.includes("312411"), codes.join(","));
+    assert.ok(codes.every((c) => c === "312311"), codes.join(","));
+    const notes = (res.candidates ?? []).flatMap((c) => c.qualificationNotes ?? []);
+    assert.ok(notes.every((n) => !/field of study|−15 pp/i.test(n)));
+  });
+
+  it("§7 Diploma in Computer Engineering → associate occupations only, no ET", () => {
+    const res = assessExtractedSubjects(ENG_ROWS, {
+      qualifications: [
+        { level: "diploma", title: "Diploma in Computer Engineering", countedYearsOverride: 2 },
+      ],
+    });
+    const codes = (res.candidates ?? []).map((c) => c.anzscoCode.replace(/\s+/g, ""));
+    assert.ok(!codes.includes(ENGINEERING_TECHNOLOGIST_CODE), codes.join(","));
+    assert.ok(
+      (res.candidates ?? []).every((c) => c.track === "engineering_associate"),
+      (res.candidates ?? []).map((c) => `${c.anzscoCode}:${c.track}`).join(","),
+    );
   });
 });

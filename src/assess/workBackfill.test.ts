@@ -9,8 +9,9 @@ import {
   type WorkJudge,
 } from "./assessCase.js";
 import type { OccupationWorkJudgement } from "./experienceBoost.js";
+import { assessConfig } from "./config.js";
 import { ENGINEERING_TECHNOLOGIST_CODE } from "./familyAdjust.js";
-import type { AnzscoCandidate, AssessmentResult, ExtractedSubjectRow } from "./schemas.js";
+import type { AnzscoCandidate, ExtractedSubjectRow } from "./schemas.js";
 
 function sub(name: string): ExtractedSubjectRow {
   return {
@@ -83,13 +84,16 @@ describe("backfilled card: work-experience judgement", () => {
     assert.equal(fill.workExperienceBoost, true);
     assert.equal(fill.workExperienceAnalysis?.related, true);
     assert.equal(fill.workExperienceAnalysis?.confidenceScoreBefore, before);
-    assert.ok(fill.scored.confidenceScore > before, "boost lifts the score");
-    assert.ok(fill.scored.confidenceScore - before <= 4 + 1e-9);
+    const cap = assessConfig.academicAlignment.scoreCap;
+    const after = fill.scored.confidenceScore;
+    assert.equal(after, Math.round(Math.min(cap, before + 4) * 10) / 10);
+    assert.ok(after <= cap);
   });
 
   it("asks the judge only for the occupation missing a judgement", async () => {
     const all = scoreAllOccupations(ROWS, undefined, { workExperienceBoost: false, qualifications: QUALS });
-    const [a, b] = [all[3]!, all[5]!];
+    assert.ok(all.length >= 2, "need two scored occupations");
+    const [a, b] = [all[0]!, all[1]!];
     const calls: string[][] = [];
     const fresh = await judgeBackfill([a, b], {
       saved: [{ anzscoCode: a.rubric.anzscoCode, related: false, matchedJobs: [], analysis: "" }],
@@ -104,7 +108,7 @@ describe("backfilled card: work-experience judgement", () => {
 
   it("no judge and no saved judgement: card left unjudged", async () => {
     const all = scoreAllOccupations(ROWS, undefined, { workExperienceBoost: false, qualifications: QUALS });
-    const fill = all[4]!;
+    const fill = all[0]!;
     const before = fill.scored.confidenceScore;
     await judgeBackfill([fill], { saved: null, judge: null });
     assert.equal(fill.workExperienceAnalysis ?? null, null);
@@ -117,65 +121,33 @@ describe("backfilled card: work-experience judgement", () => {
     const ranked = rankCandidates([c("1", 80), c("2", 60), c("3", 64), c("4", 90, false), c("5", 60)]);
     assert.deepEqual(ranked.map((r) => r.anzscoCode), ["1", "3", "2", "5", "4"]);
   });
+
+  it("when none are recommended, sorts by score not PE-before-ET", () => {
+    const c = (code: string, score: number) =>
+      ({ anzscoCode: code, title: code, confidenceScore: score, recommended: false, coreMatched: 0, foundationalMatched: 0 }) as AnzscoCandidate;
+    const ranked = rankCandidates(
+      [c("233311", 42.5), c("233914", 44.4)],
+      (code) => (code === "233311" ? 1 : 2),
+    );
+    assert.deepEqual(
+      ranked.map((r) => r.anzscoCode),
+      ["233914", "233311"],
+    );
+  });
 });
 
 describe("cached load: backfilled 3rd card gets the work judgement", () => {
-  /** A saved result where ET took the 3rd slot and moves to Maybe Suitable. */
-  function cachedWithEt(): AssessmentResult {
-    const base = assessExtractedSubjects(ROWS, { qualifications: QUALS });
-    const cands = (base.candidates ?? []).filter(
+  it("does not backfill other PE when §3 left only the matched occupation", async () => {
+    const cached = assessExtractedSubjects(ROWS, { qualifications: QUALS });
+    const pe = (cached.candidates ?? []).filter(
       (c) => c.anzscoCode.replace(/\s+/g, "") !== ENGINEERING_TECHNOLOGIST_CODE,
     );
-    assert.ok(cands.length >= 2, "fixture needs two scored occupations");
-    const primary = { ...cands[0]!, recommended: true, confidenceScore: 80 };
-    const et = { ...cands[1]!, anzscoCode: ENGINEERING_TECHNOLOGIST_CODE, title: "Engineering Technologist", recommended: true, confidenceScore: 75 };
-    const second = { ...cands[1]!, recommended: true, confidenceScore: 70 };
-    return { ...base, candidates: [primary, et, second], workExperienceJudgements: undefined, familyAdjustment: undefined };
-  }
-  const input = { rows: ROWS, qualifications: QUALS };
-
-  it("runs the check for the backfilled occupation only, boosts it, saves nothing", async () => {
-    const cached = cachedWithEt();
-    const calls: string[][] = [];
-    const added = await backfillCachedCandidates(cached, { ...input, judge: stubJudge(calls) });
-    assert.equal(added, true);
-    assert.equal(cached.candidates!.length, 4);
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0]!.length, 1, "only the backfilled occupation is judged");
-    const fill = cached.candidates!.find((c) => c.anzscoCode === calls[0]![0])!;
-    assert.equal(fill.workExperienceBoost, true);
-    assert.equal(fill.workExperienceAnalysis?.related, true);
-    assert.ok(fill.confidenceScore > fill.workExperienceAnalysis!.confidenceScoreBefore);
-    assert.equal(cached.workExperienceJudgements, undefined, "read-only load saves nothing");
-  });
-
-  it("reuses the judgement saved on the last run (no AI call)", async () => {
-    const probe = cachedWithEt();
-    const calls: string[][] = [];
-    await backfillCachedCandidates(probe, { ...input, judge: stubJudge(calls) });
-    const fillCode = calls[0]![0]!;
-
-    const cached = cachedWithEt();
-    cached.workExperienceJudgements = [related(fillCode)];
-    await backfillCachedCandidates(cached, { ...input, judge: failJudge });
-    const fill = cached.candidates!.find((c) => c.anzscoCode === fillCode)!;
-    assert.equal(fill.workExperienceBoost, true);
-    assert.equal(fill.workExperienceAnalysis?.analysis, "Related work.");
-  });
-
-  it("the boosted fill is re-ranked among the cards", async () => {
-    const cached = cachedWithEt();
-    const calls: string[][] = [];
-    await backfillCachedCandidates(cached, { ...input, judge: stubJudge(calls) });
-    const list = cached.candidates!;
-    const fillIdx = list.findIndex((c) => c.anzscoCode === calls[0]![0]);
-    const fill = list[fillIdx]!;
-    // Every card after the boosted fill in the same track ranks no higher.
-    const prof = list.filter((c) => c.anzscoCode !== ENGINEERING_TECHNOLOGIST_CODE);
-    const scores = prof.map((c) => c.confidenceScore);
-    assert.deepEqual(scores, [...scores].sort((x, y) => y - x));
-    if (fill.confidenceScore > 70) {
-      assert.ok(fillIdx < list.findIndex((c) => c.confidenceScore === 70 && c !== fill));
-    }
+    assert.ok(pe.every((c) => c.anzscoCode.replace(/\s+/g, "") === "233311"));
+    const added = await backfillCachedCandidates(cached, {
+      rows: ROWS,
+      qualifications: QUALS,
+      judge: failJudge,
+    });
+    assert.equal(added, false);
   });
 });

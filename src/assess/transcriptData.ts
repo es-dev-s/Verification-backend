@@ -23,12 +23,19 @@ import {
 import { assessConfig } from "./config.js";
 import { evidenceConfig } from "./evidenceConfig.js";
 import {
+  dedupeSubjects,
   degreeLevelToQualification,
   extractSubjectsDetailed,
   hashAssessmentInput,
   hashSubjectInput,
   type TranscriptSource,
 } from "./extractSubjects.js";
+import {
+  combineResultCards,
+  isSubjectMarksTable,
+  parseResultCard,
+  subjectsFromMarksTables,
+} from "./resultCard.js";
 import { awardLevelOf, rowsFor } from "./gate1.js";
 import {
   lateralEntryView,
@@ -37,6 +44,7 @@ import {
   type LateralEntryView,
 } from "./lateralEntry.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
+import { parseCompletionYear } from "./qualificationYear.js";
 import {
   applyTextPeriods,
   countDuration,
@@ -97,6 +105,7 @@ type QualificationRow = {
   degreeTitle: string | null;
   country: string | null;
   institution: string | null;
+  completionYear?: number | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -216,10 +225,10 @@ export function usableTranscripts<T extends TranscriptDoc & { type: string; stat
   return sortTranscripts(
     documents.filter(
       (d) =>
-        d.type === "TRANSCRIPT" &&
         d.status === "DONE" &&
         d.text?.trim() &&
-        !exclude?.has(d.id),
+        !exclude?.has(d.id) &&
+        (d.type === "TRANSCRIPT" || (d.type === "CERTIFICATE" && isSubjectMarksTable(d.text))),
     ),
   );
 }
@@ -257,6 +266,100 @@ export function subjectHashOf(transcripts: TranscriptDoc[]): string {
   return hashSubjectInput(
     transcripts.map((t) => ({ id: t.id, text: t.text ?? "", degreeLevel: t.degreeLevel })),
   );
+}
+
+function shouldReplaceResultCardTitle(current: string | null, next: string): boolean {
+  const title = current?.trim() ?? "";
+  if (!title) return true;
+  if (title.toLowerCase() === next.toLowerCase()) return false;
+  // The award line alone ("Diploma of Associate Engineer") is the yearly cards
+  // before they are combined. A title that already names the technology stays.
+  return /diploma\s+of\s+associate\s+engineer/i.test(title) && !/\btechnology\b/i.test(title);
+}
+
+/**
+ * Yearly result cards for one registration become one diploma: title, counted
+ * years and completion year. A title the assessor has already made specific
+ * is left as it is. No change when the documents are not marks tables.
+ */
+export async function syncResultCardQualifications<
+  Q extends {
+    id: string;
+    degreeLevel: string;
+    degreeTitle: string | null;
+    institution: string | null;
+    completionYear: number | null;
+    durationYears: number | null;
+  },
+>(
+  caseId: string,
+  documents: readonly { status: string; degreeLevel: string | null; text: string | null }[],
+  qualifications: Q[],
+): Promise<void> {
+  const cards = documents
+    .filter((d) => d.status === "DONE" && !!d.text?.trim() && isSubjectMarksTable(d.text))
+    .map((d) =>
+      parseResultCard(d.text!, {
+        qualification:
+          d.degreeLevel === "diploma" || d.degreeLevel === "advanced_diploma" ? d.degreeLevel : "diploma",
+      }),
+    )
+    .filter((c): c is NonNullable<typeof c> => c != null && c.subjects.length > 0);
+  const combined = combineResultCards(cards);
+  if (!combined) return;
+  const docLevel =
+    documents.find((d) => d.degreeLevel && d.text && isSubjectMarksTable(d.text))?.degreeLevel ?? combined.degreeLevel;
+  let qual = qualifications.find((q) => String(q.degreeLevel) === String(docLevel));
+  const group = cards.filter((c) => c.registrationNumber === combined.registrationNumber);
+  const examYears = new Set(group.map((c) => c.examYear).filter((n): n is number => n != null));
+  const board = group.map((c) => c.board).find(Boolean) ?? null;
+  const ownsCards = (title: string | null) => {
+    const current = title?.trim() ?? "";
+    if (!current) return true;
+    if (current.toLowerCase() === combined.title.toLowerCase()) return true;
+    if (/^dae\b/i.test(current)) return true;
+    return /diploma\s+of\s+associate\s+engineer/i.test(current) && !/\btechnology\b/i.test(current);
+  };
+  if (qual && !ownsCards(qual.degreeTitle)) return;
+  if (!qual) {
+    if (docLevel !== "diploma" && docLevel !== "advanced_diploma") return;
+    const created = await prisma.qualification.create({
+      data: {
+        caseId,
+        degreeLevel: "diploma",
+        degreeTitle: combined.title,
+        institution: board,
+        durationYears: combined.years,
+        durationCalculated: true,
+        completionYear: combined.completionYear,
+      },
+    });
+    qualifications.push(created as unknown as Q);
+    return;
+  }
+  const data: {
+    degreeTitle?: string;
+    completionYear?: number;
+    durationYears?: number;
+    durationCalculated?: boolean;
+    institution?: string;
+  } = {};
+  if (shouldReplaceResultCardTitle(qual.degreeTitle, combined.title)) data.degreeTitle = combined.title;
+  if (
+    combined.completionYear != null &&
+    qual.completionYear !== combined.completionYear &&
+    (qual.completionYear == null || examYears.has(qual.completionYear))
+  ) {
+    data.completionYear = combined.completionYear;
+  }
+  if (qual.durationYears == null || qual.durationYears < combined.years) {
+    data.durationYears = combined.years;
+    data.durationCalculated = true;
+  }
+  if (!qual.institution && board) data.institution = board;
+  if (!Object.keys(data).length) return;
+  await prisma.qualification.update({ where: { id: qual.id }, data });
+  Object.assign(qual, data);
 }
 
 /** Qualification level of a transcript (refined by the title on file for its DB level). */
@@ -308,16 +411,17 @@ export function qualificationInfosFor(
     const overrides = overridesFor(fieldSources, raw);
     const fieldOfStudy = fieldValue(fieldSources, FIELD_OF_STUDY_FIELD, raw)?.finalValue?.trim() || null;
     const awardOverride = parseAwardLevel(fieldValue(fieldSources, AWARD_LEVEL_FIELD, raw)?.finalValue);
+    const texts = transcripts
+      .filter((t) => t.degreeLevel === raw || (!t.degreeLevel && qualifications.length === 1))
+      .map((t) => t.text ?? "");
     return {
       level: degreeLevelToQualification(q.degreeLevel, q.degreeTitle),
       title: q.degreeTitle ?? null,
       rawLevel: raw,
       country: q.country ?? null,
       institution: q.institution ?? null,
-      // Transcript text at this level, so routing can spot a qualification code.
-      texts: transcripts
-        .filter((t) => t.degreeLevel === raw || (!t.degreeLevel && qualifications.length === 1))
-        .map((t) => t.text ?? ""),
+      completionYear: q.completionYear ?? parseCompletionYear(...texts),
+      texts,
       ...(fieldOfStudy ? { fieldOfStudy } : {}),
       ...(awardOverride ? { awardOverride } : {}),
       ...(overrides.countedYears != null ? { countedYearsOverride: overrides.countedYears } : {}),
@@ -508,15 +612,36 @@ export async function resolveSubjects(input: {
       ...(savedPartial ? { partial: savedPartial } : {}),
     };
     cacheable = false;
-  } else if (input.useLlm && transcripts.length) {
-    const sources: TranscriptSource[] = transcripts.map((t) => ({
-      documentId: t.id,
-      text: t.text!,
-      degreeLevelHint: input.docLevel(t),
-    }));
-    const read = await (input.extract ?? extractSubjectsDetailed)(sources, { deadlineMs: input.deadlineMs });
-    const fresh = read.rows;
-    const partial = read.partial ? partialReportOf(read.failedChunks) : undefined;
+  } else if (transcripts.length) {
+    // A certificate that prints a subject / marks table is read here. The
+    // remaining transcripts still go to the model.
+    const parsed = subjectsFromMarksTables(transcripts, (doc) =>
+      input.docLevel({ degreeLevel: doc.degreeLevel ?? null }),
+    );
+    const llmTranscripts = transcripts.filter((t) => !parsed.documentIds.has(t.id));
+    if (!parsed.rows.length && !(input.useLlm && llmTranscripts.length)) {
+      if (persistedRows.length) {
+        rows = persistedRows;
+        extraction = { subjectHash, source: "persisted" };
+      } else {
+        return null;
+      }
+    } else {
+    let fresh = parsed.rows;
+    let partial: ExtractionReport["partial"];
+    partial = undefined;
+    if (input.useLlm && llmTranscripts.length) {
+      const sources: TranscriptSource[] = llmTranscripts.map((t) => ({
+        documentId: t.id,
+        text: t.text!,
+        degreeLevelHint: input.docLevel(t),
+      }));
+      const read = await (input.extract ?? extractSubjectsDetailed)(sources, { deadlineMs: input.deadlineMs });
+      fresh = dedupeSubjects([...parsed.rows, ...read.rows]);
+      partial = read.partial ? partialReportOf(read.failedChunks) : undefined;
+    } else {
+      fresh = dedupeSubjects(parsed.rows);
+    }
     const choice = chooseSubjectsAfterExtraction(fresh, persistedRows);
     rows = choice.rows;
     if (choice.keptSaved) {
@@ -540,6 +665,7 @@ export async function resolveSubjects(input: {
       await persistExtractedSubjects(caseId, rows, transcripts);
       if (rows.length) await saveSubjectHash(caseId, subjectHash);
       else cacheable = false;
+    }
     }
   } else if (persistedRows.length) {
     rows = persistedRows;
@@ -844,6 +970,7 @@ export async function getTranscriptData(
 ): Promise<TranscriptDataSummary | null> {
   let row = await loadCase(caseId);
   if (!row) return null;
+  await syncResultCardQualifications(caseId, row.documents, row.qualifications);
   const transcripts = usableTranscripts(row.documents, priorStudyDocumentIds(row.fieldSources));
   const subjectHash = subjectHashOf(transcripts);
   const savedHash = await readSavedSubjectHash(caseId);

@@ -2,9 +2,11 @@
  * Gate 1: qualification eligibility, decided BEFORE any scoring.
  *
  * Rules are checked top to bottom and the first match decides:
- *  1. Not engineering, counted duration under 2 years (under 1 year for an
- *     Advanced Diploma), or certificate-level only → NOT ELIGIBLE (nothing
- *     is scored).
+ *  1. Counted duration under 2 years (under 1 year for an Advanced Diploma),
+ *     or certificate-level only → NOT ELIGIBLE (nothing is scored). A
+ *     Bachelor / Master / PhD that is not an engineering title still opens
+ *     Engineering Technologist (spec §8); diploma-level "not engineering"
+ *     stays not eligible.
  *  2. Unusual case → MANUAL REVIEW (nothing is scored): a Diploma (AQF 5) that
  *     is not clearly engineering, or is not the first-phase qualification
  *     (a bachelor is on file or lateral entry is confirmed); a
@@ -452,6 +454,31 @@ function outcomeFor(e: QualEval, all: readonly QualEval[], lateralEntryConfirmed
   if (e.award === "certificate") {
     return { kind: "fail", reason: `"${name}" is certificate level (below AQF 5).` };
   }
+  // Spec §1 / §8: Bachelor / Master / PhD still gets Engineering Technologist
+  // even when the title is not engineering. Professional Engineer stays closed.
+  if (e.engineering.decision === "no" && isDegreeAward(e.award)) {
+    if (d == null) {
+      return {
+        kind: "manual",
+        reason: `the duration of "${name}" could not be counted from the transcript and was not entered in Transcript data.`,
+      };
+    }
+    const floor = notEligibleBelowFor(e.award);
+    if (!isPostgraduate(e.award) && d < floor - EPS) {
+      return { kind: "fail", reason: `"${name}" is under ${yearsWord(floor)} (${yrs(d)}, ${basis}).` };
+    }
+    if (isPostgraduate(e.award) || d >= g.technologistMinYears - EPS) {
+      return {
+        kind: "open",
+        rule: 4,
+        reason: `"${name}" is a ${AWARD_LABELS[e.award]} of ${yrs(d)} (${basis}); the title is not engineering, so Engineering Technologist only.`,
+      };
+    }
+    return {
+      kind: "manual",
+      reason: `${AWARD_LABELS[e.award]} "${name}" is only ${yrs(d)} (possible top-up or bridging degree).`,
+    };
+  }
   if (isPostgraduate(e.award) && !(d != null && isDegreeAward(e.award) && d >= g.professionalMinYears - EPS)) {
     // Decision (b): a postgraduate engineering award is judged together with
     // the bachelor; with no bachelor on file it goes to manual review.
@@ -688,14 +715,19 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
   }
 
   // ---- Rule 1: not eligible ----------------------------------------------
+  // Diploma / certificate that is not engineering stays blocked. Bachelor+
+  // still proceeds so Engineering Technologist can open (spec §8).
   if (evals.every((e) => e.engineering.decision === "no")) {
     const e = evals[0];
-    return finish(
-      "not_eligible",
-      1,
-      `Not eligible: the qualification on file is not an engineering qualification (${e.engineering.reason}).`,
-      e,
-    );
+    const bachelorPlus = evals.some((x) => isDegreeAward(x.award));
+    if (!bachelorPlus) {
+      return finish(
+        "not_eligible",
+        1,
+        `Not eligible: the qualification on file is not an engineering qualification (${e.engineering.reason}).`,
+        e,
+      );
+    }
   }
   const knownAwards = evals.filter((e) => e.award !== "unknown");
   if (knownAwards.length && knownAwards.every((e) => e.award === "certificate")) {
@@ -708,7 +740,9 @@ export function evaluateGate1(input: Gate1Input): Gate1Decision {
   }
   // Not a clear "no": level and duration still decide, including when the
   // title and subjects are not clear enough to call it engineering.
-  const proceeding = evals.filter((e) => e.engineering.decision !== "no");
+  const proceeding = evals.filter(
+    (e) => e.engineering.decision !== "no" || isDegreeAward(e.award),
+  );
   // Postgraduate awards are never failed on length here (decision b handles them).
   if (
     proceeding.length &&

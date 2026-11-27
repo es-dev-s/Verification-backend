@@ -1,13 +1,19 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import { assessExtractedSubjects } from "./assessCase.js";
 import { resolveManualOccupation } from "./manualOccupation.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
 import { riskGateBlockReason } from "../risk/runRisk.js";
-import type { AssessmentResult, ExtractedSubjectRow } from "./schemas.js";
+import type { AssessmentResult, ExtractedSubjectRow, Gate1Decision } from "./schemas.js";
 import {
   applyWorkflowRouting,
+  loadTrackStatus,
+  routingForSelectedOccupation,
   specialisationMastersCheck,
+  trackListCloses,
 } from "./workflowRouting.js";
 
 function sub(name: string): ExtractedSubjectRow {
@@ -88,7 +94,7 @@ function stubResult(over: Partial<AssessmentResult>): AssessmentResult {
         subjectCatalog: [],
       },
     ],
-    gate1: { result: "open", tracks: [], notes: [] } as AssessmentResult["gate1"],
+    gate1: { result: "open" } as Gate1Decision,
     ...over,
   };
 }
@@ -104,7 +110,7 @@ describe("specialisationMastersCheck", () => {
       { level: "master", title: "Master of Science" },
     ]);
     assert.equal(wrong.ok, false);
-    assert.match(wrong.message, /does not match/);
+    assert.match(wrong.message, /could not be read/);
 
     const structural = specialisationMastersCheck("233214", [
       ...OPEN_MECH,
@@ -112,11 +118,53 @@ describe("specialisationMastersCheck", () => {
     ]);
     assert.equal(structural.ok, true);
 
-    const civil = specialisationMastersCheck("233215", [
+    const transport = specialisationMastersCheck("233215", [
       { level: "bachelor", title: "Bachelor of Engineering (Civil)", countedYearsOverride: 4 },
-      { level: "master", title: "Master of Civil Engineering" },
+      { level: "master", title: "Master of Transportation Engineering", institution: "Uni" },
     ]);
-    assert.equal(civil.ok, true);
+    assert.equal(transport.ok, true);
+
+    const civilOnly = specialisationMastersCheck("233214", [
+      ...OPEN_MECH,
+      { level: "master", title: "Master of Civil Engineering", institution: "Uni", fieldOfStudy: "Civil Engineering" },
+    ]);
+    assert.equal(civilOnly.ok, false);
+    assert.match(civilOnly.message, /does not match/);
+    assert.equal(civilOnly.masters[0]?.institution, "Uni");
+
+    const unread = specialisationMastersCheck("233212", [
+      { level: "master", title: "Master of Science", institution: "Uni" },
+    ]);
+    assert.equal(unread.ok, false);
+    assert.match(unread.message, /could not be read/);
+
+    const soil = specialisationMastersCheck("233212", [
+      { level: "master", title: "Master of Engineering", fieldOfStudy: "Soil Mechanics", institution: "Uni" },
+    ]);
+    assert.equal(soil.ok, true);
+  });
+});
+
+describe("track list", () => {
+  it("closes a track only when the maintained list says closed", () => {
+    assert.equal(trackListCloses("233512", { professional_engineer: "open" }), false);
+    assert.equal(trackListCloses("233512", { professional_engineer: "closed" }), true);
+    assert.equal(trackListCloses("312311", { engineering_associate: "closed" }), true);
+  });
+
+  it("re-reads track-status.json on each check", () => {
+    const dir = mkdtempSync(join(tmpdir(), "track-status-"));
+    const file = join(dir, "track-status.json");
+    const body = (status: "open" | "closed") =>
+      JSON.stringify({
+        professional_engineer: status,
+        engineering_technologist: "open",
+        engineering_associate: "open",
+      });
+    writeFileSync(file, body("open"));
+    assert.equal(trackListCloses("233512", loadTrackStatus(file)), false);
+    writeFileSync(file, body("closed"));
+    assert.equal(trackListCloses("233512", loadTrackStatus(file)), true);
   });
 });
 
@@ -128,7 +176,8 @@ describe("applyWorkflowRouting", () => {
     assert.equal(r.recommended, false);
     assert.equal(r.workflowRouting?.code, "below_min_confidence");
     assert.equal(r.workflowRouting?.allowRisk, false);
-    assert.match(riskGateBlockReason(r) ?? "", /below the 50%/);
+    assert.match(riskGateBlockReason(r) ?? "", /No ANZSCO reached 50%/);
+    assert.equal(r.workflowRouting?.topScores?.[0]?.confidenceScore, 40);
   });
 
   it("lets a user-selected occupation below 50% go to risk with a flag", () => {
@@ -197,6 +246,41 @@ describe("Continue with this ANZSCO", () => {
     assert.equal(r.assessorSelected?.source, "user");
     assert.equal(r.workflowRouting?.code, "closed_track");
     assert.equal(r.workflowRouting?.allowRisk, false);
-    assert.match(riskGateBlockReason(r) ?? "", /closed Gate 1 track/);
+    assert.match(riskGateBlockReason(r) ?? "", /Chosen ANZSCO is in a closed track/);
+    assert.equal(r.workflowRouting?.closedTrack?.anzscoCode, "312311");
+  });
+
+  it("sends an alternative Geotechnical selection with no Master's to manual intervention", () => {
+    const geo = resolveManualOccupation("233212");
+    assert.ok(geo.ok);
+    const r = assessExtractedSubjects(ENG, {
+      qualifications: OPEN_MECH,
+      manualSelection: { ...geo.selection, source: "user" },
+      userSelectedContinue: true,
+    });
+    assert.equal(r.assessorSelected?.anzscoCode, "233212");
+    assert.equal(r.workflowRouting?.code, "specialisation_masters");
+    assert.equal(r.workflowRouting?.allowRisk, false);
+    assert.match(r.workflowRouting?.message ?? "", /No Master's was found/);
+    const recommendedWouldAllow = riskGateBlockReason({
+      gate1: r.gate1,
+      workflowRouting: {
+        kind: "ok",
+        code: null,
+        message: "",
+        minConfidence: 50,
+        highestConfidence: 80,
+        allowRisk: true,
+      },
+    });
+    assert.equal(recommendedWouldAllow, null);
+    const selected = routingForSelectedOccupation({
+      anzscoCode: "233212",
+      confidenceScore: 80,
+      gate: r.gate1,
+      qualifications: OPEN_MECH,
+    });
+    assert.equal(selected.allowRisk, false);
+    assert.match(riskGateBlockReason({ gate1: r.gate1, workflowRouting: selected }) ?? "", /No Master's/);
   });
 });

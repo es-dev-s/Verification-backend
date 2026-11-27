@@ -20,8 +20,9 @@
  * (extracted transcript rows, qualification titles, experience rows, CV text).
  */
 import type { ExtractedSubjectRow } from "./schemas.js";
+import { specialisationMastersCheck } from "./workflowRouting.js";
 
-export const SPECIALISATION_VERSION = "2026-11-03-doc12";
+export const SPECIALISATION_VERSION = "2026-11-26-masters-required";
 
 export type SpecialisationTier = "no_risk" | "slight_risk" | "high_risk";
 
@@ -89,6 +90,11 @@ export type SpecialisationOutcome = {
   tier: SpecialisationTier;
   gaps: string[];
   routing: string;
+  /**
+   * Master's in an accepted field is required before work experience can pass.
+   * Absent on results saved before this check.
+   */
+  mastersRequired?: { ok: boolean; message: string };
 };
 
 export type SpecialisationAuditEntry = { step: string; detail: string };
@@ -328,7 +334,12 @@ const GENERIC_CIVIL = /civil|infrastructure|construction/i;
 
 export type SpecialisationInput = {
   rows: ExtractedSubjectRow[];
-  qualifications: Array<{ degreeLevel: string; degreeTitle: string | null; institution: string | null }>;
+  qualifications: Array<{
+    degreeLevel: string;
+    degreeTitle: string | null;
+    institution: string | null;
+    fieldOfStudy?: string | null;
+  }>;
   experienceRows: Array<{
     title?: string | null;
     start?: string | null;
@@ -573,8 +584,30 @@ export function assessSpecialisations(input: SpecialisationInput): Specialisatio
       }
       if (!bachelorQual?.institution?.trim()) gaps.push("Bachelor's institution not recorded.");
     }
-    const routing =
-      tier === "no_risk"
+    const mastersCheck = specialisationMastersCheck(
+      def.anzscoCode,
+      input.qualifications.map((q) => ({
+        level: q.degreeLevel === "master" ? "master" : "bachelor",
+        rawLevel: q.degreeLevel,
+        title: q.degreeTitle,
+        institution: q.institution,
+        fieldOfStudy: q.fieldOfStudy ?? null,
+      })),
+    );
+    let mastersRequired: { ok: boolean; message: string } = {
+      ok: mastersCheck.ok,
+      message: mastersCheck.ok ? "" : mastersCheck.message,
+    };
+    if (coreMet && !mastersCheck.ok) {
+      pathwayB.satisfied = false;
+      pathwayB.notes.push("A matching Master's is required. Work experience does not replace it.");
+      chosen = null;
+      tier = "high_risk";
+      if (!gaps.includes(mastersCheck.message)) gaps.unshift(mastersCheck.message);
+    }
+    const routing = !mastersCheck.ok && coreMet
+      ? mastersCheck.message
+      : tier === "no_risk"
         ? "Pass to assessor for expedited sign-off."
         : tier === "slight_risk"
           ? "Pass to assessor with the gaps listed; request supplementary evidence."
@@ -597,6 +630,7 @@ export function assessSpecialisations(input: SpecialisationInput): Specialisatio
       tier,
       gaps,
       routing,
+      mastersRequired,
     };
   });
 

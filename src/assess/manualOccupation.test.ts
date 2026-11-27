@@ -3,10 +3,13 @@ import { describe, it } from "node:test";
 import { riskGateBlockReason } from "../risk/runRisk.js";
 import { assessExtractedSubjects } from "./assessCase.js";
 import {
+  applyManualSelection,
   listManualOccupationOptions,
   MANUAL_ANZSCO_FIELD,
   manualSelectionFrom,
+  occupationSelectionHistoryFrom,
   resolveManualOccupation,
+  type ManualAnzscoState,
 } from "./manualOccupation.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
 import type { ExtractedSubjectRow, Gate1Decision } from "./schemas.js";
@@ -103,6 +106,70 @@ describe("manual occupation options", () => {
       null,
     );
     assert.equal(manualSelectionFrom([{ field: MANUAL_ANZSCO_FIELD, degreeLevel: null, finalValue: "nope" }]), null);
+  });
+
+  it("keeps earlier ANZSCO choices on the manualAnzsco row", () => {
+    const history = occupationSelectionHistoryFrom([
+      {
+        field: MANUAL_ANZSCO_FIELD,
+        degreeLevel: null,
+        finalValue: "civil-engineer",
+        alternatives: {
+          history: [
+            {
+              anzscoCode: "233512",
+              title: "Mechanical Engineer",
+              occupationId: "mechanical-engineer",
+              source: "user",
+              reason: "No ANZSCO reached 50%.",
+              replacedAt: "2026-11-26T00:00:00.000Z",
+            },
+          ],
+        },
+      },
+    ]);
+    assert.equal(history.length, 1);
+    assert.equal(history[0]?.anzscoCode, "233512");
+    assert.equal(history[0]?.source, "user");
+    assert.equal(occupationSelectionHistoryFrom([]).length, 0);
+  });
+
+  it("clear then re-select keeps both history entries", () => {
+    const geo = resolveManualOccupation("233212");
+    const mech = resolveManualOccupation("233512");
+    assert.ok(geo.ok && mech.ok);
+    const empty: ManualAnzscoState = { finalValue: "", extractedValue: "", source: null, history: [] };
+    const first = applyManualSelection(empty, { ...geo.selection, source: "user" }, { now: "2026-11-26T00:00:00.000Z" });
+    const replaced = applyManualSelection(
+      first,
+      { ...mech.selection, source: "user" },
+      { now: "2026-11-26T00:01:00.000Z", reason: "replaced" },
+    );
+    const cleared = applyManualSelection(replaced, null, { now: "2026-11-26T00:02:00.000Z" });
+    assert.equal(cleared.finalValue, "");
+    assert.equal(cleared.history.length, 2);
+    assert.equal(cleared.history[1]?.cleared, true);
+    assert.equal(cleared.history[1]?.title, "Mechanical Engineer");
+    assert.equal(cleared.history[1]?.reason, "Cleared");
+    assert.equal(
+      manualSelectionFrom([{ field: MANUAL_ANZSCO_FIELD, degreeLevel: null, finalValue: cleared.finalValue }]),
+      null,
+    );
+    const again = applyManualSelection(cleared, { ...geo.selection, source: "user" }, { now: "2026-11-26T00:03:00.000Z" });
+    assert.equal(again.history.length, 2);
+    assert.equal(again.finalValue, geo.selection.occupationId);
+    assert.equal(again.history[0]?.anzscoCode, "233212");
+    assert.equal(again.history[1]?.cleared, true);
+    const read = occupationSelectionHistoryFrom([
+      {
+        field: MANUAL_ANZSCO_FIELD,
+        degreeLevel: null,
+        finalValue: "",
+        alternatives: { history: again.history },
+      },
+    ]);
+    assert.equal(read.length, 2);
+    assert.equal(read[1]?.cleared, true);
   });
 });
 

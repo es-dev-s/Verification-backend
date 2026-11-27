@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { assessExtractedSubjects } from "./assessCase.js";
+import { ENGINEERING_TECHNOLOGIST_CODE } from "./familyAdjust.js";
 import { evidenceConfig } from "./evidenceConfig.js";
 import {
   awardLevelOf,
@@ -143,12 +144,32 @@ describe("awardLevelOf (Honours, certificate, AQF level)", () => {
 });
 
 describe("Rule 1: not eligible", () => {
-  it("not engineering", () => {
-    const g = gate([{ level: "bachelor", title: "Bachelor of Business Administration", countedYearsOverride: 4 }], BUSINESS.map((n) => sub(n)));
+  it("not engineering diploma / certificate still not eligible", () => {
+    const g = gate(
+      [{ level: "diploma", title: "Diploma of Business", countedYearsOverride: 2 }],
+      BUSINESS.map((n) => sub(n, "diploma")),
+    );
     assert.equal(g.result, "not_eligible");
     assert.equal(g.rule, 1);
     assert.match(g.reason, /not an engineering qualification/);
     assertBlocked(g);
+  });
+
+  it("non-engineering Bachelor still opens Engineering Technologist (spec §8)", () => {
+    const g = gate(
+      [{ level: "bachelor", title: "Bachelor of Business Administration", countedYearsOverride: 4 }],
+      BUSINESS.map((n) => sub(n)),
+    );
+    assert.equal(g.result, "open");
+    assert.equal(g.rule, 4);
+    assert.deepEqual(openIds(g), ["engineering_technologist:1"]);
+    assert.equal(track(g, "professional_engineer").open, false);
+    const res = assessExtractedSubjects(BUSINESS.map((n) => sub(n)), {
+      qualifications: [{ level: "bachelor", title: "Bachelor of Business Administration", countedYearsOverride: 4 }],
+    });
+    const codes = (res.candidates ?? []).map((c) => c.anzscoCode.replace(/\s+/g, ""));
+    assert.ok(codes.includes(ENGINEERING_TECHNOLOGIST_CODE), codes.join(","));
+    assert.ok(codes.every((c) => c === ENGINEERING_TECHNOLOGIST_CODE), codes.join(","));
   });
 
   it("certificate only", () => {

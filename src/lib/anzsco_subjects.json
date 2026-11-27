@@ -11941,6 +11941,7 @@
             "id": "312311-T1.3",
             "name": "English & Technical Communication",
             "variants": [
+              "English",
               "English & Technical Communication",
               "English for Technical Purposes I",
               "English for Technical Purposes II",
@@ -12087,6 +12088,8 @@
               "Electric Machines I",
               "Electric Machines II",
               "DC Machines",
+              "D.C Machines",
+              "D.C Machines & Batteries",
               "AC Machines",
               "Electrical Machinery",
               "Transformers",
@@ -12145,6 +12148,7 @@
             "id": "312311-T2.4",
             "name": "Installation, Estimation & Standards",
             "variants": [
+              "Installation Planning & Estimating",
               "Electrical Installation & Wiring",
               "Electrical Installation and Maintenance",
               "Domestic Wiring",

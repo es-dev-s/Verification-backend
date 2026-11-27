@@ -49,8 +49,10 @@ import {
   applyFieldMatchPenalty,
   etOfferedForQualifications,
   FIELD_MATCH_PENALTY_PP,
+  keepAssociateOccupation,
   keepProfessionalEngineer,
   selectDegreeField,
+  selectDiplomaField,
   type DegreeFieldSelection,
 } from "./degreeField.js";
 import { associateFallbackFor } from "./associateFallback.js";
@@ -58,10 +60,18 @@ import { isDiplomaLevel } from "./schemas.js";
 import {
   manualSelectionFrom,
   NoSavedSubjectsError,
+  occupationSelectionHistoryFrom,
   TelecomNeedsIct60220Error,
   type ManualSelection,
 } from "./manualOccupation.js";
 import { applyWorkflowRouting, previewContinueRouting } from "./workflowRouting.js";
+import {
+  QUALIFICATION_YEAR_MISSING_NOTE,
+  completionYearOf,
+  scoringQualification,
+} from "./qualificationYear.js";
+import { blendSparseHistory, historicalStatsForAnzsco } from "../risk/historical.js";
+import { withSimilarCases } from "../risk/similarCases.js";
 import { applyTextPeriods, preferFinalYearGate, withTermIndex } from "./qualificationEvidence.js";
 import {
   hasLateralState,
@@ -71,6 +81,7 @@ import {
   priorStudyDocumentIds,
   priorStudyMatches,
   priorStudyRowsFor,
+  sameFieldDiplomaLateral,
   type LateralEntryState,
 } from "./lateralEntry.js";
 import { recordLateralDecision } from "./lateralEntryStore.js";
@@ -82,6 +93,7 @@ import {
   qualificationInfosFor,
   readSavedSubjectHash,
   resolveSubjects,
+  syncResultCardQualifications,
   rowFromDb,
   subjectHashOf,
   usableTranscripts,
@@ -238,6 +250,8 @@ export async function assessCase(
   });
   if (!caseRow) throw new Error("Case not found");
 
+  await syncResultCardQualifications(caseId, caseRow.documents, caseRow.qualifications);
+
   // Earlier-study transcripts (lateral entry) are never the bachelor's own subjects.
   const transcripts = usableTranscripts(
     caseRow.documents,
@@ -260,6 +274,7 @@ export async function assessCase(
     degreeTitle: q.degreeTitle ?? null,
     country: q.country ?? null,
     institution: q.institution ?? null,
+    completionYear: q.completionYear ?? null,
   }));
   const docLevel = documentLevelResolver(qualificationRows);
   // Includes the assessor values from Upload & details / Transcript data /
@@ -313,8 +328,8 @@ export async function assessCase(
     ...(caseRow.qualifications.some((q) => isDiplomaLevel(q.degreeLevel)) ? { associateGate: 1 } : {}),
     rubric: rubricFingerprint(),
     config: scoringConfigFingerprint(),
-    // ET plus degree-title field filter / −15 pp penalty (20 Nov 2026).
-    etDegreeField: 1,
+    // ET plus degree-title field filter / −15 pp penalty / academic alignment (20 Nov 2026).
+    etDegreeField: 2,
     workflowRouting: 1,
   });
 
@@ -374,12 +389,14 @@ export async function assessCase(
     }
     // Deterministic, so derived on load for results saved before it existed.
     if (cached.specialisation === undefined || (cached.specialisation && cached.specialisation.version !== SPECIALISATION_VERSION)) {
-      cached.specialisation = specialisationFor(cached, cachedRows, caseRow, cvText);
+      cached.specialisation = specialisationFor(cached, cachedRows, caseRow, cvText, qualificationInfos);
     }
     applyWorkflowRouting(cached, {
       qualifications: qualificationInfos,
       userSelected: manualSelection?.source === "user",
     });
+    const history = occupationSelectionHistoryFrom(caseRow.fieldSources);
+    if (history.length) cached.occupationSelectionHistory = history;
     return cached;
   }
 
@@ -597,6 +614,7 @@ export async function assessCase(
     ...(workJudgements.length ? { workExperienceJudgements: workJudgements } : {}),
     degreeField,
   };
+  withQualificationYear(result, qualificationInfos);
   result.familyAdjustment = familyAdjustmentForResult(
     result,
     etOwnScore(shortlist, scoredAll),
@@ -614,6 +632,8 @@ export async function assessCase(
     qualifications: qualificationInfos,
     userSelected: assessorSelected?.source === "user",
   });
+  const history = occupationSelectionHistoryFrom(caseRow.fieldSources);
+  if (history.length) result.occupationSelectionHistory = history;
 
   // When nothing is recommended, still surface best coverage numbers from the top card
   if (!result.recommended) {
@@ -623,7 +643,7 @@ export async function assessCase(
     result.confidence = null;
   }
 
-  result.specialisation = specialisationFor(result, result.extractedSubjects, caseRow, cvText);
+  result.specialisation = specialisationFor(result, result.extractedSubjects, caseRow, cvText, qualificationInfos);
 
   result.explanation = await writeExplanation(result, {
     useLlm: useLlm && assessConfig.llmExplanation,
@@ -648,16 +668,17 @@ function specialisationFor(
   result: AssessmentResult,
   rows: ExtractedSubjectRow[],
   caseRow: {
-    qualifications: Array<{ degreeLevel: unknown; degreeTitle: string | null; institution: string | null }>;
     experienceRows: Array<{ title: string | null; start: string | null; end: string | null; domainFinal: boolean | null; domainSuggested: boolean | null }>;
   },
   cvText: string | null,
+  qualificationInfos: readonly QualificationInfo[] = [],
 ): SpecialisationResult | null {
   try {
-    const qualifications = caseRow.qualifications.map((q) => ({
-      degreeLevel: String(q.degreeLevel),
-      degreeTitle: q.degreeTitle ?? null,
+    const qualifications = qualificationInfos.map((q) => ({
+      degreeLevel: q.rawLevel ?? q.level,
+      degreeTitle: q.title ?? null,
       institution: q.institution ?? null,
+      fieldOfStudy: q.fieldOfStudy ?? null,
     }));
     const candidateCodes = [
       result.anzscoCode ?? "",
@@ -783,6 +804,7 @@ function scoreOccupation(
       rubric,
       qualificationCheck,
       applyCapstone: capstoneApplies(rubric, trackForAnzsco(rubric.anzscoCode)),
+      ...alignmentInputs(rubric.anzscoCode, opts.qualifications),
     });
     // Strictly better only, so earlier pools (Bachelor) win ties.
     if (!best || compareScores(best.scored, scored) > 0) {
@@ -868,6 +890,8 @@ export function buildQualificationEvidence(
     duration: [],
     engineering: { ...engineering, capped: false },
     finalProject: winner.finalProject ?? null,
+    completionYear: null,
+    completionYearMissing: true,
   };
 }
 
@@ -875,6 +899,52 @@ const VOCATIONAL_SOURCE: TranscriptSourceInfo = {
   kind: "diploma",
   label: "Matched using: unit codes on the transcript",
 };
+
+function historicalPctFor(
+  anzscoCode: string,
+  quals: readonly QualificationInfo[] | undefined,
+): number {
+  const stats = historicalStatsForAnzsco(anzscoCode);
+  const q = scoringQualification(quals ?? []);
+  const withSim = withSimilarCases(stats, anzscoCode, {
+    degreeTitle: q?.title ?? null,
+    university: q?.institution ?? null,
+    country: q?.country ?? null,
+  });
+  const pct = withSim.scorePct ?? withSim.positivePct;
+  // One positive case must not weigh the same as a full history.
+  return blendSparseHistory(pct, stats.totalCases);
+}
+
+function alignmentInputs(anzscoCode: string, quals: readonly QualificationInfo[] | undefined) {
+  return {
+    historicalPct: historicalPctFor(anzscoCode, quals),
+    completionYear: completionYearOf(quals ?? []).year,
+  };
+}
+
+function withQualificationYear(
+  result: AssessmentResult,
+  quals: readonly QualificationInfo[] | undefined,
+): AssessmentResult {
+  const info = completionYearOf(quals ?? []);
+  result.qualificationYear = info.year;
+  result.qualificationYearMissing = info.missing;
+  if (info.missing) {
+    const notes = result.qualificationNotes ?? [];
+    if (!notes.includes(QUALIFICATION_YEAR_MISSING_NOTE)) {
+      result.qualificationNotes = [...notes, QUALIFICATION_YEAR_MISSING_NOTE];
+    }
+  }
+  if (result.qualificationEvidence) {
+    result.qualificationEvidence = {
+      ...result.qualificationEvidence,
+      completionYear: info.year,
+      completionYearMissing: info.missing,
+    };
+  }
+  return result;
+}
 
 /** Score one vocational (unit-code) occupation as a ScoredOccupation. */
 function scoreVocationalOccupation(
@@ -992,6 +1062,22 @@ export function scoreDraftsperson(
   };
 }
 
+/** Diploma rows added for Tier 1, skipping a name the earlier-study list already has. */
+function mergePriorStudyRows(
+  existing: readonly ExtractedSubjectRow[] | undefined,
+  extra: readonly ExtractedSubjectRow[],
+): ExtractedSubjectRow[] {
+  const seen = new Set((existing ?? []).map((r) => r.name.trim().toLowerCase()));
+  const out = [...(existing ?? [])];
+  for (const row of extra) {
+    const key = row.name.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+}
+
 /**
  * Gate 1 + scoring: decide eligibility first, then rank only the occupations
  * in the open tracks (academic and vocational), best-first. A blocked gate
@@ -1002,21 +1088,32 @@ export function scoreRoutedOccupations(
   extracted: ExtractedSubjectRow[],
   ctx: ScoringContext,
 ): { scored: ScoredOccupation[]; gate: Gate1Decision; degreeField: DegreeFieldSelection } {
+  const diplomaLateral = sameFieldDiplomaLateral({
+    qualifications: ctx.qualifications ?? [],
+    rows: extracted,
+  });
+  const qualifications = diplomaLateral?.qualifications ?? ctx.qualifications ?? [];
+  const priorStudyRows = diplomaLateral
+    ? mergePriorStudyRows(ctx.priorStudyRows, diplomaLateral.priorStudyRows)
+    : ctx.priorStudyRows;
+  const lateralEntryDecided = Boolean(ctx.lateralEntryDecided || diplomaLateral);
+  const lateralEntryConfirmed = Boolean(ctx.lateralEntryConfirmed || diplomaLateral);
   const vocational = listVocationalOccupations();
   const academicAll = loadAllAcademicRubrics();
   const gate = evaluateGate1({
-    qualifications: ctx.qualifications ?? [],
+    qualifications,
     rows: extracted,
     engineeringTitledDegree: ctx.engineeringTitledDegree,
     vocational,
     rubricCodes: academicAll.map((r) => r.anzscoCode),
-    lateralEntryDecided: ctx.lateralEntryDecided,
-    lateralEntryConfirmed: ctx.lateralEntryConfirmed,
+    lateralEntryDecided,
+    lateralEntryConfirmed,
   });
-  const routing = routeQualifications(ctx.qualifications ?? [], vocational);
+  const routing = routeQualifications(qualifications, vocational);
   const out: ScoredOccupation[] = [];
-  const quals = ctx.qualifications ?? [];
+  const quals = qualifications;
   const degreeField = selectDegreeField(quals);
+  const diplomaField = selectDiplomaField(quals);
   const etOffered = etOfferedForQualifications(quals);
 
   const target = ctx.occupationId?.trim();
@@ -1045,9 +1142,9 @@ export function scoreRoutedOccupations(
       out.push({
         ...scoreOccupation(extracted, rubric, {
           workExperienceBoost: ctx.workExperienceBoost,
-          qualifications: ctx.qualifications,
+          qualifications,
           // Earlier-study subjects count on the degree path only.
-          priorStudyRows: track !== "engineering_associate" ? ctx.priorStudyRows : undefined,
+          priorStudyRows: track !== "engineering_associate" ? priorStudyRows : undefined,
         }),
         track,
       });
@@ -1068,13 +1165,19 @@ export function scoreRoutedOccupations(
     ) {
       continue;
     }
+    if (
+      track === "engineering_associate" &&
+      !keepAssociateOccupation(rubric.anzscoCode, rubric.title, diplomaField)
+    ) {
+      continue;
+    }
     const excludeDiplomaRows = track !== "engineering_associate";
     out.push({
       ...scoreOccupation(extracted, rubric, {
         workExperienceBoost: ctx.workExperienceBoost,
-        qualifications: ctx.qualifications,
+        qualifications,
         excludeDiplomaRows,
-        priorStudyRows: track !== "engineering_associate" ? ctx.priorStudyRows : undefined,
+        priorStudyRows: track !== "engineering_associate" ? priorStudyRows : undefined,
       }),
       track,
       trackPriority: priority.get(track),
@@ -1083,6 +1186,7 @@ export function scoreRoutedOccupations(
   if (priority.has("engineering_associate")) {
     if (hasIct60220(ctx.qualifications, ctx.transcriptTexts)) {
       for (const card of scoreTelecomGroup(extracted, ctx.transcriptTexts ?? [])) {
+        // ICT60220 names these three occupations by qualification code.
         out.push({
           ...telecomOccupation(card, ctx),
           track: "engineering_associate",
@@ -1098,6 +1202,7 @@ export function scoreRoutedOccupations(
     });
     for (const occ of vocational) {
       const pointed = routing.vocationalOccupationIds.includes(occ.id);
+      if (!pointed && !keepAssociateOccupation(occ.anzsco, occ.title, diplomaField)) continue;
       const draft = scoreDraftsperson(extracted, occ, routing, ctx, pointed || transcriptHasUnitCodes, origin);
       if (!draft) continue;
       out.push({
@@ -1118,6 +1223,8 @@ function withDegreeFieldPenalty(
   s: ScoredOccupation,
   field: DegreeFieldSelection,
 ): ScoredOccupation {
+  // Associate occupations are filtered by field word only. The 15-point
+  // penalty stays on the Professional Engineer track.
   if (s.track !== "professional_engineer") return s;
   const next = applyFieldMatchPenalty(s.scored, s.rubric.anzscoCode, field);
   if (next === s.scored) return s;
@@ -1295,6 +1402,7 @@ export async function checkOccupationForCase(
     degreeTitle: q.degreeTitle ?? null,
     country: q.country ?? null,
     institution: q.institution ?? null,
+    completionYear: q.completionYear ?? null,
   }));
   const docLevel = documentLevelResolver(qualificationRows);
   const saved = caseRow.extractedSubjects.map(rowFromDb);
@@ -1460,14 +1568,12 @@ function applyWorkExperienceJudgements(
       occ.vocational = v.detail;
     } else if (related) {
       occ.workExperienceBoost = true;
-      occ.scored = scoreAssessment({
-        matches: occ.matches,
-        qualificationsUsed: occ.qualificationsUsed,
-        workExperienceBoost: true,
-        rubric: occ.rubric,
-        qualificationCheck: occ.qualificationCheck,
-        applyCapstone: capstoneApplies(occ.rubric, occ.track),
-      });
+      // +4 related-work boost, then the same 96% cap as Academic Alignment.
+      const cap = assessConfig.academicAlignment.scoreCap;
+      occ.scored = {
+        ...occ.scored,
+        confidenceScore: Math.round(Math.min(cap, before + 4) * 10) / 10,
+      };
     } else {
       occ.workExperienceBoost = false;
     }
@@ -1571,8 +1677,8 @@ function savedCandidateJudgements(cands: AnzscoCandidate[]): OccupationWorkJudge
 
 /**
  * Re-rank Step 4 cards after a boost, with the same keys as the scoring
- * order (recommended, Gate 1 track priority, confidence, core, foundation).
- * Stable: ties keep their saved order.
+ * order (recommended, then score; Gate 1 track priority only among
+ * recommended occupations). Stable: ties keep their saved order.
  */
 export function rankCandidates(
   cands: AnzscoCandidate[],
@@ -1580,8 +1686,10 @@ export function rankCandidates(
 ): AnzscoCandidate[] {
   return [...cands].sort((a, b) => {
     if (a.recommended !== b.recommended) return a.recommended ? -1 : 1;
-    const p = priorityOf(a.anzscoCode) - priorityOf(b.anzscoCode);
-    if (p !== 0) return p;
+    if (a.recommended) {
+      const p = priorityOf(a.anzscoCode) - priorityOf(b.anzscoCode);
+      if (p !== 0) return p;
+    }
     if (a.confidenceScore !== b.confidenceScore) return b.confidenceScore - a.confidenceScore;
     if (a.coreMatched !== b.coreMatched) return b.coreMatched - a.coreMatched;
     return b.foundationalMatched - a.foundationalMatched;
@@ -1636,7 +1744,7 @@ function etTiersOf(...lists: ScoredOccupation[][]): EtTierDetail | null {
   }
 }
 
-/** Prefer recommended occupations, then Gate 1 track priority, then higher numeric confidence, then coverage. */
+/** Prefer recommended occupations, then score. Gate 1 track priority only among recommended. */
 function compareScoredOccupations(a: ScoredOccupation, b: ScoredOccupation): number {
   if (a.telecomOrder != null || b.telecomOrder != null) {
     if (a.telecomOrder == null) return 1;
@@ -1647,9 +1755,11 @@ function compareScoredOccupations(a: ScoredOccupation, b: ScoredOccupation): num
   if (a.scored.recommended !== b.scored.recommended) {
     return a.scored.recommended ? -1 : 1;
   }
-  const pa = a.trackPriority ?? 99;
-  const pb = b.trackPriority ?? 99;
-  if (pa !== pb) return pa - pb;
+  if (a.scored.recommended) {
+    const pa = a.trackPriority ?? 99;
+    const pb = b.trackPriority ?? 99;
+    if (pa !== pb) return pa - pb;
+  }
   if (a.scored.confidenceScore !== b.scored.confidenceScore) {
     return b.scored.confidenceScore - a.scored.confidenceScore;
   }
@@ -2154,6 +2264,7 @@ export function assessExtractedSubjects(
     ...(assessorSelected ? { assessorSelected } : {}),
     degreeField,
   };
+  withQualificationYear(result, opts?.qualifications);
   result.familyAdjustment = familyAdjustmentForResult(result, etOwnScore(scoredAll), etTiersOf(scoredAll));
   if (!opts?.occupationId && !assessorSelected) {
     const fallback = associateFallbackOf(gate, [scoredAll, shown], opts);
@@ -2215,6 +2326,7 @@ export async function scoreOccupationWithLlm(
     rubric,
     qualificationCheck,
     applyCapstone: capstoneApplies(rubric, trackForAnzsco(rubric.anzscoCode)),
+    ...alignmentInputs(rubric.anzscoCode, opts.qualifications),
   });
   return {
     ...sync,
@@ -2252,6 +2364,8 @@ export function scoringConfigFingerprint() {
     boostShortlist: assessConfig.boostShortlist,
     coverage: assessConfig.coverage,
     minConfidence: assessConfig.minConfidence,
+    academicAlignment: assessConfig.academicAlignment,
+    fieldMatchPenaltyPp: assessConfig.fieldMatchPenaltyPp,
     evidence: evidenceConfigFingerprint(),
     engine: "assess-v5-gate1",
   };

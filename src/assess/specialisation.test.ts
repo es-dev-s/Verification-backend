@@ -106,7 +106,7 @@ describe("Pathway A (Master's)", () => {
     assert.equal(spec(r, "233215").tier, "high_risk");
   });
 
-  it("generic 'Master of Civil Engineering' with part coverage → Slight Risk", () => {
+  it("a civil Master's does not satisfy Structural; a structural Master's is required", () => {
     const r = assessSpecialisations(
       base({
         rows: [
@@ -115,14 +115,15 @@ describe("Pathway A (Master's)", () => {
         ],
         qualifications: [
           { degreeLevel: "bachelor", degreeTitle: "Bachelor of Civil Engineering", institution: "Uni" },
-          { degreeLevel: "master", degreeTitle: "Master of Civil Engineering", institution: "Uni" },
+          { degreeLevel: "master", degreeTitle: "Master of Civil Engineering", institution: "Uni", fieldOfStudy: "Civil Engineering" },
         ],
       }),
     );
     const s = spec(r, "233214");
-    assert.equal(s.pathwayA.titleFit, "generic");
-    assert.equal(s.pathwayA.tier, "slight_risk");
-    assert.equal(s.tier, "slight_risk");
+    assert.equal(s.mastersRequired?.ok, false);
+    assert.equal(s.chosen, null);
+    assert.equal(s.tier, "high_risk");
+    assert.match(s.routing, /without a Master's in the same field/);
   });
 });
 
@@ -149,8 +150,10 @@ Supervised site works.`;
     assert.equal(s.pathwayB.roles[1]!.counted, false);
     assert.equal(s.pathwayB.competencyPct, 100);
     assert.equal(s.pathwayB.tier, "slight_risk");
-    assert.equal(s.chosen, "B");
-    assert.ok(s.gaps.some((g) => /Reference letters/.test(g)));
+    assert.equal(s.pathwayB.satisfied, false);
+    assert.equal(s.chosen, null);
+    assert.equal(s.tier, "high_risk");
+    assert.match(s.routing, /No Master's was found/);
   });
 
   it("no Master's: Pathway B alone is evaluated; under 5 years → High Risk", () => {
@@ -162,9 +165,10 @@ Supervised site works.`;
     );
     const s = spec(r, "233214");
     assert.equal(s.pathwayA.available, false);
-    assert.equal(s.chosen, "B");
+    assert.equal(s.chosen, null);
     assert.equal(s.pathwayB.satisfied, false);
     assert.equal(s.tier, "high_risk");
+    assert.match(s.routing, /No Master's was found/);
   });
 
   it("part-time roles count at 0.5 FTE and overlaps are not double counted", () => {

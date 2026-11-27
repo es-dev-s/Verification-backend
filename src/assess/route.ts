@@ -32,7 +32,7 @@ export const MECH_DRAFTSPERSON_ANZSCO = "312511";
 /** Words that make a title a drafting / design / CAD title. */
 export const DRAFTING_WORDS = ["draft*", "draught*", "design*", "cad", "autocad"] as const;
 const MECHANICAL_WORDS = ["mechanical", "mech"] as const;
-const ENGINEERING_WORDS = ["engineer*", "engg", "beng", "meng", "btech", "mtech", "be", "me"] as const;
+const ENGINEERING_WORDS = ["engineer*", "engg", "beng", "meng", "btech", "mtech", "be", "me", "dae"] as const;
 
 /** Training-package qualification code, e.g. UEE62122, RII60520, ICT60220. */
 const QUALIFICATION_CODE_RE = /\b[A-Z]{3}\d{5}\b/g;

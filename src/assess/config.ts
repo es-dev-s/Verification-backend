@@ -108,4 +108,22 @@ export const assessConfig = {
    * (percentage). Override with ASSESS_MIN_CONFIDENCE.
    */
   minConfidence: floatEnv("ASSESS_MIN_CONFIDENCE", 50),
+  /**
+   * Academic Alignment Confidence (ET Plus spec §6): foundation / core /
+   * historical weights, then a cap, then year multipliers and penalties.
+   */
+  academicAlignment: {
+    foundationWeight: floatEnv("ASSESS_ALIGN_FOUNDATION_WEIGHT", 0.3),
+    coreWeight: floatEnv("ASSESS_ALIGN_CORE_WEIGHT", 0.5),
+    historicalWeight: floatEnv("ASSESS_ALIGN_HISTORICAL_WEIGHT", 0.2),
+    scoreCap: floatEnv("ASSESS_ALIGN_SCORE_CAP", 96),
+    /** Years strictly before this cut use the pre-2000 multiplier. */
+    yearCutPre2000: intEnv("ASSESS_YEAR_CUT_PRE2000", 2000),
+    /** Years from yearCutPre2000 through this cut use the 2000–2010 multiplier. */
+    yearCutThrough2010: intEnv("ASSESS_YEAR_CUT_THROUGH_2010", 2010),
+    yearMultiplierPre2000: floatEnv("ASSESS_YEAR_MULT_PRE2000", 0.5),
+    yearMultiplier2000To2010: floatEnv("ASSESS_YEAR_MULT_2000_2010", 0.7),
+  },
+  /** Extra percentage points removed from unmatched PE occupations (spec §5). */
+  fieldMatchPenaltyPp: floatEnv("ASSESS_FIELD_MATCH_PENALTY_PP", 15),
 };

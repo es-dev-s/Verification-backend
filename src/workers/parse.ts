@@ -36,6 +36,7 @@ import {
   type PerSourceEducation,
 } from "../parse/schemas.js";
 import { correctOcrEducationText } from "../parse/ocrCorrect.js";
+import { parseCompletionYear } from "../assess/qualificationYear.js";
 import {
   clientNameFromCvText,
   saveClientName,
@@ -298,10 +299,20 @@ export async function parseEducation(
 
   const merged = mergeEducation(sources);
 
+  const yearPriority: DocumentTypeLabel[] = ["CERTIFICATE", "TRANSCRIPT", "CV"];
+  const completionYear = [...sources]
+    .sort(
+      (a, b) =>
+        yearPriority.indexOf(a.documentType) - yearPriority.indexOf(b.documentType),
+    )
+    .map((s) => parseCompletionYear(s.extract.end))
+    .find((y): y is number => y != null) ?? null;
+
   const qualificationData = {
     degreeTitle: merged.fields.degreeTitle.value,
     institution: merged.fields.institution.value,
     country: merged.fields.country.value,
+    ...(completionYear != null ? { completionYear } : {}),
   };
 
   await prisma.qualification.upsert({

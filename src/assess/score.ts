@@ -1,4 +1,5 @@
 import { assessConfig } from "./config.js";
+import { yearMultiplier } from "./qualificationYear.js";
 import type { Rubric } from "./loadRubric.js";
 import type {
   ConfidenceLevel,
@@ -21,6 +22,10 @@ export type ScoreInput = {
    * Omitted or true keeps the gate. False leaves determination and the score unchanged by it.
    */
   applyCapstone?: boolean;
+  /** Historical outcomes 0–100 for the 20% academic-alignment term. */
+  historicalPct?: number;
+  /** Qualification completion year for the §6 year multiplier. */
+  completionYear?: number | null;
 };
 
 export type ScoreResult = {
@@ -154,10 +159,6 @@ function mapConfidence(
 }
 
 /**
- * Numeric 0–100 confidence from determination + coverage + gate + CV boost.
- * Always computed (including non-recommended) so candidates can be ranked.
- */
-/**
  * Coverage % for ranking: blends matched/total with an absolute matched count
  * (see assessConfig.coverage) so tiny denominators do not dominate.
  */
@@ -187,7 +188,15 @@ export function computeConfidenceScore(input: {
   foundationalExpected?: number;
   coreMatched?: number;
   coreExpected?: number;
+  /**
+   * Historical outcomes for similar cases (0–100). Neutral 50 when omitted
+   * (no comparable cases, or caller did not look up the datasheet).
+   */
+  historicalPct?: number;
+  /** Qualification completion year; omitted / null → no year multiplier. */
+  completionYear?: number | null;
 }): number {
+  const align = assessConfig.academicAlignment;
   const corePct =
     input.coreMatched != null && input.coreExpected
       ? blendedCoveragePct(
@@ -204,38 +213,18 @@ export function computeConfidenceScore(input: {
           assessConfig.coverage.foundationRef,
         )
       : input.foundationalPct;
-  const coverage = corePct * 0.65 + foundationalPct * 0.35;
-  let score: number;
-
-  switch (input.rawDetermination) {
-    case "verified_no_risk":
-      // Strong academic fit: roughly 78–96
-      score = 78 + coverage * 0.18;
-      break;
-    case "conditional":
-      // Borderline / manual review: roughly 52–74
-      score = 52 + coverage * 0.22;
-      break;
-    case "not_verified":
-    case "no_match":
-    default:
-      // Weak fit — still show a coverage-based score for ranking: 8–42
-      score = 8 + coverage * 0.34;
-      break;
-  }
-
+  const historicalPct =
+    input.historicalPct == null || !Number.isFinite(input.historicalPct)
+      ? 50
+      : Math.min(100, Math.max(0, input.historicalPct));
+  let score =
+    foundationalPct * align.foundationWeight +
+    corePct * align.coreWeight +
+    historicalPct * align.historicalWeight;
+  score *= yearMultiplier(input.completionYear).factor;
   if (input.workExperienceBoost) score += 4;
-  if (input.applyCapstone !== false) {
-    if (input.tier3GateMet) score += 3;
-    else if (
-      input.rawDetermination === "verified_no_risk" ||
-      input.rawDetermination === "conditional"
-    ) {
-      score -= 6;
-    }
-  }
-
-  return Math.max(0, Math.min(100, Math.round(score)));
+  score = Math.min(align.scoreCap, Math.max(0, score));
+  return Math.round(score * 10) / 10;
 }
 
 function labelFromScore(score: number): ConfidenceLevel | null {
@@ -328,6 +317,8 @@ export function scoreAssessment(input: ScoreInput): ScoreResult {
     foundationalExpected,
     coreMatched,
     coreExpected,
+    historicalPct: input.historicalPct,
+    completionYear: input.completionYear,
   });
 
   // Prefer determination-based label when recommended; otherwise derive from score

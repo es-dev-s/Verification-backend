@@ -38,10 +38,10 @@ import type { QualificationCheckResult, ScoreResult } from "./score.js";
  * A "pool" core list (312311: Group A–E units) counts matched pool units
  * against the required total; it does not list every unmatched pool unit.
  *
- * Band → 0–100 confidence uses the same bases as the academic scale
- * (computeConfidenceScore): verified 78 + 0.18·core%, conditional
- * 52 + 0.22·core%, otherwise 8 + 0.34·core%; +4 for related work. There is no
- * Tier 3 gate in this flow, so no gate adjustment.
+ * Band → 0–100 confidence keeps the unit-code scale (verified 78 + 0.18·core%,
+ * conditional 52 + 0.22·core%, otherwise 8 + 0.34·core%; +4 for related work).
+ * Academic occupations use Academic Alignment Confidence (30/50/20) instead.
+ * There is no Tier 3 gate in this flow, so no gate adjustment.
  */
 
 /** Global form of UNIT_CODE_RE for scanning raw transcript text. */
@@ -244,7 +244,7 @@ export function vocationalDetermination(
   return electives === "not_met" ? "conditional" : "verified_no_risk";
 }
 
-/** Same bases as computeConfidenceScore, with coverage = core-unit %. */
+/** Unit-code band scale (not the academic 30/50/20 mix), coverage = core-unit %. */
 export function vocationalConfidenceScore(
   determination: Determination,
   corePct: number,
@@ -255,7 +255,8 @@ export function vocationalConfidenceScore(
   else if (determination === "conditional") score = 52 + corePct * 0.22;
   else score = 8 + corePct * 0.34;
   if (workExperienceBoost) score += 4;
-  return Math.max(0, Math.min(100, Math.round(score)));
+  const cap = assessConfig.academicAlignment.scoreCap;
+  return Math.max(0, Math.min(cap, Math.round(score)));
 }
 
 function confidenceLabel(det: Determination, score: number, boost: boolean, recommended: boolean): ConfidenceLevel | null {

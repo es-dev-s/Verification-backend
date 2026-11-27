@@ -4604,7 +4604,8 @@
           {
             "id": "312311-T1.3",
             "name": "English & Technical Communication",
-            "status": "expected"
+            "status": "expected",
+            "aliases": ["English"]
           },
           {
             "id": "312311-T1.4",
@@ -4657,7 +4658,8 @@
           },
           {
             "id": "312311-T2.2",
-            "name": "Electrical Fundamentals & Machines"
+            "name": "Electrical Fundamentals & Machines",
+            "aliases": ["D.C Machines", "D.C Machines & Batteries"]
           },
           {
             "id": "312311-T2.3",
@@ -4665,7 +4667,8 @@
           },
           {
             "id": "312311-T2.4",
-            "name": "Installation, Estimation & Standards"
+            "name": "Installation, Estimation & Standards",
+            "aliases": ["Installation Planning & Estimating"]
           },
           {
             "id": "312311-T2.5",

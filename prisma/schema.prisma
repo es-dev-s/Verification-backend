@@ -219,6 +219,8 @@ model Qualification {
   country            String?
   durationYears      Float?
   durationCalculated Boolean     @default(false)
+  /// Calendar year the award was completed (from transcript/certificate).
+  completionYear     Int?
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 

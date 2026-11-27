@@ -19,6 +19,7 @@ const qualificationDraftSchema = z.object({
   degreeTitle: z.string().nullable().optional(),
   institution: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
+  completionYear: z.number().int().min(1950).max(2100).nullable().optional(),
 });
 
 const draftBody = z.object({
@@ -132,11 +133,13 @@ async function upsertQualifications(
         degreeTitle: q.degreeTitle ?? null,
         institution: q.institution ?? null,
         country: q.country ?? null,
+        ...(q.completionYear !== undefined ? { completionYear: q.completionYear } : {}),
       },
       update: {
         degreeTitle: q.degreeTitle ?? null,
         institution: q.institution ?? null,
         country: q.country ?? null,
+        ...(q.completionYear !== undefined ? { completionYear: q.completionYear } : {}),
       },
     });
   }

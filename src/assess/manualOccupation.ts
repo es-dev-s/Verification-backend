@@ -11,6 +11,7 @@ import { prisma } from "../lib/prisma.js";
 import { EM_ANZSCO, EM_OCCUPATION_ID } from "./engineeringManager.js";
 import { trackOccupations } from "./gate1.js";
 import { listAcademicOccupations, listVocationalOccupations } from "./loadRubric.js";
+import type { OccupationSelectionRecord } from "./schemas.js";
 import { TELECOM_ANZSCO, TELECOM_ANZSCO_CODES } from "./telecomGroup.js";
 
 export const MANUAL_ANZSCO_FIELD = "manualAnzsco";
@@ -164,7 +165,43 @@ export function isEngineeringManager(occupationId: string): boolean {
 /** Shown when Engineering Manager is sent to subject matching. */
 export const EM_CHECK_ONLY = "Engineering Manager has its own eligibility check. Open it from Check an ANZSCO.";
 
-type FieldSourceLike = { field: string; degreeLevel?: unknown; finalValue?: string | null };
+type FieldSourceLike = {
+  field: string;
+  degreeLevel?: unknown;
+  finalValue?: string | null;
+  alternatives?: unknown;
+};
+
+export function selectionHistoryFrom(alternatives: unknown): OccupationSelectionRecord[] {
+  const raw = alternatives && typeof alternatives === "object" && "history" in alternatives
+    ? (alternatives as { history?: unknown }).history
+    : null;
+  if (!Array.isArray(raw)) return [];
+  const out: OccupationSelectionRecord[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Partial<OccupationSelectionRecord>;
+    if (!r.anzscoCode || !r.occupationId || !r.replacedAt) continue;
+    out.push({
+      anzscoCode: String(r.anzscoCode),
+      title: String(r.title ?? r.anzscoCode),
+      occupationId: String(r.occupationId),
+      source: r.source === "user" ? "user" : "assessor",
+      reason: r.reason ? String(r.reason) : null,
+      ...(r.cleared ? { cleared: true } : {}),
+      replacedAt: String(r.replacedAt),
+    });
+  }
+  return out;
+}
+
+/** Earlier choices stored on the manualAnzsco FieldSource row. */
+export function occupationSelectionHistoryFrom(
+  fieldSources: readonly FieldSourceLike[],
+): OccupationSelectionRecord[] {
+  const row = fieldSources.find((f) => f.field === MANUAL_ANZSCO_FIELD && (f.degreeLevel ?? null) === null);
+  return selectionHistoryFrom(row?.alternatives);
+}
 
 export function manualSelectionSourceFrom(
   fieldSources: readonly FieldSourceLike[],
@@ -204,6 +241,61 @@ async function saveSourceRow(caseId: string, source: "assessor" | "user" | null)
   }
 }
 
+export type ManualAnzscoState = {
+  finalValue: string;
+  extractedValue: string;
+  source: "assessor" | "user" | null;
+  history: OccupationSelectionRecord[];
+};
+
+/**
+ * Next manualAnzsco row. Clearing appends a "cleared" history entry and
+ * leaves the current value empty. Replacing appends the previous choice.
+ * An empty current value is not an active choice, and history is kept.
+ */
+export function applyManualSelection(
+  state: ManualAnzscoState,
+  next: { occupationId: string; anzscoCode: string; title: string; source: "assessor" | "user" } | null,
+  opts: { now?: string; reason?: string | null } = {},
+): ManualAnzscoState {
+  const now = opts.now ?? new Date().toISOString();
+  const history = [...state.history];
+  const currentId = state.finalValue.trim();
+  if (!next) {
+    if (!currentId) {
+      return { ...state, finalValue: "", extractedValue: "", source: null, history };
+    }
+    const resolved = resolveManualOccupation(currentId);
+    history.push({
+      anzscoCode: resolved.ok ? resolved.selection.anzscoCode : state.extractedValue || currentId,
+      title: resolved.ok ? resolved.selection.title : state.extractedValue || currentId,
+      occupationId: currentId,
+      source: state.source === "user" ? "user" : "assessor",
+      reason: "Cleared",
+      cleared: true,
+      replacedAt: now,
+    });
+    return { finalValue: "", extractedValue: "", source: null, history };
+  }
+  if (currentId && currentId !== next.occupationId) {
+    const resolved = resolveManualOccupation(currentId);
+    history.push({
+      anzscoCode: resolved.ok ? resolved.selection.anzscoCode : state.extractedValue || currentId,
+      title: resolved.ok ? resolved.selection.title : state.extractedValue || currentId,
+      occupationId: currentId,
+      source: state.source === "user" ? "user" : "assessor",
+      reason: opts.reason?.trim() || null,
+      replacedAt: now,
+    });
+  }
+  return {
+    finalValue: next.occupationId,
+    extractedValue: next.anzscoCode,
+    source: next.source,
+    history,
+  };
+}
+
 /** Save (or clear with null) the assessor / user-continue choice for a case. */
 export async function saveManualSelection(
   caseId: string,
@@ -213,12 +305,48 @@ export async function saveManualSelection(
   const existing = await prisma.fieldSource.findFirst({
     where: { caseId, field: MANUAL_ANZSCO_FIELD, degreeLevel: null },
   });
+  const sourceRow = await prisma.fieldSource.findFirst({
+    where: { caseId, field: MANUAL_ANZSCO_SOURCE_FIELD, degreeLevel: null },
+  });
+  const state: ManualAnzscoState = {
+    finalValue: existing?.finalValue ?? "",
+    extractedValue: existing?.extractedValue ?? "",
+    source: sourceRow?.finalValue === "user" ? "user" : existing ? "assessor" : null,
+    history: selectionHistoryFrom(existing?.alternatives),
+  };
   if (!selection) {
-    if (existing) await prisma.fieldSource.delete({ where: { id: existing.id } });
+    if (!existing) return;
+    const next = applyManualSelection(state, null);
+    await prisma.fieldSource.update({
+      where: { id: existing.id },
+      data: {
+        finalValue: next.finalValue,
+        extractedValue: next.extractedValue,
+        alternatives: { history: next.history },
+      },
+    });
     await saveSourceRow(caseId, null);
     return;
   }
-  const data = { extractedValue: selection.anzscoCode, finalValue: selection.occupationId };
+  let reason: string | null = null;
+  if (state.finalValue.trim() && state.finalValue.trim() !== selection.occupationId) {
+    const assessment = await prisma.assessment.findUnique({
+      where: { caseId },
+      select: { resultJson: true },
+    });
+    const saved = assessment?.resultJson as { workflowRouting?: { message?: string } } | null;
+    reason = saved?.workflowRouting?.message?.trim() || null;
+  }
+  const next = applyManualSelection(
+    state,
+    { ...selection, source: selection.source ?? source },
+    { reason },
+  );
+  const data = {
+    extractedValue: next.extractedValue,
+    finalValue: next.finalValue,
+    alternatives: { history: next.history },
+  };
   if (existing) {
     await prisma.fieldSource.update({ where: { id: existing.id }, data });
   } else {
@@ -226,7 +354,7 @@ export async function saveManualSelection(
       data: { caseId, field: MANUAL_ANZSCO_FIELD, degreeLevel: null, ...data },
     });
   }
-  await saveSourceRow(caseId, selection.source ?? source);
+  await saveSourceRow(caseId, next.source);
 }
 
 /** Raised by a saved-subjects-only run when the case has no saved subjects. */

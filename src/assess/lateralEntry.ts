@@ -17,6 +17,7 @@
  * Pure module: no DB, no LLM. State is stored in one FieldSource row
  * (`transcript.lateralEntry`, degree level "bachelor"); see lateralEntryStore.ts.
  */
+import { identifyDegreeField } from "./degreeField.js";
 import {
   BRIDGING_TEXT_RE,
   BRIDGING_TITLE_RE,
@@ -25,6 +26,7 @@ import {
   CREDIT_TEXT_RE,
   CREDIT_TITLE_RE,
 } from "./gate1.js";
+import type { QualificationInfo } from "./qualificationCheck.js";
 import type { RubricSubject } from "./loadRubric.js";
 import { matchSubjectsSync, type MatchOptions } from "./matchSubjects.js";
 import { parseTerm } from "./qualificationEvidence.js";
@@ -630,6 +632,37 @@ export function lateralEntryDecided(view: LateralEntryView | null): boolean {
 /** Lateral entry confirmed (Route 3): Gate 1 treats a 3-year bachelor as the 4-year gate, and opens a 2 to under 3-year bachelor on the Technologist track. */
 export function lateralEntryConfirmed(view: LateralEntryView | null): boolean {
   return view?.route === 3;
+}
+
+/**
+ * Bachelor transcript starts at semester 3 and a diploma in the same field is
+ * on file: treat it as lateral entry. Gate 1 counts the combined programme as
+ * 4 years. The diploma rows are returned so they can fill Tier 1 only.
+ */
+export function sameFieldDiplomaLateral(input: {
+  qualifications: readonly QualificationInfo[];
+  rows: readonly ExtractedSubjectRow[];
+}): {
+  qualifications: QualificationInfo[];
+  priorStudyRows: ExtractedSubjectRow[];
+} | null {
+  const bachelor = input.qualifications.find((q) => (q.rawLevel ?? q.level) === "bachelor");
+  const diploma = input.qualifications.find((q) => (q.rawLevel ?? q.level) === "diploma");
+  if (!bachelor || !diploma) return null;
+  const bachelorField = identifyDegreeField([bachelor.title, bachelor.fieldOfStudy].filter(Boolean).join(" "));
+  const diplomaField = identifyDegreeField([diploma.title, diploma.fieldOfStudy].filter(Boolean).join(" "));
+  if (!bachelorField || !diplomaField || bachelorField.id !== diplomaField.id) return null;
+  const bachelorRows = input.rows.filter((r) => r.qualification === "bachelor" && !r.isRepeat);
+  const start = startPeriodOf(bachelorRows);
+  if (!start || start.index !== 3) return null;
+  const priorStudyRows = input.rows.filter((r) => r.qualification === "diploma" && !r.isRepeat);
+  if (!priorStudyRows.length) return null;
+  const years = bachelor.countedYearsOverride;
+  const qualifications =
+    years != null && years >= 4
+      ? [...input.qualifications]
+      : input.qualifications.map((q) => (q === bachelor ? { ...q, countedYearsOverride: 4 } : q));
+  return { qualifications, priorStudyRows };
 }
 
 /** Earlier-study rows to add to the pool (Route 3 only). */
