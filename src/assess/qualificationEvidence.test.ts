@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { assessExtractedSubjects, scoreRoutedOccupations } from "./assessCase.js";
+import { ENGINEERING_TECHNOLOGIST_CODE } from "./familyAdjust.js";
 import {
   countDuration,
   creditsToYears,
@@ -442,18 +443,27 @@ describe("D. engineering decision", () => {
     assert.equal(d.decision, "yes");
   });
 
-  it("a clear no is not eligible at Gate 1: nothing is scored", () => {
+  it("a non-engineering Bachelor opens Gate 1 as Engineering Technologist only", () => {
     const rows = [...business, ...CHEM.slice(0, 1).map((n) => sub(n))];
     const quals: QualificationInfo[] = [
       { level: "bachelor", title: "Bachelor of Business Administration", countedYearsOverride: 4 },
     ];
     const { scored, gate } = scoreRoutedOccupations(rows, { workExperienceBoost: false, qualifications: quals });
-    assert.equal(gate.result, "not_eligible");
-    assert.equal(gate.rule, 1);
-    assert.equal(scored.length, 0);
-    assert.ok(gate.tracks.every((t) => !t.open && t.reason));
+    assert.equal(gate.result, "open");
+    assert.equal(gate.rule, 4);
+    assert.ok(scored.length > 0);
+    assert.ok(
+      scored.every((s) => s.rubric.anzscoCode.replace(/\s+/g, "") === ENGINEERING_TECHNOLOGIST_CODE),
+    );
+    assert.equal(gate.tracks.find((t) => t.track === "engineering_technologist")?.open, true);
+    assert.equal(gate.tracks.find((t) => t.track === "professional_engineer")?.open, false);
     const res = assessExtractedSubjects(rows, { qualifications: quals });
-    assert.equal(res.gate1?.result, "not_eligible");
-    assert.deepEqual(res.candidates, []);
+    assert.equal(res.gate1?.result, "open");
+    assert.ok((res.candidates ?? []).length > 0);
+    assert.ok(
+      (res.candidates ?? []).every(
+        (c) => c.anzscoCode.replace(/\s+/g, "") === ENGINEERING_TECHNOLOGIST_CODE,
+      ),
+    );
   });
 });

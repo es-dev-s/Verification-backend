@@ -18,6 +18,7 @@ import {
   priorStudyMatches,
   priorStudyReadPlan,
   priorStudyRowsFor,
+  sameFieldDiplomaLateral,
   startPeriodOf,
   sameLateralDecision,
   withAnswer,
@@ -555,5 +556,57 @@ describe("lateral entry: decision audit", () => {
     const rec = lateralAuditOf({ ...view, contradiction: { fired: true, reasons: ["admission note"] } }, "decision", AT)!;
     assert.deepEqual(rec.contradiction, { fired: true, reasons: ["admission note"] });
     assert.match(withLateralAudit(s, rec)!.events.at(-1)!.event, /contradiction: admission note/);
+  });
+});
+
+describe("same-field diploma and a bachelor that starts at semester 3", () => {
+  const diplomaRows = ["Engineering Physics", "Engineering Chemistry", "Engineering Mechanics", "Engineering Drawing"].map(
+    (name) => sub(name, "semester 1", null, "diploma"),
+  );
+  const bachelorRows = [
+    sub("Engineering Mathematics", "semester 3"),
+    sub("Engineering Physics", "semester 3"),
+    sub("Structural Analysis", "semester 4"),
+    sub("Fluid Mechanics", "semester 4"),
+    sub("Soil Mechanics", "semester 5"),
+    sub("Surveying", "semester 5"),
+    sub("Transportation Engineering", "semester 6"),
+    sub("Reinforced Concrete Design", "semester 7"),
+    sub("Design of Steel Structures", "semester 8"),
+    sub("Final Year Project", "semester 8"),
+  ];
+  const quals: QualificationInfo[] = [
+    { level: "diploma", rawLevel: "diploma", title: "Diploma in Civil Engineering", countedYearsOverride: 3 },
+    { level: "bachelor", rawLevel: "bachelor", title: "B.Tech Civil", countedYearsOverride: 3 },
+  ];
+
+  it("counts the programme as 4 years, opens Professional Engineer, and fills Tier 1 once", () => {
+    const detected = sameFieldDiplomaLateral({ qualifications: quals, rows: [...diplomaRows, ...bachelorRows] });
+    assert.ok(detected);
+    assert.equal(detected.qualifications.find((q) => q.level === "bachelor")?.countedYearsOverride, 4);
+    assert.equal(detected.priorStudyRows.length, 4);
+
+    const result = assessExtractedSubjects([...diplomaRows, ...bachelorRows], { qualifications: quals });
+    assert.equal(result.gate1?.result, "open");
+    assert.equal(result.gate1?.rule, 3);
+    assert.equal(result.gate1?.tracks.find((t) => t.track === "professional_engineer")?.open, true);
+    const top = result.candidates?.[0];
+    assert.equal(top?.anzscoCode, "233211");
+    const physics = (top?.matches ?? []).filter((m) => m.rubricSubject === "Engineering Physics");
+    assert.equal(physics.length, 1);
+    const fromDiploma = (top?.matches ?? []).filter((m) => m.priorStudy);
+    assert.ok(fromDiploma.length >= 1);
+    for (const m of fromDiploma) assert.equal(m.tier, "tier1");
+    assert.ok((top?.foundationalMatched ?? 0) >= 4);
+  });
+
+  it("does not apply when the diploma is a different field or the bachelor starts at semester 1", () => {
+    const other: QualificationInfo[] = [
+      { level: "diploma", rawLevel: "diploma", title: "Diploma in Electrical Engineering", countedYearsOverride: 3 },
+      quals[1]!,
+    ];
+    assert.equal(sameFieldDiplomaLateral({ qualifications: other, rows: [...diplomaRows, ...bachelorRows] }), null);
+    const fromStart = bachelorRows.map((r) => ({ ...r, yearOrSemester: "semester 1" }));
+    assert.equal(sameFieldDiplomaLateral({ qualifications: quals, rows: [...diplomaRows, ...fromStart] }), null);
   });
 });

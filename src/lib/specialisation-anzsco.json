@@ -1,0 +1,28 @@
+{
+  "occupations": [
+    {
+      "anzscoCode": "233214",
+      "label": "Structural Engineer",
+      "parentAnzsco": "233211",
+      "parentLabel": "Civil Engineer",
+      "acceptedFields": ["structural"],
+      "fieldLabel": "a structural-related degree"
+    },
+    {
+      "anzscoCode": "233215",
+      "label": "Transport Engineer",
+      "parentAnzsco": "233211",
+      "parentLabel": "Civil Engineer",
+      "acceptedFields": ["transport", "transportation"],
+      "fieldLabel": "a transportation-related degree"
+    },
+    {
+      "anzscoCode": "233212",
+      "label": "Geotechnical Engineer",
+      "parentAnzsco": "233211",
+      "parentLabel": "Civil Engineer",
+      "acceptedFields": ["soil", "geotechnical"],
+      "fieldLabel": "a soil or geotechnical degree"
+    }
+  ]
+}

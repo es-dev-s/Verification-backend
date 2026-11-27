@@ -3,8 +3,19 @@ import { describe, it } from "node:test";
 import { loadRubric, scoringSubjects } from "../assess/loadRubric.js";
 import { academicRubricFor, riskComponentSplits, splitTier } from "./componentSplit.js";
 import { computeRiskScores } from "./scoreRisk.js";
+import { blendSparseHistory } from "./historical.js";
 import { profileSimilarity, withSimilarCases, type PastCase } from "./similarCases.js";
 import type { HistoricalStats } from "./schemas.js";
+
+describe("sparse historical blend", () => {
+  it("blends fewer than 5 cases toward 50% and leaves a full history unchanged", () => {
+    assert.equal(blendSparseHistory(100, 0), 50);
+    assert.equal(blendSparseHistory(100, 1), 60);
+    assert.equal(blendSparseHistory(80, 4), 74);
+    assert.equal(blendSparseHistory(83.6, 5), 83.6);
+    assert.equal(blendSparseHistory(83.6, 61), 83.6);
+  });
+});
 
 describe("risk: 70% Major / 30% Supporting", () => {
   it("uses the rubric's Supporting marking (263311)", () => {

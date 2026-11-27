@@ -477,6 +477,10 @@ export type AssessmentResult = {
    * occupations (ET Plus Degree Logic). Absent on older saved results.
    */
   degreeField?: DegreeFieldSelection;
+  /** Completion year used for the §6 multiplier (null when missing). */
+  qualificationYear?: number | null;
+  /** True when no readable qualification completion year was found. */
+  qualificationYearMissing?: boolean;
   /**
    * Work-experience judgements made on the last full run (whole shortlist,
    * up to boostShortlist occupations), reused on cached loads for an
@@ -500,6 +504,11 @@ export type AssessmentResult = {
    * Absent on older saved results.
    */
   workflowRouting?: WorkflowRouting;
+  /**
+   * Earlier Continue / assessor picks, newest last. The current choice stays
+   * on assessorSelected. Absent when the case has not replaced a choice.
+   */
+  occupationSelectionHistory?: OccupationSelectionRecord[];
 };
 
 /** One specific Associate ANZSCO in the 312999 near-miss list. */
@@ -591,6 +600,40 @@ export type AssessorSelected = {
   source?: "assessor" | "user";
 };
 
+/** A replaced or cleared Continue / assessor choice, kept after a later selection. */
+export type OccupationSelectionRecord = {
+  anzscoCode: string;
+  title: string;
+  occupationId: string;
+  source: "assessor" | "user";
+  /** Routing message at the time it was replaced, or "Cleared". */
+  reason: string | null;
+  /** True when the user cleared this choice rather than replacing it. */
+  cleared?: boolean;
+  replacedAt: string;
+};
+
+/** One scored ANZSCO kept with a below-floor routing decision. */
+export type WorkflowTopScore = {
+  anzscoCode: string;
+  title: string;
+  confidenceScore: number;
+};
+
+/** Master's qualification shown with a specialisation routing decision. */
+export type MastersOnFile = {
+  title: string | null;
+  field: string | null;
+  institution: string | null;
+};
+
+/** Track and code stored when Continue stops on a closed track. */
+export type ClosedTrackRecord = {
+  anzscoCode: string;
+  track: Gate1TrackId | null;
+  trackLabel: string | null;
+};
+
 /** Post-scoring routing (confidence floor, closed track, specialisation Master's). */
 export type WorkflowRoutingKind = "ok" | "manual_review" | "manual_intervention";
 export type WorkflowRoutingCode =
@@ -605,6 +648,14 @@ export type WorkflowRouting = {
   minConfidence: number;
   highestConfidence: number;
   allowRisk: boolean;
+  /** Top candidate scores, saved with a below-floor decision. */
+  topScores?: WorkflowTopScore[];
+  /** Why the scores stayed under the floor (subjects not read, weak matching, missing duration). */
+  factors?: string[];
+  /** Master's degrees considered for a specialisation ANZSCO. Empty when none were found. */
+  masters?: MastersOnFile[];
+  /** Set when Continue stopped because the ANZSCO's track is closed. */
+  closedTrack?: ClosedTrackRecord;
 };
 
 /** Unit a printed year / semester was read in. */
@@ -657,6 +708,10 @@ export type QualificationEvidence = {
   duration: DurationEvidence[];
   engineering: EngineeringDecision;
   finalProject: FinalProjectEvidence | null;
+  /** Calendar year the scoring qualification was completed. */
+  completionYear?: number | null;
+  /** True when that year could not be read from the transcript/certificate. */
+  completionYearMissing?: boolean;
 };
 
 /** Gate 1 (qualification eligibility, checked before any scoring). */

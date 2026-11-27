@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { applyDocumentLevels, assessExtractedSubjects } from "./assessCase.js";
 import { degreeLevelFromTitle, degreeLevelToQualification } from "./extractSubjects.js";
+import { QUALIFICATION_YEAR_MISSING_NOTE } from "./qualificationYear.js";
 import { flattenRubricSubjects, loadRubric } from "./loadRubric.js";
 import { matchOptionsForRubric, matchSubjectsSync } from "./matchSubjects.js";
 import { checkQualification } from "./qualificationCheck.js";
@@ -144,7 +145,7 @@ describe("312511 Step 1 qualification check", () => {
     assert.equal(r.foundationalMatched, 4);
     assert.equal(r.tier3GateMet, true);
     assert.equal(r.determination, "verified_no_risk");
-    assert.deepEqual(r.qualificationNotes, []);
+    assert.deepEqual(r.qualificationNotes, [QUALIFICATION_YEAR_MISSING_NOTE]);
     assert.equal(r.candidates?.[0]?.qualificationCapped, false);
   });
 

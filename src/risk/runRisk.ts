@@ -1,6 +1,9 @@
 import { prisma } from "../lib/prisma.js";
+import { FIELD_OF_STUDY_FIELD } from "../assess/awardDetails.js";
 import { assessConfig } from "../assess/config.js";
-import type { AssessmentResult } from "../assess/schemas.js";
+import type { QualificationInfo } from "../assess/qualificationCheck.js";
+import type { AssessmentResult, QualificationType } from "../assess/schemas.js";
+import { routingForSelectedOccupation } from "../assess/workflowRouting.js";
 import { historicalStatsForAnzsco } from "./historical.js";
 import { academicRubricFor, riskComponentSplits } from "./componentSplit.js";
 import { withSimilarCases } from "./similarCases.js";
@@ -51,6 +54,7 @@ function findCandidate(assessment: AssessmentResult, anzscoCode: string) {
       missingSubjects: assessment.missingSubjects ?? { tier1: [], tier2: [] },
       workExperienceBoost: assessment.workExperienceBoost,
       workExperienceAnalysis: null,
+      confidenceScore: assessment.confidenceScore ?? 0,
     };
   }
   return null;
@@ -68,8 +72,43 @@ async function persistRisk(
   });
 }
 
+const QUAL_LEVELS: readonly QualificationType[] = [
+  "bachelor",
+  "master",
+  "diploma",
+  "advanced_diploma",
+  "associate_degree",
+  "unknown",
+];
+
+function qualificationLevel(raw: string): QualificationType {
+  return (QUAL_LEVELS as readonly string[]).includes(raw) ? (raw as QualificationType) : "unknown";
+}
+
+/** Qualifications for the selected-occupation routing check (Master's field included). */
+export function riskQualificationInfos(
+  qualifications: readonly { degreeLevel: unknown; degreeTitle: string | null; institution: string | null }[],
+  fieldSources: readonly { field: string; degreeLevel?: unknown; finalValue?: string | null }[],
+): QualificationInfo[] {
+  return qualifications.map((q) => {
+    const raw = String(q.degreeLevel);
+    const field = fieldSources.find(
+      (s) => s.field === FIELD_OF_STUDY_FIELD && String(s.degreeLevel ?? "") === raw,
+    );
+    return {
+      level: qualificationLevel(raw),
+      rawLevel: raw,
+      title: q.degreeTitle,
+      institution: q.institution,
+      fieldOfStudy: field?.finalValue?.trim() || null,
+    };
+  });
+}
+
 /**
- * Why risk analysis cannot run for this assessment (null when it can).
+ * Why risk cannot run for this assessment (null when it can).
+ * `workflowRouting` must already be the routing for the occupation being scored,
+ * not the recommended occupation's saved flag.
  * Gate 1 must be open, or manual review with an assessor-selected occupation.
  */
 export function riskGateBlockReason(
@@ -102,21 +141,31 @@ export async function runRiskAssessment(
 
   const caseRow = await prisma.case.findUnique({
     where: { id: caseId },
-    include: { assessment: true, qualifications: true },
+    include: { assessment: true, qualifications: true, fieldSources: true },
   });
   if (!caseRow?.assessment?.resultJson) {
     throw new Error("Run ANZSCO assessment before risk analysis.");
   }
 
   const assessment = caseRow.assessment.resultJson as StoredAssessment;
-  const blocked = riskGateBlockReason(assessment);
-  if (blocked) throw new Error(blocked);
   const candidate = findCandidate(assessment, opts.anzscoCode);
   if (!candidate) {
     throw new Error(
       `ANZSCO ${opts.anzscoCode} was not found in the assessment candidates.`,
     );
   }
+  const selectedRouting = routingForSelectedOccupation({
+    anzscoCode: opts.anzscoCode,
+    confidenceScore: candidate.confidenceScore ?? 0,
+    gate: assessment.gate1,
+    qualifications: riskQualificationInfos(caseRow.qualifications, caseRow.fieldSources),
+  });
+  const blocked = riskGateBlockReason({
+    gate1: assessment.gate1,
+    assessorSelected: assessment.assessorSelected,
+    workflowRouting: selectedRouting,
+  });
+  if (blocked) throw new Error(blocked);
 
   const title = opts.title?.trim() || candidate.title;
 

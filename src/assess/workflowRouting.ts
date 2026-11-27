@@ -1,46 +1,78 @@
 /**
  * Assessment routing after scoring (suggested workflow, 2026):
  *  1. Configurable confidence floor (default 50%): no auto-recommend below it.
+ *     The routing record keeps the top scores and the factors that lowered them.
  *  2. Continue with this ANZSCO after a check: lock that occupation, score it,
  *     label User-selected; below the floor is allowed with a manual-review flag.
- *  3. Continue on a closed Gate 1 track → manual intervention (no automated risk).
- *  4. Structural 233214 / Transport 233215 / Geotechnical 233212 require a
- *     Master's in a matching field, else manual intervention.
+ *  3. Continue on a closed track → manual intervention (no automated risk).
+ *     A track is closed when Gate 1 did not open it, or track-status.json marks it closed.
+ *  4. Specialisation ANZSCOs (specialisation-anzsco.json) require a Master's in
+ *     an accepted field, else manual intervention.
  */
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { assessConfig } from "./config.js";
 import { identifyDegreeField } from "./degreeField.js";
-import { openTracks, TRACK_LABELS, trackForAnzsco } from "./gate1.js";
+import { TRACK_LABELS, trackForAnzsco } from "./gate1.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
 import type {
   AssessmentResult,
+  Gate1Decision,
   Gate1Result,
+  MastersOnFile,
   WorkflowRouting,
   WorkflowRoutingCode,
   WorkflowRoutingKind,
+  WorkflowTopScore,
 } from "./schemas.js";
 
 export type { WorkflowRouting, WorkflowRoutingCode, WorkflowRoutingKind };
 
-export const SPECIALISATION_ANZSCO = {
-  "233214": {
-    label: "Structural Engineer",
-    keywords: ["structural", "civil"],
-  },
-  "233215": {
-    label: "Transport Engineer",
-    keywords: ["transport", "transportation", "civil"],
-  },
-  "233212": {
-    label: "Geotechnical Engineer",
-    keywords: ["geotechnical", "soil", "civil"],
-  },
-} as const;
+type SpecialisationDef = {
+  anzscoCode: string;
+  label: string;
+  parentAnzsco: string;
+  parentLabel: string;
+  acceptedFields: string[];
+  fieldLabel: string;
+};
 
-export type SpecialisationAnzsco = keyof typeof SPECIALISATION_ANZSCO;
+type SpecialisationFile = { occupations: SpecialisationDef[] };
 
-export function isSpecialisationAnzsco(code: string | null | undefined): code is SpecialisationAnzsco {
+type TrackStatus = Record<string, "open" | "closed">;
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+let specialisations: SpecialisationDef[] | null = null;
+function loadSpecialisations(): SpecialisationDef[] {
+  if (!specialisations) {
+    const path = resolve(here, "../lib/specialisation-anzsco.json");
+    specialisations = (JSON.parse(readFileSync(path, "utf8")) as SpecialisationFile).occupations;
+  }
+  return specialisations;
+}
+
+const defaultTrackStatusPath = resolve(here, "../lib/track-status.json");
+
+/** Read on every call so an edit to track-status.json applies without a restart. */
+export function loadTrackStatus(filePath: string = defaultTrackStatusPath): TrackStatus {
+  return JSON.parse(readFileSync(filePath, "utf8")) as TrackStatus;
+}
+
+export function specialisationOf(code: string | null | undefined): SpecialisationDef | null {
   const n = digits(code);
-  return n === "233214" || n === "233215" || n === "233212";
+  return loadSpecialisations().find((s) => s.anzscoCode === n) ?? null;
+}
+
+export function isSpecialisationAnzsco(code: string | null | undefined): boolean {
+  return specialisationOf(code) != null;
+}
+
+/** True when the maintained track list marks this occupation's track closed. */
+export function trackListCloses(anzscoCode: string, status: TrackStatus = loadTrackStatus()): boolean {
+  const track = trackForAnzsco(anzscoCode);
+  return track != null && status[track] === "closed";
 }
 
 export function isMasterQualification(q: QualificationInfo): boolean {
@@ -57,45 +89,74 @@ function haystackOf(q: QualificationInfo): string {
   return [(q.title ?? "").trim(), (q.fieldOfStudy ?? "").trim()].filter(Boolean).join(" ");
 }
 
+function titleHasWord(text: string, word: string): boolean {
+  return new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text);
+}
+
+export function mastersOnFile(qualifications: readonly QualificationInfo[]): MastersOnFile[] {
+  return qualifications.filter(isMasterQualification).map((q) => ({
+    title: (q.title ?? "").trim() || null,
+    field: (q.fieldOfStudy ?? "").trim() || identifyDegreeField(haystackOf(q))?.label || null,
+    institution: (q.institution ?? "").trim() || null,
+  }));
+}
+
+function fieldWasRead(q: QualificationInfo): boolean {
+  if ((q.fieldOfStudy ?? "").trim()) return true;
+  const title = (q.title ?? "").trim();
+  if (!title) return false;
+  return identifyDegreeField(title) != null;
+}
+
+function matchesAccepted(q: QualificationInfo, spec: SpecialisationDef): boolean {
+  const text = haystackOf(q);
+  if (!text) return false;
+  return spec.acceptedFields.some((k) => titleHasWord(text, k));
+}
+
+export type MastersCheck = {
+  ok: boolean;
+  message: string;
+  masters: MastersOnFile[];
+};
+
+const MASTERS_REASON = "Specialization ANZSCO without a Master's in the same field";
+
 export function specialisationMastersCheck(
   anzscoCode: string,
   qualifications: readonly QualificationInfo[],
-): { ok: boolean; message: string } {
-  const n = digits(anzscoCode);
-  const spec = SPECIALISATION_ANZSCO[n as SpecialisationAnzsco];
-  if (!spec) return { ok: true, message: "" };
+): MastersCheck {
+  const spec = specialisationOf(anzscoCode);
+  if (!spec) return { ok: true, message: "", masters: [] };
 
   const masters = qualifications.filter(isMasterQualification);
+  const found = mastersOnFile(qualifications);
   if (!masters.length) {
     return {
       ok: false,
-      message: `${spec.label} (${n}) needs a Master's in a matching field (or manual intervention). No Master's was found.`,
+      masters: [],
+      message: `${MASTERS_REASON}. No Master's was found. ${spec.label} (${spec.anzscoCode}) needs a Master's in ${spec.fieldLabel}.`,
     };
   }
-
-  const matching = masters.filter((q) => {
-    const text = haystackOf(q);
-    if (!text) return false;
-    if (spec.keywords.some((k) => titleHasWord(text, k))) return true;
-    const field = identifyDegreeField(text);
-    if (!field) return false;
-    if (n === "233214") return field.id === "structural" || field.id === "civil";
-    if (n === "233215") return field.id === "civil";
-    if (n === "233212") return field.id === "geotechnical" || field.id === "civil";
-    return false;
-  });
-
-  if (!matching.length) {
+  if (masters.some((q) => matchesAccepted(q, spec))) {
+    return { ok: true, message: "", masters: found };
+  }
+  const listed = found
+    .map((m) => [m.title, m.field, m.institution].filter(Boolean).join(", "))
+    .filter(Boolean);
+  const detail = listed.length ? ` Master's on file: ${listed.join("; ")}.` : "";
+  if (masters.every((q) => !fieldWasRead(q))) {
     return {
       ok: false,
-      message: `${spec.label} (${n}) needs a Master's in a matching field (or manual intervention). The Master's on file does not match that field.`,
+      masters: found,
+      message: `${MASTERS_REASON}. Field of study could not be read.${detail}`,
     };
   }
-  return { ok: true, message: "" };
-}
-
-function titleHasWord(text: string, word: string): boolean {
-  return new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text);
+  return {
+    ok: false,
+    masters: found,
+    message: `${MASTERS_REASON}. The Master's field does not match ${spec.fieldLabel}.${detail}`,
+  };
 }
 
 export function highestConfidenceOf(result: Pick<AssessmentResult, "confidenceScore" | "candidates">): number {
@@ -104,6 +165,40 @@ export function highestConfidenceOf(result: Pick<AssessmentResult, "confidenceSc
     ...(result.candidates ?? []).map((c) => c.confidenceScore ?? 0),
   ];
   return scores.reduce((m, n) => (n > m ? n : m), 0);
+}
+
+export function topScoresOf(result: Pick<AssessmentResult, "confidenceScore" | "anzscoCode" | "title" | "candidates">): WorkflowTopScore[] {
+  const rows: WorkflowTopScore[] = (result.candidates ?? []).map((c) => ({
+    anzscoCode: c.anzscoCode,
+    title: c.title,
+    confidenceScore: Math.round(c.confidenceScore ?? 0),
+  }));
+  if (!rows.length && result.anzscoCode) {
+    rows.push({
+      anzscoCode: result.anzscoCode,
+      title: result.title ?? result.anzscoCode,
+      confidenceScore: Math.round(result.confidenceScore ?? 0),
+    });
+  }
+  return rows.sort((a, b) => b.confidenceScore - a.confidenceScore);
+}
+
+/** Why the scores stayed under the floor, from data already on the assessment. */
+export function loweringFactors(result: AssessmentResult): string[] {
+  const factors: string[] = [];
+  if (result.extraction?.partial) factors.push("Subjects not read");
+  const weak = (result.candidates ?? []).some((c) => {
+    const unmatched = c.unmatched?.length ?? 0;
+    const coreLow = (c.coreExpected ?? 0) > 0 && (c.corePct ?? 0) < 50;
+    const foundLow = (c.foundationalExpected ?? 0) > 0 && (c.foundationalPct ?? 0) < 50;
+    return unmatched >= 3 || coreLow || foundLow;
+  });
+  if (weak) factors.push("Weak subject matching");
+  const used = result.gate1?.qualifications?.find((q) => q.used);
+  if (used && (used.durationSource === "none" || used.durationYears == null)) {
+    factors.push("Missing duration");
+  }
+  return factors;
 }
 
 function workingAnzsco(result: AssessmentResult): string | null {
@@ -132,6 +227,7 @@ function routing(
   message: string,
   allowRisk: boolean,
   highest: number,
+  extra: Partial<Pick<WorkflowRouting, "topScores" | "factors" | "masters" | "closedTrack">> = {},
 ): WorkflowRouting {
   return {
     kind,
@@ -140,12 +236,27 @@ function routing(
     minConfidence: assessConfig.minConfidence,
     highestConfidence: highest,
     allowRisk,
+    ...extra,
   };
 }
 
+function closedTrackRouting(anzscoCode: string, highest: number): WorkflowRouting {
+  const track = trackForAnzsco(anzscoCode);
+  const trackLabel = track ? TRACK_LABELS[track] : null;
+  const where = trackLabel ? `${trackLabel} track` : "a closed track";
+  return routing(
+    "manual_intervention",
+    "closed_track",
+    `Chosen ANZSCO is in a closed track. ${anzscoCode} is on the ${where}. Automated risk will not run.`,
+    false,
+    highest,
+    { closedTrack: { anzscoCode, track, trackLabel } },
+  );
+}
+
 /**
- * Closed-track Continue: Gate 1 is open (or not eligible) but this occupation's
- * track was not opened for the case.
+ * Closed-track Continue: the maintained list marks the track closed, Gate 1
+ * is not eligible, or Gate 1 is open but this occupation's track was not.
  */
 export function isClosedTrackContinue(opts: {
   anzscoCode: string;
@@ -154,6 +265,7 @@ export function isClosedTrackContinue(opts: {
   /** False when Gate 1 has no track rows (legacy / stub) — do not assume closed. */
   hasTrackInfo?: boolean;
 }): boolean {
+  if (trackListCloses(opts.anzscoCode)) return true;
   if (opts.gateResult === "manual_review") return false;
   if (opts.gateResult === "not_eligible") return true;
   if (opts.gateResult !== "open") return false;
@@ -168,36 +280,62 @@ export function previewContinueRouting(opts: {
   trackOpen: boolean;
   gateResult: Gate1Result;
   qualifications?: readonly QualificationInfo[];
+  /** False when Gate 1 has no track rows — do not assume the occupation's track is closed. */
+  hasTrackInfo?: boolean;
 }): WorkflowRouting {
   const min = assessConfig.minConfidence;
   const highest = opts.confidenceScore;
-  if (isClosedTrackContinue({ anzscoCode: opts.anzscoCode, gateResult: opts.gateResult, trackOpen: opts.trackOpen })) {
-    const track = trackForAnzsco(opts.anzscoCode);
-    const label = track ? TRACK_LABELS[track] : "this";
-    return routing(
-      "manual_intervention",
-      "closed_track",
-      `Continue on a closed Gate 1 track (${label}) needs manual intervention. Automated risk will not run.`,
-      false,
-      highest,
-    );
+  if (
+    isClosedTrackContinue({
+      anzscoCode: opts.anzscoCode,
+      gateResult: opts.gateResult,
+      trackOpen: opts.trackOpen,
+      hasTrackInfo: opts.hasTrackInfo,
+    })
+  ) {
+    return closedTrackRouting(opts.anzscoCode, highest);
   }
   if (isSpecialisationAnzsco(opts.anzscoCode)) {
     const spec = specialisationMastersCheck(opts.anzscoCode, opts.qualifications ?? []);
     if (!spec.ok) {
-      return routing("manual_intervention", "specialisation_masters", spec.message, false, highest);
+      return routing("manual_intervention", "specialisation_masters", spec.message, false, highest, {
+        masters: spec.masters,
+      });
     }
   }
   if (highest < min) {
     return routing(
       "manual_review",
       "below_min_confidence",
-      `Confidence is ${Math.round(highest)}% (below the ${min}% floor). Continuing labels it User-selected and sends the case to manual review; risk can still run.`,
+      `No ANZSCO reached ${min}%. Confidence is ${Math.round(highest)}%. Continuing labels it User-selected and sends the case to manual review; risk can still run.`,
       true,
       highest,
     );
   }
   return routing("ok", null, "", true, highest);
+}
+
+/**
+ * Continue / risk routing for one selected ANZSCO. Ignores whatever routing
+ * was saved for the recommended occupation.
+ */
+export function routingForSelectedOccupation(opts: {
+  anzscoCode: string;
+  confidenceScore: number;
+  gate: Pick<Gate1Decision, "result" | "tracks"> | undefined;
+  qualifications?: readonly QualificationInfo[];
+}): WorkflowRouting {
+  const tracks = opts.gate?.tracks ?? [];
+  const track = trackForAnzsco(opts.anzscoCode);
+  const trackOpen = track != null && tracks.some((t) => t.open && t.track === track);
+  return previewContinueRouting({
+    anzscoCode: opts.anzscoCode,
+    confidenceScore: opts.confidenceScore,
+    trackOpen,
+    gateResult: opts.gate?.result ?? "open",
+    qualifications: opts.qualifications,
+    hasTrackInfo: tracks.length > 0,
+  });
 }
 
 /**
@@ -215,27 +353,23 @@ export function applyWorkflowRouting(
   const userSelected = Boolean(opts.userSelected || result.assessorSelected?.source === "user");
   const code = workingAnzsco(result);
   const quals = opts.qualifications ?? [];
+  const scores = topScoresOf(result);
+  const factors = loweringFactors(result);
 
   if (userSelected && code && result.gate1) {
+    const tracks = result.gate1.tracks ?? [];
     const track = trackForAnzsco(code);
-    const opened = openTracks(result.gate1).some((t) => t.track === track);
+    const opened = tracks.some((t) => t.open && t.track === track);
     if (
       isClosedTrackContinue({
         anzscoCode: code,
         gateResult: result.gate1.result,
         trackOpen: opened,
-        hasTrackInfo: (result.gate1.tracks?.length ?? 0) > 0,
+        hasTrackInfo: tracks.length > 0,
       })
     ) {
       clearAutomatedRecommendation(result);
-      const label = track ? TRACK_LABELS[track] : "this";
-      result.workflowRouting = routing(
-        "manual_intervention",
-        "closed_track",
-        `Continue on a closed Gate 1 track (${label}) needs manual intervention. Automated risk will not run.`,
-        false,
-        highest,
-      );
+      result.workflowRouting = closedTrackRouting(code, highest);
       return result;
     }
   }
@@ -244,29 +378,37 @@ export function applyWorkflowRouting(
     const spec = specialisationMastersCheck(code, quals);
     if (!spec.ok) {
       clearAutomatedRecommendation(result);
-      result.workflowRouting = routing("manual_intervention", "specialisation_masters", spec.message, false, highest);
+      result.workflowRouting = routing("manual_intervention", "specialisation_masters", spec.message, false, highest, {
+        masters: spec.masters,
+      });
       return result;
     }
   }
 
   if (highest < min) {
     clearAutomatedRecommendation(result);
+    const floor = {
+      topScores: scores,
+      ...(factors.length ? { factors } : {}),
+    };
     if (userSelected || result.assessorSelected) {
       result.workflowRouting = routing(
         "manual_review",
         "below_min_confidence",
-        `User-selected occupation is ${Math.round(highest)}% (below the ${min}% floor). The case is flagged for manual review; risk can still run.`,
+        `No ANZSCO reached ${min}%. The chosen occupation is ${Math.round(highest)}%. The case is flagged for manual review; risk can still run.`,
         true,
         highest,
+        floor,
       );
       return result;
     }
     result.workflowRouting = routing(
       "manual_review",
       "below_min_confidence",
-      `Highest ANZSCO confidence is ${Math.round(highest)}% (below the ${min}% floor). No automated recommendation; send to manual review.`,
+      `No ANZSCO reached ${min}%. No automated recommendation; send to manual review.`,
       false,
       highest,
+      floor,
     );
     return result;
   }

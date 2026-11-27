@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { assessExtractedSubjects } from "./assessCase.js";
+import { assessConfig } from "./config.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
 import type { ExtractedSubjectRow } from "./schemas.js";
 import { scoreTelecomGroup } from "./telecomGroup.js";
@@ -125,6 +126,8 @@ describe("telecommunications group", () => {
     );
     assert.equal(res.anzscoCode, "313213");
     assert.equal(res.recommended, true);
+    assert.equal(res.confidenceScore, assessConfig.academicAlignment.scoreCap);
+    assert.ok(telecom.every((c) => c.confidenceScore <= assessConfig.academicAlignment.scoreCap));
     assert.equal(telecom[1]!.confidenceScore, telecom[2]!.confidenceScore);
   });
 

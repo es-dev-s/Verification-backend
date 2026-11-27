@@ -86,3 +86,20 @@ export function historicalStatsForAnzsco(anzscoCode: string): HistoricalStats {
     positivePct,
   };
 }
+
+/** Past-case count at which the historical score is used as-is. */
+export const HISTORICAL_FULL_WEIGHT_CASES = 5;
+/** Score a thin history is blended toward. */
+export const HISTORICAL_NEUTRAL_PCT = 50;
+
+/**
+ * Fewer than 5 past cases: blend the historical score toward 50% in proportion
+ * to the case count. One case at 100% becomes 60, not 100. Five or more are
+ * unchanged. No cases stay at 50.
+ */
+export function blendSparseHistory(pct: number, totalCases: number): number {
+  const n = Number.isFinite(totalCases) ? Math.max(0, totalCases) : 0;
+  if (n >= HISTORICAL_FULL_WEIGHT_CASES) return pct;
+  const weight = n / HISTORICAL_FULL_WEIGHT_CASES;
+  return Math.round((weight * pct + (1 - weight) * HISTORICAL_NEUTRAL_PCT) * 10) / 10;
+}

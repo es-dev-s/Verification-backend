@@ -14,6 +14,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assessConfig } from "./config.js";
 import type { Rubric } from "./loadRubric.js";
 import { bestSimilarity, normalizeSubjectName } from "./normalize.js";
 import { findQualificationCodes } from "./route.js";
@@ -299,6 +300,14 @@ function card(input: {
   };
 }
 
+function alignmentCap(): number {
+  return assessConfig.academicAlignment.scoreCap;
+}
+
+function cappedScore(n: number): number {
+  return Math.min(alignmentCap(), Math.max(0, n));
+}
+
 function missingNote(units: Unit[]): string {
   const list = units.map(unitLabel).join("; ");
   return `Foundational units missing: ${list}. No recommendation among Telecommunication Field Engineer (313212), Telecommunications Network Planner (313213) and Telecommunications Technical Officer or Technologist (313214).`;
@@ -368,7 +377,7 @@ export function scoreTelecomGroup(
         status: "recommended",
         order: 0,
         recommended: true,
-        confidenceScore: 100,
+        confidenceScore: alignmentCap(),
         core: groupG,
         coreHits: gee.hits,
         note: plannerNote,
@@ -380,7 +389,7 @@ export function scoreTelecomGroup(
         status: "eligible",
         order: 1,
         recommended: false,
-        confidenceScore: 100,
+        confidenceScore: alignmentCap(),
         core: coreAG,
         coreHits: ag.hits,
         note: eligibleNote,
@@ -392,7 +401,7 @@ export function scoreTelecomGroup(
         status: "eligible",
         order: 1,
         recommended: false,
-        confidenceScore: 100,
+        confidenceScore: alignmentCap(),
         core: coreAG,
         coreHits: ag.hits,
         note: eligibleNote,
@@ -418,7 +427,7 @@ export function scoreTelecomGroup(
       status: "eligible",
       order: a.coverage === best ? 0 : 1,
       recommended: false,
-      confidenceScore: a.coverage,
+      confidenceScore: cappedScore(a.coverage),
       core: a.core,
       coreHits: a.hits,
       note: `Eligible. Ranked by core units from Groups A–G: ${a.hits.length} of ${a.core.length} (${a.coverage}%). Network Planner is rejected because a telecommunications network engineering unit is missing.`,

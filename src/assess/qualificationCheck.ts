@@ -24,6 +24,8 @@ export type QualificationInfo = {
   creditTotalOverride?: number | null;
   /** Engineering subject share (0–1) entered by the assessor. */
   engineeringShareOverride?: number | null;
+  /** Calendar year the qualification was completed (transcript / certificate). */
+  completionYear?: number | null;
 };
 
 /**

@@ -14,6 +14,7 @@ import {
 } from "./extractSubjects.js";
 import {
   flattenRubricSubjects,
+  loadAllAcademicRubrics,
   loadRubric,
   scoringSubjects,
   synonymsFromMatchingNote,
@@ -304,7 +305,7 @@ describe("#6 cache keys", () => {
 describe("#9 work boost applied before the top-N cut", () => {
   it("lets a 4th-ranked related occupation into the top 3", () => {
     const rows = [sub("Engineering Mathematics"), sub("Engineering Physics")];
-    const all = scoreAllOccupations(rows, undefined, {
+    const all = scoreAllOccupations(rows, loadAllAcademicRubrics(), {
       workExperienceBoost: false,
       qualifications: [
         { level: "bachelor", title: "Bachelor of Engineering in Electrical Engineering", countedYearsOverride: 4 },

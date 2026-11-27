@@ -7,11 +7,13 @@
  *    this module is the extra level check and the PE occupation filter.
  * 2. Field of study is the first keyword hit in the bachelor title (specific
  *    terms before general). "Computer Engineering" is not a listed term.
- * 3. When the field maps to a Professional Engineer ANZSCO, every PE occupation
- *    stays in the list and every occupation except that match and ET loses
- *    FIELD_MATCH_PENALTY_PP. When it does not (none / computer science / IT),
- *    PE occupations stay only if their own keywords appear in the title.
+ * 3. When a field is identified, only PE occupations whose keywords match that
+ *    field stay. When none is identified, a PE occupation stays only if its
+ *    keywords appear in the degree title. ET is never removed here.
+ * 4. When the field maps to a PE ANZSCO, remaining occupations except that
+ *    match and ET lose FIELD_MATCH_PENALTY_PP.
  */
+import { assessConfig } from "./config.js";
 import type { QualificationInfo } from "./qualificationCheck.js";
 
 const ET_CODE = "233914";
@@ -21,7 +23,7 @@ function normalizeCode(code: string | null | undefined): string {
 }
 
 /** Percentage points removed from unmatched PE occupations (doc section 5). */
-export const FIELD_MATCH_PENALTY_PP = 15;
+export const FIELD_MATCH_PENALTY_PP = assessConfig.fieldMatchPenaltyPp;
 
 export type DegreeFieldId =
   | "geotechnical"
@@ -208,6 +210,35 @@ function occupationMatchesField(anzscoCode: string, title: string, field: Degree
   return field.keywords.some((k) => titleHasKeyword(occBlob, k) || occKeys.includes(k.toLowerCase()));
 }
 
+/** Building and Engineering Technicians nec stays available on every diploma field. */
+export const ASSOCIATE_NEC_CODE = "312999";
+
+/**
+ * Associate keep-filter. When a diploma-level qualification has an identified
+ * field, only occupations whose title contains that field word stay, plus
+ * 312999. No field identified: every Associate occupation stays. The 15-point
+ * Professional Engineer penalty is not applied on this track.
+ */
+export function keepAssociateOccupation(
+  anzscoCode: string,
+  occupationTitle: string,
+  selection: DegreeFieldSelection | null,
+): boolean {
+  if (normalizeCode(anzscoCode) === ASSOCIATE_NEC_CODE) return true;
+  if (!selection?.fieldId) return true;
+  const def = FIELD_DEFS.find((d) => d.id === selection.fieldId) ?? null;
+  if (!def) return true;
+  return occupationMatchesField(anzscoCode, occupationTitle, def);
+}
+
+/** Field of a diploma / advanced diploma / associate degree, when one is named. */
+export function selectDiplomaField(quals: readonly QualificationInfo[]): DegreeFieldSelection | null {
+  const diplomas = quals.filter(isSubBachelor);
+  if (!diplomas.length) return null;
+  const selection = selectDegreeField(diplomas);
+  return selection.fieldId ? selection : null;
+}
+
 /**
  * Whether a Professional Engineer occupation stays in the scored list.
  * ET is not filtered here (callers skip this for the technologist track).
@@ -218,7 +249,6 @@ export function keepProfessionalEngineer(
   selection: DegreeFieldSelection,
 ): boolean {
   if (normalizeCode(anzscoCode) === ET_CODE) return true;
-  if (selection.penaltyApplies) return true;
   const def = selection.fieldId
     ? FIELD_DEFS.find((d) => d.id === selection.fieldId) ?? null
     : null;
